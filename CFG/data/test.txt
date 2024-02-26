@@ -1,0 +1,12 @@
+# Extension allows comments on their own lines
+# (but not at end of line)
+
+startGoal -> A $
+A -> T A
+    | lambda
+T -> Var equal E
+E -> a plus b
+    | s times t
+E -> zero | Var
+Var -> e | f | g
+    | h | j | k
