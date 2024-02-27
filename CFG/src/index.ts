@@ -36,6 +36,15 @@
     console.log('Follow Sets:');
     [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': {${[...followSet(cfg,x)[0].values()].map(x=>`'${x}'`)}}`));
     console.log();
+
+    console.log('Predict Sets:');
+    i = 0;
+    for(const [target,ruleSet] of cfg.rules.entries()) {
+        for(const rule of ruleSet) {
+            const ruleBody = rule.length > 0 ? target === cfg.startingSymbol ? [...rule,'$'].join(' ') : rule.join(' ') : '\u03bb';
+            console.log(`(${(i++).toString().padStart(~~(cfg.rules.size/10)+2,' ')})\t'${target} -> ${ruleBody}': {${[...predictSet(cfg,[target,rule]).values()].join(', ')}}`); 
+        }
+    }
 })();
 
 function derivesToLambda(cfg: CFG, L: NonTerminal, T: SearchableStack<CFGRule> = []): boolean {
@@ -74,7 +83,7 @@ function isNonTerminal(string: string): string is NonTerminal {
     return string.toLowerCase() !== string;
 }
 
-function firstSet(cfg: CFG, [X,...B]:string[], T: Set<NonTerminal> = new Set()): [Set<NonTerminal>,Set<NonTerminal>] {
+function firstSet(cfg: CFG, [X,...B]:string[], T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
     const EOF = '$';
     const P = cfg.rules;
 
@@ -85,7 +94,7 @@ function firstSet(cfg: CFG, [X,...B]:string[], T: Set<NonTerminal> = new Set()):
         return [new Set([X]), T];
     }
 
-    const F = new Set<NonTerminal>();
+    const F = new Set<Terminal>();
     if(!T.has(X)) {
         T.add(X);
         for(const p of (P.get(X) ?? []).map(x=>[X,x])) {
@@ -103,7 +112,7 @@ function firstSet(cfg: CFG, [X,...B]:string[], T: Set<NonTerminal> = new Set()):
     return [F,T];
 }
 
-function followSet(cfg: CFG, A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<NonTerminal>,Set<NonTerminal>] {
+function followSet(cfg: CFG, A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
     const P = cfg.rules;
 
     if(T.has(A)) {
@@ -112,7 +121,7 @@ function followSet(cfg: CFG, A: NonTerminal, T: Set<NonTerminal> = new Set()): [
 
     T.add(A);
     
-    const F = new Set<NonTerminal>();
+    const F = new Set<Terminal>();
     
     for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [string, CFGRule]] : []))) {
         const [lhs,rhs] = p;
@@ -140,4 +149,12 @@ function followSet(cfg: CFG, A: NonTerminal, T: Set<NonTerminal> = new Set()): [
     }
 
     return [F,T];
+}
+
+function predictSet(cfg: CFG,[lhs,rhs]: [NonTerminal,CFGRule]): Set<Terminal> {
+    const F = firstSet(cfg,rhs)[0];
+    if(rhs.every(x=>derivesToLambda(cfg,x))) {
+        [...followSet(cfg,lhs)[0].values()].forEach(x=>F.add(x));
+    }
+    return F;
 }
