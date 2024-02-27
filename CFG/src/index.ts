@@ -32,6 +32,10 @@
     console.log('First Sets:');
     [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': {${[...firstSet(cfg,[x])[0].values()].map(x=>`'${x}'`)}}`));
     console.log();
+
+    console.log('Follow Sets:');
+    [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': {${[...followSet(cfg,x)[0].values()].map(x=>`'${x}'`)}}`));
+    console.log();
 })();
 
 function derivesToLambda(cfg: CFG, L: NonTerminal, T: SearchableStack<CFGRule> = []): boolean {
@@ -84,8 +88,9 @@ function firstSet(cfg: CFG, [X,...B]:string[], T: Set<NonTerminal> = new Set()):
     const F = new Set<NonTerminal>();
     if(!T.has(X)) {
         T.add(X);
-        for(const p of (P.get(X) ?? [])) {
-            const [G,I] = firstSet(cfg,cfg.startingSymbol === X ? [...p, EOF] : p,T);
+        for(const p of (P.get(X) ?? []).map(x=>[X,x])) {
+            const [lhs,rhs] = p;
+            const [G,I] = firstSet(cfg,cfg.startingSymbol === X ? [...rhs, EOF] : rhs,T);
             G.forEach(x=>F.add(x));
         }
     }
@@ -108,11 +113,31 @@ function followSet(cfg: CFG, A: NonTerminal, T: Set<NonTerminal> = new Set()): [
     T.add(A);
     
     const F = new Set<NonTerminal>();
+    
+    for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [string, CFGRule]] : []))) {
+        const [lhs,rhs] = p;
+        for(const [i,gamma] of [...rhs.entries()].filter(([_,x])=>x===A)) {
+            const pi = rhs.slice(i+1);
 
-    //==================//
-    ///#warning NYI
-    throw new Error('NYI')
-    //==================//
+            if(pi.length) {
+                const [G,I] = firstSet(cfg, pi, new Set());
+                G.forEach(x=>F.add(x));
+            }
+
+            if(lhs === cfg.startingSymbol) {
+                F.add('$');
+            }
+
+            if(!pi.length || (
+                lhs !== cfg.startingSymbol
+                && pi.every(x=>isNonTerminal(x))
+                && pi.every(x=>derivesToLambda(cfg,x))
+            )) {
+                const [G,I] = followSet(cfg,lhs,T);
+                G.forEach(x=>F.add(x));
+            }
+        }
+    }
 
     return [F,T];
 }

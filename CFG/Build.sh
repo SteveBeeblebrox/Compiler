@@ -1,5 +1,5 @@
 # Run using:
-# mtsc -pcomment src/index.ts -o- | node
+# mtsc -p src/index.ts -o- | node
 
 # MTSC can be found here:
 # https://github.com/SteveBeeblebrox/mtsc
