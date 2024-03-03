@@ -11,7 +11,7 @@ namespace AlphabetEncoding {
     }
     export function encode(text: string): string {
         function escape(char: string) {
-            return `x${char.charCodeAt(0).toString(16)}`
+            return `x${char.charCodeAt(0).toString(16).padStart(2,'0')}`;
         }
         return text?.replace(/[^0-9A-Za-wy-z]/g, escape);
     }

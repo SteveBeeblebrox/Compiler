@@ -1,4 +1,5 @@
 ///#pragma once
+///#include "encoding.ts"
 class Tape<T> {
     private buffer: T[] = [];
     private index: number = -1;
@@ -44,7 +45,10 @@ class Tape<T> {
     }
 
     toString() {
-        return `[${[...this.buffer.slice(0,this.index+1)].join(', ')} | ${this.buffer.slice(this.index+1).join(', ')}]`;
+        function escape(t: T) {
+            return `'${JSON.stringify(t).slice(1,-1).replace(/'/g,'\\\'').replace(/\\"/g, '"')}'`;
+        }
+        return `[${[...this.buffer.slice(0,this.index+1).map(escape)].join(', ')} | ${this.buffer.slice(this.index+1).map(escape).join(', ')}]`;
     }
 
     // The number of items that can be rewinded back; forward length has little to no meaning

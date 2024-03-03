@@ -38,8 +38,8 @@ function readCFG(path: string, commentExtension = true): CFG {
                     break;
                 case SPECIAL_SYMBOLS.EOF:
                     if(startingSymbol === null)
-                    startingSymbol = target;
-                    else
+                        startingSymbol = target;
+                    else if(startingSymbol !== target)
                         throw new Error(`Multiple starting rules containing '${SPECIAL_SYMBOLS.EOF}' found!`);
                     break;
                 case SPECIAL_SYMBOLS.OR:

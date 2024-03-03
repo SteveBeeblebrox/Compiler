@@ -1,0 +1,5 @@
+# S -> < S > $ | lambda $
+# λ
+S -> G S $ | lambda $
+G -> < K >
+K -> < K > | lambda

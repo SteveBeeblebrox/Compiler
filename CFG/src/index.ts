@@ -1,7 +1,7 @@
 ///#include "lib/types.ts"
 ///#include "lib/io.ts"
 (function() {
-    const cfg = readCFG('data/test.txt');
+    const cfg = readCFG('data/brackets.txt');
 
     console.log('Non-Terminals:');
     console.log([...cfg.rules.keys()].map(x=>`'${x}'`).join(', '));
@@ -41,7 +41,7 @@
     i = 0;
     for(const [target,ruleSet] of cfg.rules.entries()) {
         for(const rule of ruleSet) {
-            const ruleBody = rule.length > 0 ? target === cfg.startingSymbol ? [...rule,'$'].join(' ') : rule.join(' ') : '\u03bb';
+            const ruleBody = (rule.length > 0 ? rule.join(' ') : '\u03bb') + (target === cfg.startingSymbol ? ' $' : '');
             console.log(`(${(i++).toString().padStart(~~(cfg.rules.size/10)+2,' ')})\t'${target} -> ${ruleBody}': {${[...predictSet(cfg,[target,rule]).values()].join(', ')}}`); 
         }
     }

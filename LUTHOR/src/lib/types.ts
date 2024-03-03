@@ -5,9 +5,12 @@ type char = '\u0000' | '\u0001' | '\u0002' | '\u0003' | '\u0004' | '\u0005' | '\
 
 class LanguageDefinition {
     constructor(
-        public alphabet: (char)[] = [],
+        public alphabet: char[] = [],
         public tokenTypes: TokenType[] = []
     ) {}
+    public createMatchers() {
+        return this.tokenTypes.map(tt => new TokenMatcher(tt, this.alphabet));
+    }
 }
 
 class TokenType {
@@ -19,3 +22,31 @@ class TokenType {
 }
 
 type TransitionTable = {accepting: boolean, data: (number|null)[]}[]
+
+class TokenMatcher {
+    private static readonly NO_MATCH = -1;
+    private state: number = 0;
+    constructor(
+        private type: TokenType,
+        private alphabet: char[]
+    ) {}
+    public reset() {
+        this.state = 0;
+    }
+    public accept(byte: char) {
+        if(this.state !== TokenMatcher.NO_MATCH) {
+            this.state = this.type.table[this.state].data[this.alphabet.indexOf(byte)] ?? -1;
+        }
+    }
+    public isComplete(): boolean {
+        return this.state !== TokenMatcher.NO_MATCH && this.type.table[this.state].accepting;
+    }
+    public getType(): TokenType {
+        return this.type;
+    }
+    public isFailed(): boolean {
+        return this.state === TokenMatcher.NO_MATCH;
+    }
+}
+
+type Position = {line: number, column: number};
