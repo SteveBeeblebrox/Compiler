@@ -210,7 +210,6 @@ class Tape {
         try {
             const [uFile, srcFile, outFile] = system.args.slice(1);
             const language = readLanguageDefinition(uFile);
-            console.log(language);
             const inStream = yield system.createFileReadStream(srcFile);
             const outStream = yield system.createFileWriteStream(outFile);
             const tape = new Tape(() => inStream.read(1));
@@ -220,16 +219,16 @@ class Tape {
             let line = 1;
             let col = 1;
             let bytes = [];
-            while (byte = tape.next()) {
-                bytes.push(byte);
-                matchers.forEach(matcher => matcher.accept(byte));
+            while (byte = tape.next() || bytes.length) {
+                if (byte) {
+                    bytes.push(byte);
+                    matchers.forEach(matcher => matcher.accept(byte));
+                }
                 const matcher = (_a = matchers.find(matcher => matcher.isComplete())) !== null && _a !== void 0 ? _a : null;
-                if (matchers.every(matcher => matcher.isFailed())) {
-                    // console.log(tape.toString())
+                if (matchers.every(matcher => matcher.isFailed()) || !byte) {
                     if (!bestMatch) {
                         throw new Error('Language matched nothing!');
                     }
-                    // console.log(`${bestMatch[0].name} --- ` + matchers.map(x=>`${x.getType().name}:${x.state}`).join(', '))
                     outStream.write(`${bestMatch[0].name} ${alphaEncode((_b = bestMatch[0].value) !== null && _b !== void 0 ? _b : bytes.slice(0, bestMatch[1]).join(''))} ${line} ${col}\n`);
                     matchers.forEach(matcher => matcher.reset());
                     tape.rewind(bytes.length - bestMatch[1]);
@@ -246,10 +245,6 @@ class Tape {
                 //     col=1;
                 // }
             }
-            console.log('Got to end of file...');
-            console.log(bytes);
-            console.log(matchers.map(x => `${x.getType().name}:${x.state}`).join(', '));
-            console.log(bestMatch);
         }
         catch (e) {
             console.error(e);
