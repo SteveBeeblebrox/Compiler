@@ -1,7 +1,7 @@
 ///#include "lib/types.ts"
 ///#include "lib/io.ts"
 (function() {
-    const cfg = readCFG('data/brackets.txt');
+    const cfg = readCFG('data/challenge.cfg');
 
     console.log('Non-Terminals:');
     console.log([...cfg.rules.keys()].map(x=>`'${x}'`).join(', '));
