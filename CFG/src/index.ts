@@ -2,7 +2,7 @@
 ///#include "lib/io.ts"
 (function() {
     const cfg = readCFG('data/challenge.cfg');
-/*
+
     console.log('Non-Terminals:');
     console.log([...cfg.rules.keys()].map(x=>`'${x}'`).join(', '));
     console.log();
@@ -32,7 +32,7 @@
     console.log('First Sets:');
     [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': {${[...firstSet(cfg,[x])[0].values()].map(x=>`'${x}'`)}}`));
     console.log();
-*/
+
     console.log('Follow Sets:');
     [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': {${[...followSet(cfg,x)[0].values()].map(x=>`'${x}'`)}}`));
     console.log();
