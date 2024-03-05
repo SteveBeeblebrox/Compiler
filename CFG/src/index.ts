@@ -1,6 +1,5 @@
 ///#include "lib/types.ts"
 ///#include "lib/io.ts"
-///#include "lib/set.ts"
 (function() {
     const cfg = readCFG('data/challenge.cfg');
 

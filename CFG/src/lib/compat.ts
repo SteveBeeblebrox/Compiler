@@ -47,3 +47,5 @@ Array.prototype.flat ??= function flat<T>(this: (T|T[])[],depth:number=1): T[] {
 Array.prototype.flatMap ??= function flatMap<T,U, This>(callback: (this: This, value: T, index: number, array: T[]) => U | readonly U[], thisArg?: This | undefined): U[] {
     return Array.prototype.map.call(this, callback, thisArg).flat();
 }
+
+///#include "set.ts"
