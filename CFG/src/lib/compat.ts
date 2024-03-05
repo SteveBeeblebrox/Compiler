@@ -11,7 +11,7 @@ const system = {
         return fs.readFileSync(path, {encoding:'utf8'});
     },
     writeFile(path: string, data: string) {
-        fs.writeFileSync(path, data, {encoding:'utf8'})
+        fs.writeFileSync(path, data, {encoding:'utf8'});
     }
 }
 
