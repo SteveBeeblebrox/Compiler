@@ -58,5 +58,5 @@ function readCFG(path: string, commentExtension = true): CFG {
     if(startingSymbol === null)
         throw new Error(`No starting rule containing '${SPECIAL_SYMBOLS.EOF}' found!`);
 
-    return {rules, startingSymbol, terminals};
+    return new CFG(rules, startingSymbol, terminals);
 }
