@@ -1,5 +1,6 @@
 ///#include "lib/types.ts"
 ///#include "lib/io.ts"
+///#include "lib/set.ts"
 (function() {
     const cfg = readCFG('data/challenge.cfg');
 
@@ -100,13 +101,13 @@ function firstSet(cfg: CFG, [X,...B]:string[], T: Set<NonTerminal> = new Set()):
         for(const p of (P.get(X) ?? []).map(x=>[X,x])) {
             const [lhs,rhs] = p;
             const [G,I] = firstSet(cfg,cfg.startingSymbol === X ? [...rhs, EOF] : rhs,T);
-            G.forEach(x=>F.add(x));
+            F.takeUnion(G);
         }
     }
 
     if(derivesToLambda(cfg,X) && B.length) {
         const [G,I] = firstSet(cfg,B,T);
-        G.forEach(x=>F.add(x));
+        F.takeUnion(G);
     }
 
     return [F,T];
@@ -130,7 +131,7 @@ function followSet(cfg: CFG, A: NonTerminal, T: Set<NonTerminal> = new Set()): [
 
             if(pi.length) {
                 const [G,I] = firstSet(cfg, pi, new Set());
-                G.forEach(x=>F.add(x));
+                F.takeUnion(G);
             }
 
             if(!pi.length || (
@@ -141,7 +142,7 @@ function followSet(cfg: CFG, A: NonTerminal, T: Set<NonTerminal> = new Set()): [
                     F.add('$');
                 }
                 const [G,I] = followSet(cfg,lhs,T);
-                G.forEach(x=>F.add(x));
+                F.takeUnion(G);
             }
         }
     }
