@@ -135,12 +135,12 @@ class CFG {
 
     public toParseTable(): ParseTable {
         let i = 0;
-        const table: ParseTable = new Map(this.getNonTerminals().map(N=>[N,new Map(this.getTerminalsAndEOF().map(a => [a,-1]))]));
+        const parseTable: ParseTable = new Map(this.getNonTerminals().map(N=>[N,new Map(this.getTerminalsAndEOF().map(a => [a,-1]))]));
         for(const [lhs,rules] of this.rules.entries()) {
             if(rules.reduce((S,rhs) => {
                 const P = this.predictSet([lhs,rhs]);
                 for(const a of P) {
-                    table.get(lhs)!.set(a,i);
+                    parseTable.get(lhs)!.set(a,i);
                 }
                 i++;
                 return S.takeIntersection(P);
@@ -148,7 +148,7 @@ class CFG {
                 throw new Error(`Grammar is not LL(1) (Caused by '${lhs}')`);
             }
         }
-        return table;
+        return parseTable;
     }
 }
 

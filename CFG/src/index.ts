@@ -48,12 +48,12 @@
 
     console.log('Parse Table:');
     try {
-        const table = cfg.toParseTable();
+        const parseTable = cfg.toParseTable();
         const k = Math.max(...cfg.getNonTerminals().map(x=>x.length));
         const j = Math.max(...cfg.getTerminalsAndEOF().map(x=>x.length), i%9) + 1;
         console.log(`${''.padEnd(k)} | ${cfg.getTerminalsAndEOF().map(x => x.padStart(j)).join(' ')}`);
         console.log('-'.repeat(k+3+(j+1)*cfg.getTerminalsAndEOF().length));
-        for(const [N,row] of table) {
+        for(const [N,row] of parseTable) {
             console.log(`${N.padEnd(k)} | ${row.values().map(x=>(x===-1?' ':x.toString()).padStart(j)).toArray().join(' ')}`);
         }
     } catch(e) {
@@ -64,8 +64,8 @@
 })();
 
 
-function parse(cfg: CFG[], tokens: Iterator<Token>): ParseTree {
-
-
+function parse(cfg: CFG, tokens: Iterator<Token>): ParseTree {
+    const LTT = cfg.toParseTable();
+    const P = cfg.rules.values().toArray().flat();
     throw null;
 }
