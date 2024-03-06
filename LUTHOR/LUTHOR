@@ -209,18 +209,16 @@ class Tape {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const [uFile, srcFile, outFile] = system.args.slice(1);
-            const language = readScannerDefinition(uFile);
+            const scanner = readScannerDefinition(uFile);
             const inStream = yield system.createFileReadStream(srcFile);
             const outStream = yield system.createFileWriteStream(outFile);
             const tape = new Tape(() => inStream.read(1));
             let byte;
-            let matchers = language.createMatchers();
+            let matchers = scanner.createMatchers();
             let bestMatch = null;
-            let line = 1;
-            let col = 1;
-            let start = { line, col };
+            let currentPos = { line: 1, col: 1 };
+            let startPos = Object.assign({}, currentPos);
             let bytes = [];
-            let deltaLines = 0, deltaCols = 0;
             while (byte = tape.next() || bytes.length) {
                 if (byte) {
                     bytes.push(byte);
@@ -231,22 +229,22 @@ class Tape {
                     if (!bestMatch) {
                         throw new Error('Language matched nothing!');
                     }
-                    outStream.write(`${bestMatch[0].name} ${alphaEncode((_b = bestMatch[0].value) !== null && _b !== void 0 ? _b : bytes.slice(0, bestMatch[1]).join(''))} ${start.line} ${start.col}\n`);
+                    outStream.write(`${bestMatch[0].name} ${alphaEncode((_b = bestMatch[0].value) !== null && _b !== void 0 ? _b : bytes.slice(0, bestMatch[1]).join(''))} ${startPos.line} ${startPos.col}\n`);
                     matchers.forEach(matcher => matcher.reset());
                     tape.rewind(bytes.length - bestMatch[1]);
                     tape.erase();
                     bytes = [];
-                    start = { line: start.line + bestMatch[2].line, col: start.col + bestMatch[2].col };
+                    startPos = bestMatch[2];
+                    currentPos = Object.assign({}, startPos);
                     bestMatch = null;
-                    deltaLines = deltaCols = 0;
                 }
                 else {
-                    bestMatch = matcher ? [matcher.getType(), bytes.length, { line: deltaLines, col: deltaCols }] : bestMatch;
-                }
-                deltaCols++;
-                if (byte === '\n') {
-                    deltaLines++;
-                    deltaCols = 1;
+                    currentPos.col++;
+                    if (byte === '\n') {
+                        currentPos.line++;
+                        currentPos.col = 1;
+                    }
+                    bestMatch = matcher ? [matcher.getType(), bytes.length, Object.assign({}, currentPos)] : bestMatch;
                 }
             }
         }

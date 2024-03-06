@@ -18,9 +18,8 @@
 
         let matchers: TokenMatcher[] = scanner.createMatchers();
         let bestMatch: [TokenType,number,end:Loc] | null = null;
-        let line = 1;
-        let col = 1;
-        let start = {line,col};
+        let currentPos = {line: 1, col: 1}
+        let startPos: Loc = {...currentPos};
         let bytes: char[] = [];
 
         while(byte = tape.next() || bytes.length) {
@@ -35,22 +34,22 @@
                 if(!bestMatch) {
                     throw new Error('Language matched nothing!');
                 }
-                outStream.write(`${bestMatch[0].name} ${alphaEncode(bestMatch[0].value ?? bytes.slice(0,bestMatch[1]).join(''))} ${start.line} ${start.col}\n`);
+                outStream.write(`${bestMatch[0].name} ${alphaEncode(bestMatch[0].value ?? bytes.slice(0,bestMatch[1]).join(''))} ${startPos.line} ${startPos.col}\n`);
                 matchers.forEach(matcher => matcher.reset());
                 tape.rewind(bytes.length - bestMatch[1]);
                 tape.erase();
                 bytes = [];
-                (start={line,col}=bestMatch[2]);
+                startPos = bestMatch[2];
+                currentPos = {...startPos};
                 bestMatch = null;
             } else {
-                col++;
+                currentPos.col++;
                 if(byte === '\n') {
-                    line++;
-                    col=1;
+                    currentPos.line++;
+                    currentPos.col=1;
                 }
-                bestMatch = matcher ? [matcher.getType(), bytes.length, {line,col}] : bestMatch;
+                bestMatch = matcher ? [matcher.getType(), bytes.length, {...currentPos}] : bestMatch;
             }
-
         }
     } catch(e) {
         console.error(e);
