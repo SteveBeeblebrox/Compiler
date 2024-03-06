@@ -3,13 +3,13 @@
 ///#include "encoding.ts"
 
 
-function readLanguageDefinition(path: string): LanguageDefinition {
+function readScannerDefinition(path: string): ScannerDefinition {
     const text = system.readFile(path).trim();
     if(!text) {
         throw new Error(`${path} is empty!`)
     }
     
-    const language = new LanguageDefinition();
+    const language = new ScannerDefinition();
 
     const [alphabet,...body] = text.split('\n').map(x=>x.trim());
     language.alphabet=alphaDecode(alphabet.replace(/\s+/g,'')).split('') as char[]

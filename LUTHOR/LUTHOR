@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var _a, _b, _c;
 var _d, _e;
-class LanguageDefinition {
+class ScannerDefinition {
     constructor(alphabet = [], tokenTypes = []) {
         this.alphabet = alphabet;
         this.tokenTypes = tokenTypes;
@@ -122,12 +122,12 @@ var AlphabetEncoding;
     AlphabetEncoding.encode = encode;
 })(AlphabetEncoding || (AlphabetEncoding = {}));
 const { decode: alphaDecode, encode: alphaEncode } = AlphabetEncoding;
-function readLanguageDefinition(path) {
+function readScannerDefinition(path) {
     const text = system.readFile(path).trim();
     if (!text) {
         throw new Error(`${path} is empty!`);
     }
-    const language = new LanguageDefinition();
+    const language = new ScannerDefinition();
     const [alphabet, ...body] = text.split('\n').map(x => x.trim());
     language.alphabet = alphaDecode(alphabet.replace(/\s+/g, '')).split('');
     for (const line of body) {
@@ -209,7 +209,7 @@ class Tape {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const [uFile, srcFile, outFile] = system.args.slice(1);
-            const language = readLanguageDefinition(uFile);
+            const language = readScannerDefinition(uFile);
             const inStream = yield system.createFileReadStream(srcFile);
             const outStream = yield system.createFileWriteStream(outFile);
             const tape = new Tape(() => inStream.read(1));
@@ -218,7 +218,9 @@ class Tape {
             let bestMatch = null;
             let line = 1;
             let col = 1;
+            let start = { line, col };
             let bytes = [];
+            let deltaLines = 0, deltaCols = 0;
             while (byte = tape.next() || bytes.length) {
                 if (byte) {
                     bytes.push(byte);
@@ -229,21 +231,23 @@ class Tape {
                     if (!bestMatch) {
                         throw new Error('Language matched nothing!');
                     }
-                    outStream.write(`${bestMatch[0].name} ${alphaEncode((_b = bestMatch[0].value) !== null && _b !== void 0 ? _b : bytes.slice(0, bestMatch[1]).join(''))} ${line} ${col}\n`);
+                    outStream.write(`${bestMatch[0].name} ${alphaEncode((_b = bestMatch[0].value) !== null && _b !== void 0 ? _b : bytes.slice(0, bestMatch[1]).join(''))} ${start.line} ${start.col}\n`);
                     matchers.forEach(matcher => matcher.reset());
                     tape.rewind(bytes.length - bestMatch[1]);
                     tape.erase();
                     bytes = [];
+                    start = { line: start.line + bestMatch[2].line, col: start.col + bestMatch[2].col };
                     bestMatch = null;
+                    deltaLines = deltaCols = 0;
                 }
                 else {
-                    bestMatch = matcher ? [matcher.getType(), bytes.length] : bestMatch;
+                    bestMatch = matcher ? [matcher.getType(), bytes.length, { line: deltaLines, col: deltaCols }] : bestMatch;
                 }
-                // col++;
-                // if(byte === '\n') {
-                //     line++;
-                //     col=1;
-                // }
+                deltaCols++;
+                if (byte === '\n') {
+                    deltaLines++;
+                    deltaCols = 1;
+                }
             }
         }
         catch (e) {
