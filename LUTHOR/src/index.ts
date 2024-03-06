@@ -20,8 +20,8 @@
         let bestMatch: [TokenType,number,end:Loc] | null = null;
         let line = 1;
         let col = 1;
-        let start = {line,col}
-        let bytes: char[] = []
+        let start = {line,col};
+        let bytes: char[] = [];
 
         while(byte = tape.next() || bytes.length) {
             if(byte) {
