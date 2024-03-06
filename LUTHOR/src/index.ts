@@ -8,7 +8,7 @@
 ; (async function() {
     try {
         const [uFile,srcFile,outFile] = system.args.slice(1);
-        const language: ScannerDefinition = readScannerDefinition(uFile); 
+        const scanner: ScannerDefinition = readScannerDefinition(uFile); 
 
         const inStream = await system.createFileReadStream(srcFile);
         const outStream = await system.createFileWriteStream(outFile)
@@ -16,8 +16,8 @@
 
         let byte: char | undefined;
 
-        let matchers: TokenMatcher[] = language.createMatchers();
-        let bestMatch: [TokenType,number,Loc] | null = null;
+        let matchers: TokenMatcher[] = scanner.createMatchers();
+        let bestMatch: [TokenType,number,end:Loc] | null = null;
         let line = 1;
         let col = 1;
         let start = {line,col}
