@@ -165,7 +165,6 @@ class ParseTree {
 
 }
 
-
 type NonTerminal = Opaque<string,'NonTerminal'>;
 type Terminal = Opaque<string,'Terminal'>;
 type CFGRuleSet = CFGRule[];
