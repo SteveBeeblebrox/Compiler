@@ -16,12 +16,12 @@ function readCFG(path: string, commentExtension = true): CFG {
         tokens = tokens.concat(line.split(' ').filter(x=>x));
     }
 
-    const rules: Map<string,CFGRuleSet> = new Map();
-    let startingSymbol: string | null = null;
-    const terminals: Set<string> = new Set();
+    const rules: Map<NonTerminal,CFGRuleSet> = new Map();
+    let startingSymbol: NonTerminal | null = null;
+    const terminals: Set<Terminal> = new Set();
 
     while(tokens.length) {
-        const target = tokens.shift()!;
+        const target = tokens.shift()! as NonTerminal;
         if(tokens.shift() !== SPECIAL_SYMBOLS.ARROW)
             throw new Error(`Expected '${SPECIAL_SYMBOLS.ARROW}' after '${target}'!`);
 
@@ -46,7 +46,7 @@ function readCFG(path: string, commentExtension = true): CFG {
                     ruleSet.push(currentRule = []);
                     break;
                 default:
-                    if(token.toLowerCase() === token)
+                    if(CFG.isTerminal(token))
                         terminals.add(token);
 
                     currentRule.push(token);

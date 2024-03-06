@@ -1,6 +1,12 @@
 ///#pragma once
+namespace OpaqueTypes {
+    declare const type: unique symbol;
+    export type Opaque<T,Ident> = T & {[type]:Ident};
+}
+type Opaque<T,Ident> = OpaqueTypes.Opaque<T,Ident>;
+
 class CFG {
-    public static readonly EOF = '$';
+    public static readonly EOF = '$' as Terminal & '$';
     constructor(
         public readonly rules: Map<NonTerminal,CFGRuleSet>,
         public readonly startingSymbol: NonTerminal,
@@ -19,9 +25,9 @@ class CFG {
         return [...new Set(this.rules.keys())];
     }
 
-    public derivesToLambda(L: NonTerminal, T: SearchableStack<CFGRule> = []): boolean {
+    public derivesToLambda(L: NonTerminal | Terminal, T: SearchableStack<CFGRule> = []): boolean {
         const P = this.rules;
-        for(const p of (P.get(L) ?? [])) {
+        for(const p of (P.get(L as NonTerminal) ?? [])) {
             if(T.includes(p)) {
                 continue;
             }
@@ -32,7 +38,7 @@ class CFG {
                 continue;
             }
             let adl = true;
-            for(const X of p.filter(x=>CFG.isNonTerminal(x))) {
+            for(const X of p.filter(x=>CFG.isNonTerminal(x)) as NonTerminal[]) {
                 T.push(p);
                 adl = this.derivesToLambda(X,T);
                 T.pop();
@@ -55,7 +61,7 @@ class CFG {
         return string.toLowerCase() !== string;
     }
     
-    public firstSet([X,...B]:string[], T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
+    public firstSet([X,...B]:(Terminal|NonTerminal)[], T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
         const P = this.rules;
     
         if(X === undefined) {
@@ -68,7 +74,7 @@ class CFG {
         const F = new Set<Terminal>();
         if(!T.has(X)) {
             T.add(X);
-            for(const p of (P.get(X) ?? []).map(x=>[X,x])) {
+            for(const p of (P.get(X) ?? [] as CFGRuleSet[]).map(x=>[X,x])) {
                 const [lhs,rhs] = p;
                 const [G,I] = this.firstSet(this.startingSymbol === X ? [...rhs, CFG.EOF] : rhs,T);
                 F.takeUnion(G);
@@ -94,7 +100,7 @@ class CFG {
         
         const F = new Set<Terminal>();
         
-        for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [string, CFGRule]] : []))) {
+        for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [NonTerminal, CFGRule]] : []))) {
             const [lhs,rhs] = p;
             for(const [i,gamma] of [...rhs.entries()].filter(([_,x])=>x===A)) {
                 const pi = rhs.slice(i+1);
@@ -105,8 +111,7 @@ class CFG {
                 }
     
                 if(!pi.length || (
-                    pi.every(x=>CFG.isNonTerminal(x))
-                    && pi.every(x=>this.derivesToLambda(x))
+                    pi.every(x=>CFG.isNonTerminal(x) && this.derivesToLambda(x))
                 )) {
                     if(lhs === this.startingSymbol) {
                         F.add(CFG.EOF);
@@ -161,10 +166,10 @@ class ParseTree {
 }
 
 
-type NonTerminal = string;
-type Terminal = string;
+type NonTerminal = Opaque<string,'NonTerminal'>;
+type Terminal = Opaque<string,'Terminal'>;
 type CFGRuleSet = CFGRule[];
-type CFGRule = string[];
+type CFGRule = (NonTerminal|Terminal)[];
 
 type Stack<T> = {
     push(t:T): void,
