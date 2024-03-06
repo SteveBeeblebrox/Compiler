@@ -15,6 +15,14 @@ const system = {
     }
 }
 
+function installPolyfill<T>(base: { new(...args: any[]): T }, pollyfill: { [key: PropertyKey]: (this: T, ...args: any[]) => any }, debug = false) {
+    for (const [name, func] of Object.entries(pollyfill)) {
+        if (!(name in base.prototype)) {
+            Object.defineProperty(base.prototype, name, { value: func, configurable: debug });
+        }
+    }
+}
+
 interface Object {
     groupBy<T,Key extends PropertyKey>(values: T[], callback: (element: T,index: number)=>Key): {[key in Key]: T[]};
 }
@@ -49,3 +57,5 @@ Array.prototype.flatMap ??= function flatMap<T,U, This>(callback: (this: This, v
 }
 
 ///#include "set.ts"
+///#include "iterator.ts"
+///#include "asynciterator.ts"

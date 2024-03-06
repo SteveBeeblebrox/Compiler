@@ -1,12 +1,25 @@
 ///#pragma once
 class CFG {
+    public static readonly EOF = '$';
     constructor(
         public readonly rules: Map<NonTerminal,CFGRuleSet>,
         public readonly startingSymbol: NonTerminal,
-        public readonly terminals: Set<Terminal>
+        private readonly terminals: Set<Terminal>
     ) {}
 
-    derivesToLambda(L: NonTerminal, T: SearchableStack<CFGRule> = []): boolean {
+    public getTerminals(): Terminal[] {
+        return [...this.terminals];
+    }
+
+    public getTerminalsAndEOF(): Terminal[] {
+        return [...this.terminals, CFG.EOF];
+    }
+
+    public getNonTerminals(): NonTerminal[] {
+        return [...new Set(this.rules.keys())];
+    }
+
+    public derivesToLambda(L: NonTerminal, T: SearchableStack<CFGRule> = []): boolean {
         const P = this.rules;
         for(const p of (P.get(L) ?? [])) {
             if(T.includes(p)) {
@@ -33,23 +46,22 @@ class CFG {
         }
         return false;
     }
-    
-    static isTerminal(string: string): string is Terminal {
+
+    public static isTerminal(string: string): string is Terminal {
         return string.toLowerCase() === string;
     }
     
-    static isNonTerminal(string: string): string is NonTerminal {
+    public static isNonTerminal(string: string): string is NonTerminal {
         return string.toLowerCase() !== string;
     }
     
-    firstSet([X,...B]:string[], T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
-        const EOF = '$';
+    public firstSet([X,...B]:string[], T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
         const P = this.rules;
     
         if(X === undefined) {
             return [new Set(),T];
         }
-        if(X === EOF || CFG.isTerminal(X)) {
+        if(X === CFG.EOF || CFG.isTerminal(X)) {
             return [new Set([X]), T];
         }
     
@@ -58,7 +70,7 @@ class CFG {
             T.add(X);
             for(const p of (P.get(X) ?? []).map(x=>[X,x])) {
                 const [lhs,rhs] = p;
-                const [G,I] = this.firstSet(this.startingSymbol === X ? [...rhs, EOF] : rhs,T);
+                const [G,I] = this.firstSet(this.startingSymbol === X ? [...rhs, CFG.EOF] : rhs,T);
                 F.takeUnion(G);
             }
         }
@@ -71,7 +83,7 @@ class CFG {
         return [F,T];
     }
     
-    followSet(A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
+    public followSet(A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
         const P = this.rules;
     
         if(T.has(A)) {
@@ -97,7 +109,7 @@ class CFG {
                     && pi.every(x=>this.derivesToLambda(x))
                 )) {
                     if(lhs === this.startingSymbol) {
-                        F.add('$');
+                        F.add(CFG.EOF);
                     }
                     const [G,I] = this.followSet(lhs,T);
                     F.takeUnion(G);
@@ -108,14 +120,46 @@ class CFG {
         return [F,T];
     }
     
-    predictSet([lhs,rhs]: [NonTerminal,CFGRule]): Set<Terminal> {
+    public predictSet([lhs,rhs]: [NonTerminal,CFGRule]): Set<Terminal> {
         const F = this.firstSet(rhs)[0];
         if(rhs.every(x=>this.derivesToLambda(x))) {
             [...this.followSet(lhs)[0].values()].forEach(x=>F.add(x));
         }
         return F;
     }
+
+    public toParseTable(): ParseTable {
+        let i = 0;
+        const table: ParseTable = new Map(this.getNonTerminals().map(N=>[N,new Map(this.getTerminalsAndEOF().map(a => [a,-1]))]));
+        for(const [lhs,rules] of this.rules.entries()) {
+            if(rules.reduce((S,rhs) => {
+                const P = this.predictSet([lhs,rhs]);
+                for(const a of P) {
+                    table.get(lhs)!.set(a,i);
+                }
+                i++;
+                return S.takeIntersection(P);
+            }, new Set()).size != 0) {
+                throw new Error(`Grammar is not LL(1) (Caused by '${lhs}')`);
+            }
+        }
+        return table;
+    }
 }
+
+type ParseTable = Map<NonTerminal,Map<Terminal,number>>;
+
+class Token {
+    constructor(
+        public readonly name: string,
+        public readonly value?: string
+    ) {}
+}
+
+class ParseTree {
+
+}
+
 
 type NonTerminal = string;
 type Terminal = string;

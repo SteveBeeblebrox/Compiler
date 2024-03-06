@@ -154,11 +154,3 @@ declare interface Set<T> {
 }
 
 installPolyfill(Set,SetPolyfill);
-
-function installPolyfill<T>(base: {new (...args: any[]):T}, pollyfill: {[key: PropertyKey]: (this: T,...args: any[])=>any}, debug = false) {
-    for(const [name,func] of Object.entries(pollyfill)) {
-        if(!(name in base.prototype)) {
-            Object.defineProperty(base.prototype, name, {value: func, configurable: debug});
-        }
-    }
-}

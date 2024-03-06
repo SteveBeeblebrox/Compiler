@@ -4,11 +4,11 @@
     const cfg = readCFG('data/challenge.cfg');
 
     console.log('Non-Terminals:');
-    console.log([...cfg.rules.keys()].map(x=>`'${x}'`).join(', '));
+    console.log(cfg.getNonTerminals().map(x=>`'${x}'`).join(', '));
     console.log();
 
     console.log('Terminals:');
-    console.log([...cfg.terminals.values()].map(x=>`'${x}'`).join(', '));
+    console.log(cfg.getTerminals().map(x=>`'${x}'`).join(', '));
     console.log();
 
     console.log('Rules:')
@@ -26,15 +26,15 @@
     console.log();
 
     console.log('Derive to Lambda:');
-    [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': ${cfg.derivesToLambda(x)}`));
+    cfg.getNonTerminals().forEach(x=>console.log(`'${x}': ${cfg.derivesToLambda(x)}`));
     console.log();
 
     console.log('First Sets:');
-    [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': {${[...cfg.firstSet([x])[0].values()].map(x=>`'${x}'`)}}`));
+    cfg.getNonTerminals().forEach(x=>console.log(`'${x}': {${[...cfg.firstSet([x])[0].values()].map(x=>`'${x}'`)}}`));
     console.log();
 
     console.log('Follow Sets:');
-    [...cfg.rules.keys()].forEach(x=>console.log(`'${x}': {${[...cfg.followSet(x)[0].values()].map(x=>`'${x}'`)}}`));
+    cfg.getNonTerminals().forEach(x=>console.log(`'${x}': {${[...cfg.followSet(x)[0].values()].map(x=>`'${x}'`)}}`));
     console.log();
 
     console.log('Predict Sets:');
@@ -45,6 +45,27 @@
             console.log(`(${(i++).toString().padStart(~~(cfg.rules.size/10)+2,' ')})\t'${target} -> ${ruleBody}': {${[...cfg.predictSet([target,rule]).values()].join(', ')}}`); 
         }
     }
+
+    console.log('Parse Table:');
+    try {
+        const table = cfg.toParseTable();
+        const k = Math.max(...cfg.getNonTerminals().map(x=>x.length));
+        const j = Math.max(...cfg.getTerminalsAndEOF().map(x=>x.length), i%9) + 1;
+        console.log(`${''.padEnd(k)} | ${cfg.getTerminalsAndEOF().map(x => x.padStart(j)).join(' ')}`);
+        console.log('-'.repeat(k+3+(j+1)*cfg.getTerminalsAndEOF().length));
+        for(const [N,row] of table) {
+            console.log(`${N.padEnd(k)} | ${row.values().map(x=>(x===-1?' ':x.toString()).padStart(j)).toArray().join(' ')}`);
+        }
+    } catch(e) {
+        console.error(e.message);
+    }
+    
+    console.log();
 })();
 
 
+function parse(cfg: CFG[], tokens: Iterator<Token>): ParseTree {
+
+
+    throw null;
+}
