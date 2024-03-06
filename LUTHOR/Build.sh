@@ -1,5 +1,5 @@
 #!/bin/sh
 TARGET='LUTHOR'
 echo "#!$(which node)" > "$TARGET"
-mtsc -p -o- -tes2015 src/index.ts >> "$TARGET"
+cat src/index.js >> "$TARGET"
 chmod +x "$TARGET"
