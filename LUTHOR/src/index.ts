@@ -17,9 +17,10 @@
         let byte: char | undefined;
 
         let matchers: TokenMatcher[] = language.createMatchers();
-        let bestMatch: [TokenType,number] | null = null;
+        let bestMatch: [TokenType,number,Loc] | null = null;
         let line = 1;
         let col = 1;
+        let start = {line,col}
         let bytes: char[] = []
 
         while(byte = tape.next() || bytes.length) {
@@ -34,21 +35,22 @@
                 if(!bestMatch) {
                     throw new Error('Language matched nothing!');
                 }
-                outStream.write(`${bestMatch[0].name} ${alphaEncode(bestMatch[0].value ?? bytes.slice(0,bestMatch[1]).join(''))} ${line} ${col}\n`);
+                outStream.write(`${bestMatch[0].name} ${alphaEncode(bestMatch[0].value ?? bytes.slice(0,bestMatch[1]).join(''))} ${start.line} ${start.col}\n`);
                 matchers.forEach(matcher => matcher.reset());
                 tape.rewind(bytes.length - bestMatch[1]);
                 tape.erase();
                 bytes = [];
+                (start={line,col}=bestMatch[2]);
                 bestMatch = null;
             } else {
-                bestMatch = matcher ? [matcher.getType(), bytes.length] : bestMatch;
+                col++;
+                if(byte === '\n') {
+                    line++;
+                    col=1;
+                }
+                bestMatch = matcher ? [matcher.getType(), bytes.length, {line,col}] : bestMatch;
             }
 
-            // col++;
-            // if(byte === '\n') {
-            //     line++;
-            //     col=1;
-            // }
         }
     } catch(e) {
         console.error(e);
