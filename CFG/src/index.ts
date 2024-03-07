@@ -46,6 +46,7 @@
             console.log(`(${(i++).toString().padStart(~~(cfg.rules.size/10)+2,' ')})\t'${target} -> ${ruleBody}': {${[...cfg.predictSet([target,rule]).values()].join(', ')}}`); 
         }
     }
+    console.log()
 
     console.log('Parse Table:');
     try {
@@ -60,8 +61,6 @@
     } catch(e) {
         console.error(e.message);
     }
-    
-    console.log();
 })();
 
 
