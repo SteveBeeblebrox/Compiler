@@ -156,18 +156,21 @@ class CFG {
     }
 
     public toParseTable(): ParseTable {
-        let i = 0;
         const parseTable: ParseTable = new Map(this.getNonTerminals().map(N=>[N,new Map(this.getTerminalsAndEOF().map(a => [a,-1]))]));
+        let i = 0;
         for(const [lhs,rules] of this.rules.entries()) {
-            if(rules.reduce((S,rhs) => {
+            const row = parseTable.get(lhs)!;
+            for(const rhs of rules) {
                 const P = this.predictSet([lhs,rhs]);
                 for(const a of P) {
-                    parseTable.get(lhs)!.set(a,i);
+                    if(row.get(a) != -1) {
+                        // Possibly implement C hack for dangling bracket here later on
+                        throw new Error(`Grammar is not LL(1) (Caused by rules ${row.get(a)} and ${i})`);
+                    } else {
+                        row.set(a,i);
+                    }
                 }
                 i++;
-                return S.takeIntersection(P);
-            }, new Set()).size != 0) {
-                throw new Error(`Grammar is not LL(1) (Caused by '${lhs}')`);
             }
         }
         return parseTable;
