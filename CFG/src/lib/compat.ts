@@ -27,6 +27,8 @@ const system = {
     }
 }
 
+const throws = (e: any) => {throw e};
+
 function installPolyfill<T>(base: { new(...args: any[]): T }, pollyfill: { [key: PropertyKey]: (this: T, ...args: any[]) => any }, debug = false) {
     for (const [name, func] of Object.entries(pollyfill)) {
         if (!(name in base.prototype)) {
@@ -56,9 +58,9 @@ interface Array<T> {
 Array.prototype.at ??= function at(this: T[], index: number) {
     index*=1;
     if(index >= 0) {
-        return this[+index];
+        return this[index];
     } else if (index < 0) {
-        return this[this.length + +index];
+        return this[this.length + index];
     } else {
         throw new TypeError(`Argument to at() is not a number`);
     }
@@ -79,8 +81,6 @@ Array.prototype.flat ??= function flat<T>(this: (T|T[])[],depth:number=1): T[] {
 Array.prototype.flatMap ??= function flatMap<T,U, This>(callback: (this: This, value: T, index: number, array: T[]) => U | readonly U[], thisArg?: This | undefined): U[] {
     return Array.prototype.map.call(this, callback, thisArg).flat();
 }
-
-const throws = (e: any) => {throw e};
 
 ///#include "set.ts"
 ///#include "iterator.ts"

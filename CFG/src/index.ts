@@ -3,7 +3,8 @@
 ///#include "lib/io.ts"
 ///#include "lib/tree.ts"
 (function() {
-    const cfg = readCFG('data/complicated-first.tok.cfg');
+    const [cfgSrc,tokenSrc,treeDest] = ['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
+    const cfg = readCFG(cfgSrc);
 
     console.log('Non-Terminals:');
     console.log(cfg.getNonTerminals().map(x=>`'${x}'`).join(', '));
@@ -59,7 +60,7 @@
         console.error(e.message);
     }
 
-    system.writeFile('data/parsetree.json',JSON.stringify(parseLL1(cfg,readTokens('data/complicated-first.tok').values()),undefined,2));
+    system.writeFile(treeDest,JSON.stringify(parseLL1(cfg,readTokens(tokenSrc).values()),undefined,2));
 })();
 
 
@@ -82,7 +83,7 @@ function parseLL1(cfg: CFG, tokens: Iterator<Token>): ParseTree {
         if(x === MARKER) {
             Current = Current.parent!;
         } else if(CFG.isNonTerminal(x)) {
-            let p = P[LLT.get(x)?.get(ts.peek()?.name!) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`))];
+            let p = P[LLT.get(x)?.get(ts.peek()?.name!) ?? throws(new Error(`Syntax Error: Unexpected token ${(ts.peek()??{name:CFG.EOF}).name}`))];
             K.push(MARKER);
             const R = p[1];
             
@@ -101,14 +102,18 @@ function parseLL1(cfg: CFG, tokens: Iterator<Token>): ParseTree {
             Current = Current.at(-1)!;
         } else if(CFG.isTerminalOrEOF(x) || CFG.isLambda(x)) {
             if(CFG.isTerminalOrEOF(x)) {
-                if(x !== (ts.peek()??{name:CFG.EOF}).name) throws(new Error(`Syntax Error: Unexpected token ${(ts.peek()??{name:CFG.EOF}).name}`));
+                if(x !== (ts.peek()??{name:CFG.EOF}).name) {
+                    throw new Error(`Syntax Error: Unexpected token ${(ts.peek()??{name:CFG.EOF}).name}`);
+                }
                 x = ts.pop() ?? CFG.EOF;
             }
             Current.push(new Tree(x));
         }
     }
 
-    if(T.length !== 1) throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`));
+    if(T.length !== 1) {
+        throw new Error(`Syntax Error`);
+    }
 
     return T.pop()!;
 }
