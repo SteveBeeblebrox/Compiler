@@ -1,8 +1,9 @@
 ///#include "lib/types.ts"
 ///#include "lib/peek.ts"
 ///#include "lib/io.ts"
+///#include "lib/tree.ts"
 (function() {
-    const cfg = readCFG('data/challenge.cfg');
+    const cfg = readCFG('data/complicated-first.tok.cfg');
 
     console.log('Non-Terminals:');
     console.log(cfg.getNonTerminals().map(x=>`'${x}'`).join(', '));
@@ -14,11 +15,9 @@
 
     console.log('Rules:')
     let i = 0;
-    for(const [target,ruleSet] of cfg.rules.entries()) {
-        for(const rule of ruleSet) {
-            const ruleBody = rule.length > 0 ? target === cfg.startingSymbol ? [...rule,'$'].join(' ') : rule.join(' ') : '\u03bb';
-            console.log(`(${(i++).toString().padStart(~~(cfg.rules.size/10)+2,' ')})\t${target} -> ${ruleBody}`); 
-        }
+    for(const [lhs,rhs] of cfg.getRuleList()) {
+        const ruleBody = rhs.length > 0 ? lhs === cfg.startingSymbol ? [...rhs,'$'].join(' ') : rhs.join(' ') : CFG.LAMBDA;
+        console.log(`(${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+2,' ')})\t${lhs} -> ${ruleBody}`); 
     }
     console.log();
 
@@ -40,11 +39,9 @@
 
     console.log('Predict Sets:');
     i = 0;
-    for(const [target,ruleSet] of cfg.rules.entries()) {
-        for(const rule of ruleSet) {
-            const ruleBody = (rule.length > 0 ? rule.join(' ') : '\u03bb') + (target === cfg.startingSymbol ? ' $' : '');
-            console.log(`(${(i++).toString().padStart(~~(cfg.rules.size/10)+2,' ')})\t'${target} -> ${ruleBody}': {${[...cfg.predictSet([target,rule]).values()].join(', ')}}`); 
-        }
+    for(const [lhs,rhs] of cfg.getRuleList()) {
+        const ruleBody = (rhs.length > 0 ? rhs.join(' ') : CFG.LAMBDA) + (lhs === cfg.startingSymbol ? ' $' : '');
+        console.log(`(${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+2,' ')})\t'${lhs} -> ${ruleBody}': {${[...cfg.predictSet([lhs,rhs]).values()].join(', ')}}`); 
     }
     console.log()
 
@@ -61,14 +58,59 @@
     } catch(e) {
         console.error(e.message);
     }
+
+    system.writeFile('data/parsetree.json',JSON.stringify(parseLL1(cfg,readTokens('data/complicated-first.tok').values()),undefined,2));
 })();
 
 
-function parse(cfg: CFG, tokens: Iterator<Token>): ParseTree {
-    const LTT = cfg.toParseTable();
-    const P = cfg.rules.values().toArray().flat();
-    tokens = createPeekableIterator(tokens);
+function parseLL1(cfg: CFG, tokens: Iterator<Token>): ParseTree {
+    const LLT = cfg.toParseTable();
+    const P = cfg.getRuleList();
+    const ts = createPeekableIterator(tokens);
+    const MARKER = Symbol(), LAMBDA = Symbol();
 
+    type TreeT = NonTerminal | Token | typeof CFG.EOF | typeof CFG.LAMBDA;
+    const T: StrayTree<TreeT> = new Tree<TreeT>(undefined as unknown as Token) as StrayTree<TreeT>;
+    const K: Stack<NonTerminal | Terminal | typeof MARKER | typeof LAMBDA> = [];
 
-    throw null;
+    let Current: Tree<TreeT> = T;
+    K.push(cfg.startingSymbol);
+
+    while(K.length) {
+        let x: NonTerminal | Terminal | typeof MARKER | typeof LAMBDA | Token = K.pop()!;
+        if(x === MARKER) {
+            Current = Current.parent!;
+        } else if(x === LAMBDA) {
+            Current.push(new Tree(CFG.LAMBDA));
+        } else if(CFG.isNonTerminal(x)) {
+            let p = P[LLT.get(x)?.get(ts.peek()?.name!) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`))];
+            K.push(MARKER);
+            const R = p[1];
+            
+            if(p[0] === cfg.startingSymbol) {
+                K.push(CFG.EOF);
+            }
+
+            if(R.length) {
+                K.push(...[...R].reverse());
+            } else {
+                K.push(LAMBDA);
+            }
+
+            const n = new Tree<TreeT>(x);
+            Current.push(n);
+            Current = Current.at(-1)!;
+        } else if(CFG.isTerminal(x)) {
+            if(x !== ts.peek()?.name) throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`));
+            x = ts.pop()!;
+            Current.push(new Tree(x));
+        } else if(CFG.isEOF(x)) {
+            if(ts.peek() !== undefined) throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`));
+            Current.push(new Tree(CFG.EOF));
+        }
+    }
+
+    if(T.length !== 1) throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`));
+
+    return T.pop()!;
 }

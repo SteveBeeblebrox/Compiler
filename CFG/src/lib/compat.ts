@@ -7,11 +7,23 @@ declare var fs;
 const system = {
     args: process.argv.slice(1),
     exit: process.exit,
-    readFile(path: string) {
+    readFile(path: string): string {
         return fs.readFileSync(path, {encoding:'utf8'});
     },
     writeFile(path: string, data: string) {
         fs.writeFileSync(path, data, {encoding:'utf8'});
+    },
+    async createFileReadStream(path: string) {
+        const stream = fs.createReadStream(path, {encoding:'utf8'});
+        void await new Promise(function(resolve,reject) {
+            stream.on('readable',resolve);
+            stream.on('error',reject);
+        });
+        return stream;
+    },
+    async createFileWriteStream(path: string) {
+        const stream = fs.createWriteStream(path, {encoding:'utf8'});
+        return stream;
     }
 }
 
@@ -68,6 +80,8 @@ Array.prototype.flatMap ??= function flatMap<T,U, This>(callback: (this: This, v
     return Array.prototype.map.call(this, callback, thisArg).flat();
 }
 
+const throws = (e: any) => {throw e};
+
 ///#include "set.ts"
 ///#include "iterator.ts"
-/////#include "asynciterator.ts"
+///#include "asynciterator.ts"

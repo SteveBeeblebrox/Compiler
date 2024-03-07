@@ -7,8 +7,9 @@ type Opaque<T,Ident> = OpaqueTypes.Opaque<T,Ident>;
 
 class CFG {
     public static readonly EOF = '$' as Terminal & '$';
+    public static readonly LAMBDA = '\u03bb';
     constructor(
-        public readonly rules: Map<NonTerminal,CFGRuleSet>,
+        private readonly rules: Map<NonTerminal,CFGRuleSet>,
         public readonly startingSymbol: NonTerminal,
         private readonly terminals: Set<Terminal>
     ) {}
@@ -54,11 +55,20 @@ class CFG {
     }
 
     public static isTerminal(string: string): string is Terminal {
-        return string.toLowerCase() === string;
+        return string.toLowerCase() === string && string.length >= 1 && !this.isEOF(string);
     }
     
+    public static isTerminalOrEOF(string: string): string is Terminal | typeof CFG.EOF {
+        return CFG.isEOF(string) || CFG.isTerminal(string);
+    }
+
+
+    public static isEOF(string: string): string is typeof CFG.EOF {
+        return string === CFG.EOF;
+    }
+
     public static isNonTerminal(string: string): string is NonTerminal {
-        return string.toLowerCase() !== string;
+        return string.toLowerCase() !== string && string.length >= 1;
     }
     
     public firstSet([X,...B]:(Terminal|NonTerminal)[], T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
@@ -67,7 +77,7 @@ class CFG {
         if(X === undefined) {
             return [new Set(),T];
         }
-        if(X === CFG.EOF || CFG.isTerminal(X)) {
+        if(CFG.isTerminalOrEOF(X)) {
             return [new Set([X]), T];
         }
     
@@ -133,6 +143,10 @@ class CFG {
         return F;
     }
 
+    public getRuleList(): [NonTerminal, CFGRule][] {
+        return this.rules.entries().flatMap(([target,rules])=>rules.flatMap(rule => [[target,rule]])).toArray() as [NonTerminal, CFGRule][];
+    }
+
     public toParseTable(): ParseTable {
         let i = 0;
         const parseTable: ParseTable = new Map(this.getNonTerminals().map(N=>[N,new Map(this.getTerminalsAndEOF().map(a => [a,-1]))]));
@@ -156,14 +170,12 @@ type ParseTable = Map<NonTerminal,Map<Terminal,number>>;
 
 class Token {
     constructor(
-        public readonly name: string,
+        public readonly name: Terminal,
         public readonly value?: string
     ) {}
 }
 
-class ParseTree {
-
-}
+type ParseTree = StrayTree<NonTerminal | Token | typeof CFG.EOF | typeof CFG.LAMBDA>;
 
 type NonTerminal = Opaque<string,'NonTerminal'>;
 type Terminal = Opaque<string,'Terminal'>;
@@ -171,7 +183,7 @@ type CFGRuleSet = CFGRule[];
 type CFGRule = (NonTerminal|Terminal)[];
 
 type Stack<T> = {
-    push(t:T): void,
+    push(...t:T[]): void,
     pop(): T | undefined,
     length: number
 }

@@ -5,7 +5,7 @@ function readCFG(path: string, commentExtension = true): CFG {
         ARROW: '->',
         LAMBDA: 'lambda',
         OR: '|',
-        EOF: '$'
+        EOF: CFG.EOF
     });
     const text = system.readFile(path);
     let tokens: string[] = []
@@ -35,6 +35,7 @@ function readCFG(path: string, commentExtension = true): CFG {
             const token = tokens.shift()!;
             switch(token) {
                 case SPECIAL_SYMBOLS.LAMBDA:
+                case CFG.LAMBDA:
                     break;
                 case SPECIAL_SYMBOLS.EOF:
                     if(startingSymbol === null)
@@ -59,4 +60,10 @@ function readCFG(path: string, commentExtension = true): CFG {
         throw new Error(`No starting rule containing '${SPECIAL_SYMBOLS.EOF}' found!`);
 
     return new CFG(rules, startingSymbol, terminals);
+}
+
+function readTokens(path: string) {
+    const text = system.readFile(path);
+    // @ts-expect-error
+    return text.split('\n').map(line=>line.trim()).filter(x=>x).map(line => new Token(...line.split(' ',2)));
 }

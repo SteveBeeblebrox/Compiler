@@ -1,0 +1,57 @@
+{
+  "value": "S",
+  "children": [
+    {
+      "value": "A",
+      "children": [
+        {
+          "value": "B",
+          "children": [
+            {
+              "value": {
+                "name": "b"
+              },
+              "children": []
+            },
+            {
+              "value": {
+                "name": "g"
+              },
+              "children": []
+            },
+            {
+              "value": {
+                "name": "h"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "value": "C",
+          "children": [
+            {
+              "value": "λ",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "value": "M",
+      "children": [
+        {
+          "value": {
+            "name": "m"
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "value": "$",
+      "children": []
+    }
+  ]
+}
