@@ -17,7 +17,7 @@ const system = {
         const stream = fs.createReadStream(path, {encoding:'utf8'});
         void await new Promise(function(resolve,reject) {
             stream.on('readable',resolve);
-            stream.on('error',resolve);
+            stream.on('error',reject);
         });
         return stream;
     },
