@@ -1,4 +1,5 @@
 ///#include "lib/types.ts"
+///#include "lib/peek.ts"
 ///#include "lib/io.ts"
 (function() {
     const cfg = readCFG('data/challenge.cfg');
@@ -67,5 +68,8 @@
 function parse(cfg: CFG, tokens: Iterator<Token>): ParseTree {
     const LTT = cfg.toParseTable();
     const P = cfg.rules.values().toArray().flat();
+    tokens = createPeekableIterator(tokens);
+
+
     throw null;
 }
