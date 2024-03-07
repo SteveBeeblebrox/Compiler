@@ -154,7 +154,7 @@ class CFG {
     public getRuleList(): CFGRule[] {
         return this.rules.entries().flatMap(([lhs,rules])=>rules.flatMap(rhs => [[lhs,rhs]])).toArray() as CFGRule[];
     }
-
+    
     public toParseTable(): ParseTable {
         const parseTable: ParseTable = new Map(this.getNonTerminals().map(N=>[N,new Map(this.getTerminalsAndEOF().map(a => [a,-1]))]));
         let i = 0;
@@ -164,7 +164,7 @@ class CFG {
                 const P = this.predictSet([lhs,rhs]);
                 for(const a of P) {
                     if(row.get(a) != -1) {
-                        // Possibly implement C hack for dangling bracket here later on
+                        // Possibly implement C hack for dangling bracket here later on or just mark issue
                         throw new Error(`Grammar is not LL(1) (Caused by rules ${row.get(a)} and ${i})`);
                     } else {
                         row.set(a,i);
