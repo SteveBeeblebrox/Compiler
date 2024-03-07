@@ -36,8 +36,20 @@ Object.groupBy ??= function groupBy<T,Key extends PropertyKey>(values: T[], call
 }
 
 interface Array<T> {
+    at(this: T[], index: number): T | undefined;
     flat(this: (T|T[])[],depth:number): T[];
     flatMap<U, This>(callback: (this: This, value: T, index: number, array: T[]) => U | readonly U[], thisArg?: This | undefined): U[]
+}
+
+Array.prototype.at ??= function at(this: T[], index: number) {
+    index*=1;
+    if(index >= 0) {
+        return this[+index];
+    } else if (index < 0) {
+        return this[this.length + +index];
+    } else {
+        throw new TypeError(`Argument to at() is not a number`);
+    }
 }
 
 Array.prototype.flat ??= function flat<T>(this: (T|T[])[],depth:number=1): T[] {
@@ -58,4 +70,4 @@ Array.prototype.flatMap ??= function flatMap<T,U, This>(callback: (this: This, v
 
 ///#include "set.ts"
 ///#include "iterator.ts"
-///#include "asynciterator.ts"
+// Doesn't work on older node ///#include "asynciterator.ts"
