@@ -16,7 +16,7 @@
     console.log('Rules:')
     let i = 0;
     for(const [lhs,rhs] of cfg.getRuleList()) {
-        const ruleBody = rhs.length > 0 ? lhs === cfg.startingSymbol ? [...rhs,'$'].join(' ') : rhs.join(' ') : CFG.LAMBDA;
+        const ruleBody = rhs.length > 0 ? cfg.isStartingRule(lhs) ? [...rhs,'$'].join(' ') : rhs.join(' ') : CFG.LAMBDA;
         console.log(`(${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+2,' ')})\t${lhs} -> ${ruleBody}`); 
     }
     console.log();
@@ -43,7 +43,7 @@
         const ruleBody = (rhs.length > 0 ? rhs.join(' ') : CFG.LAMBDA) + (lhs === cfg.startingSymbol ? ' $' : '');
         console.log(`(${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+2,' ')})\t'${lhs} -> ${ruleBody}': {${[...cfg.predictSet([lhs,rhs]).values()].join(', ')}}`); 
     }
-    console.log()
+    console.log();
 
     console.log('Parse Table:');
     try {
@@ -67,46 +67,44 @@ function parseLL1(cfg: CFG, tokens: Iterator<Token>): ParseTree {
     const LLT = cfg.toParseTable();
     const P = cfg.getRuleList();
     const ts = createPeekableIterator(tokens);
-    const MARKER = Symbol(), LAMBDA = Symbol();
+    const MARKER = Symbol();
 
     type TreeT = NonTerminal | Token | typeof CFG.EOF | typeof CFG.LAMBDA;
     const T: StrayTree<TreeT> = new Tree<TreeT>(undefined as unknown as Token) as StrayTree<TreeT>;
-    const K: Stack<NonTerminal | Terminal | typeof MARKER | typeof LAMBDA> = [];
+    type StackT = NonTerminal | Terminal | typeof MARKER | typeof CFG.LAMBDA
+    const K: Stack<StackT> = [];
 
     let Current: Tree<TreeT> = T;
     K.push(cfg.startingSymbol);
 
     while(K.length) {
-        let x: NonTerminal | Terminal | typeof MARKER | typeof LAMBDA | Token = K.pop()!;
+        let x: StackT | Token = K.pop()!;
         if(x === MARKER) {
             Current = Current.parent!;
-        } else if(x === LAMBDA) {
-            Current.push(new Tree(CFG.LAMBDA));
         } else if(CFG.isNonTerminal(x)) {
             let p = P[LLT.get(x)?.get(ts.peek()?.name!) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`))];
             K.push(MARKER);
             const R = p[1];
             
-            if(p[0] === cfg.startingSymbol) {
+            if(cfg.isStartingRule(p)) {
                 K.push(CFG.EOF);
             }
 
             if(R.length) {
                 K.push(...[...R].reverse());
             } else {
-                K.push(LAMBDA);
+                K.push(CFG.LAMBDA);
             }
 
             const n = new Tree<TreeT>(x);
             Current.push(n);
             Current = Current.at(-1)!;
-        } else if(CFG.isTerminal(x)) {
-            if(x !== ts.peek()?.name) throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`));
-            x = ts.pop()!;
+        } else if(CFG.isTerminalOrEOF(x) || CFG.isLambda(x)) {
+            if(CFG.isTerminalOrEOF(x)) {
+                if(x !== (ts.peek()??{name:CFG.EOF}).name) throws(new Error(`Syntax Error: Unexpected token ${(ts.peek()??{name:CFG.EOF}).name}`));
+                x = ts.pop() ?? CFG.EOF;
+            }
             Current.push(new Tree(x));
-        } else if(CFG.isEOF(x)) {
-            if(ts.peek() !== undefined) throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name}`));
-            Current.push(new Tree(CFG.EOF));
         }
     }
 

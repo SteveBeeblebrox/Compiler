@@ -16,7 +16,7 @@ function readCFG(path: string, commentExtension = true): CFG {
         tokens = tokens.concat(line.split(' ').filter(x=>x));
     }
 
-    const rules: Map<NonTerminal,CFGRuleSet> = new Map();
+    const rules: Map<NonTerminal,CFGRuleBody[]> = new Map();
     let startingSymbol: NonTerminal | null = null;
     const terminals: Set<Terminal> = new Set();
 
@@ -59,7 +59,7 @@ function readCFG(path: string, commentExtension = true): CFG {
     if(startingSymbol === null)
         throw new Error(`No starting rule containing '${SPECIAL_SYMBOLS.EOF}' found!`);
 
-    return new CFG(rules, startingSymbol, terminals);
+    return new CFG(startingSymbol, rules, terminals);
 }
 
 function readTokens(path: string) {
