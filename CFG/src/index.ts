@@ -3,9 +3,13 @@
 ///#include "lib/io.ts"
 ///#include "lib/tree.ts"
 ///#include "lib/ll1.ts"
+
+// Note, some of the optimizations can't see through  A -> B -> C rules
+// Ideally, we'd optimize those out first, but that's nyi
+
 (function() {
     const [cfgSrc,tokenSrc,treeDest] = ['data/regex.cfg',,,];['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
-    const cfg = LL1.convertLeftRecursion(leftFactor(readCFG(cfgSrc)));
+    const cfg = LL1.convertLeftRecursion(LL1.leftFactor(readCFG(cfgSrc)));
 
     console.log('Non-Terminals:');
     console.log(cfg.getNonTerminals().map(x=>`'${x}'`).join(', '));
@@ -66,16 +70,3 @@
     }
 })();
 
-function leftFactor(cfg: CFG): CFG {
-    const newRules = new Map<NonTerminal,CFGRuleBody[]>()
-
-    for(const N of cfg.getNonTerminals()) {
-        const rules = new Set(cfg.getRuleListFor(N));
-        newRules.set(N,[]);
-
-    }
-
-    return cfg;
-    return system.exit()
-    return new CFG(cfg.startingSymbol, newRules, new Set(cfg.getTerminals()));
-}

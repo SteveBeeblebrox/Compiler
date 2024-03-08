@@ -16,12 +16,13 @@ namespace LL1 {
         }
     
         for(const N of cfg.getNonTerminals()) {
-            const rules = new Set(cfg.getRuleListFor(N));
+            // Sort by descending length to ensure we see non lambda rules first
+            const rules = new Set(cfg.getRuleListFor(N).sort(([lhsA,rhsA],[lhsB,rhsB])=>rhsB.length-rhsA.length));
             newRules.set(N,[]);
     
             refactor:
             for(const [lhs1,rhs1,ref1] of rules.values().map(r=>[...r,r] as [NonTerminal,CFGRuleBody,CFGRule])) {
-                
+                // TODO, lambda rules skip this, we need to order by length
                 if(rhs1[0] === lhs1) {
                     for(const [lhs2,rhs2,ref2] of rules.values().map(x=>[...x,x] as [NonTerminal,CFGRuleBody,CFGRule])) {
                         if(rhs1 === rhs2) {
@@ -46,6 +47,48 @@ namespace LL1 {
                 }
     
                 newRules.get(N)!.push(rhs1); // No refactor happened
+            }
+        }
+    
+        return new CFG(cfg.startingSymbol, newRules, new Set(cfg.getTerminals()));
+    }
+
+    export function leftFactor(cfg: CFG): CFG {
+        const newRules = new Map<NonTerminal,CFGRuleBody[]>()
+    
+        for(const N of cfg.getNonTerminals()) {
+            const rules = new Set(cfg.getRuleListFor(N));
+            newRules.set(N,[]);
+    
+            for(const [lhs1,rhs1,ref1] of rules.values().map(r=>[...r,r] as [NonTerminal,CFGRuleBody,CFGRule])) {
+                if(rhs1.length < 1) {
+                    continue;
+                }
+                
+                const pre1 = rhs1[0];
+                const W = CFG.makeUniqueNonTerminal(cfg,N);
+                let anyOverlaps = false;
+    
+                for(const [lhs2,rhs2,ref2] of rules.values().map(r=>[...r,r] as [NonTerminal,CFGRuleBody,CFGRule])) { 
+                    const pre2 = rhs2[0];
+                    if(rhs1 !== rhs2 && pre1 === pre2) {
+                        if(!anyOverlaps) {
+                            newRules.set(W,[]);
+                        }
+                        anyOverlaps = true;
+    
+                        newRules.get(W)!.push(rhs2.slice(1));
+                        rules.delete(ref2);
+                    }
+                }
+    
+                if(anyOverlaps) {
+                    newRules.get(W)!.push(rhs1.slice(1));
+                    newRules.get(N)!.push([pre1,W]);
+                    rules.delete(ref1);
+                } else {
+                    newRules.get(N)!.push(rhs1);
+                }
             }
         }
     
