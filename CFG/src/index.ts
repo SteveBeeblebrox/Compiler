@@ -8,7 +8,7 @@
 // Ideally, we'd optimize those out first, but that's nyi (or maybe compare with first sets?)
 
 (function() {
-    const [cfgSrc,tokenSrc,treeDest] = ['data/regex.cfg',,,];['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
+    const [cfgSrc,tokenSrc,treeDest] = ['data/regex.cfg','data/regex.in','data/regex.out',];//['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
     const cfg = LL1.applyGrammarTransforms(readCFG(cfgSrc));
 
     console.log('# Non-Terminals:');
@@ -66,12 +66,11 @@
     }
     console.log()
 
+    console.log('# Formatted Grammar:');
+    console.log(cfg.getNonTerminals().map(N => `${N} -> ${cfg.getRuleListFor(N).map(r=>cfg.stringifyRule(r,false)).join('\n\t| ')}`).join('\n'));
+
     if(tokenSrc && treeDest) {
         system.writeFile(treeDest,JSON.stringify(LL1.parse(cfg,readTokens(tokenSrc).values()),undefined,2));
     }
-
-    
-    console.log('# Formatted Grammar:');
-    console.log(cfg.getNonTerminals().map(N => `${N} -> ${cfg.getRuleListFor(N).map(r=>cfg.stringifyRule(r,false)).join('\n\t| ')}`).join('\n'));
 })();
 
