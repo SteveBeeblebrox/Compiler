@@ -23,7 +23,7 @@
     let i = 0;
     for(const [lhs,rhs] of cfg.getRuleList()) {
         const ruleBody = rhs.length > 0 ? cfg.isStartingRule(lhs) ? [...rhs,'$'].join(' ') : rhs.join(' ') : CFG.LAMBDA;
-        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+2,' ')})\t${lhs} -> ${ruleBody}`); 
+        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+1,' ')})\t${lhs} -> ${ruleBody}`); 
     }
     console.log();
 
@@ -47,7 +47,7 @@
     i = 0;
     for(const [lhs,rhs] of cfg.getRuleList()) {
         const ruleBody = (rhs.length > 0 ? rhs.join(' ') : CFG.LAMBDA) + (lhs === cfg.startingSymbol ? ' $' : '');
-        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+2,' ')})\t'${lhs} -> ${ruleBody}': {${[...cfg.predictSet([lhs,rhs]).values()].join(', ')}}`); 
+        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+1,' ')})\t'${lhs} -> ${ruleBody}': {${[...cfg.predictSet([lhs,rhs]).values()].join(', ')}}`); 
     }
     console.log();
 
