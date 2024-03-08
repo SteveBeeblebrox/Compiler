@@ -34,9 +34,9 @@ namespace LL1 {
                             const A = lhs1;
                             const gamma = rhs1.slice(1,rhs1.length-beta.length);
                             rules.delete(ref1);
-                            rules.delete(ref2); // Don't visiting again
+                            rules.delete(ref2); // Don't visit again
     
-                            const R = N+'\'' as NonTerminal;
+                            const R = CFG.makeUniqueNonTerminal(cfg,N);
     
                             newRules.get(N)!.push([...beta,R]);
                             newRules.set(R, [[...gamma, ...beta, R],[]]);

@@ -179,6 +179,12 @@ class CFG {
         }
         return parseTable;
     }
+
+    public static makeUniqueNonTerminal(cfg: CFG, name: NonTerminal, suffix='\''): NonTerminal {
+        // @ts-expect-error
+        while(cfg.getNonTerminals().includes(name)) name += suffix;
+        return name;
+    }
 }
 
 
