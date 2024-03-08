@@ -1,5 +1,5 @@
 namespace LL1 {
-    export function convertLeftRecursion(cfg: CFG): CFG {
+    function convertLeftRecursion(cfg: CFG): CFG {
         const newRules = new Map<NonTerminal,CFGRuleBody[]>()
     
         function getTailOverrlap<T>(a: T[], b: T[]) {
@@ -53,7 +53,7 @@ namespace LL1 {
         return new CFG(cfg.startingSymbol, newRules, new Set(cfg.getTerminals()));
     }
 
-    export function leftFactor(cfg: CFG): CFG {
+    function leftFactor(cfg: CFG): CFG {
         const newRules = new Map<NonTerminal,CFGRuleBody[]>()
     
         for(const N of cfg.getNonTerminals()) {
@@ -62,6 +62,7 @@ namespace LL1 {
     
             for(const [lhs1,rhs1,ref1] of rules.values().map(r=>[...r,r] as [NonTerminal,CFGRuleBody,CFGRule])) {
                 if(rhs1.length < 1) {
+                    newRules.get(N)!.push(rhs1);
                     continue;
                 }
                 
@@ -147,5 +148,15 @@ namespace LL1 {
         }
     
         return T.pop()!;
+    }
+
+    export function applyGrammarTransforms(cfg: CFG): CFG {
+        let k;
+        do {
+            k = cfg.getRuleList().length;
+            cfg = leftFactor(cfg);
+        } while(k != cfg.getRuleList().length);
+
+        return convertLeftRecursion(cfg);
     }
 }

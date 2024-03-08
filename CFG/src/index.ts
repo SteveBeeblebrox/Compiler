@@ -5,11 +5,11 @@
 ///#include "lib/ll1.ts"
 
 // Note, some of the optimizations can't see through  A -> B -> C rules
-// Ideally, we'd optimize those out first, but that's nyi
+// Ideally, we'd optimize those out first, but that's nyi (or maybe compare with first sets?)
 
 (function() {
     const [cfgSrc,tokenSrc,treeDest] = ['data/regex.cfg',,,];['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
-    const cfg = LL1.convertLeftRecursion(LL1.leftFactor(readCFG(cfgSrc)));
+    const cfg = LL1.applyGrammarTransforms(readCFG(cfgSrc)));
 
     console.log('Non-Terminals:');
     console.log(cfg.getNonTerminals().map(x=>`'${x}'`).join(', '));
