@@ -1,8 +1,5 @@
-# Run using:
-# mtsc -p src/index.ts -o- | node
-
-# MTSC can be found here:
-# https://github.com/SteveBeeblebrox/mtsc
-
-echo 'Build.sh NYI!'
-exit 1
+#!/bin/sh
+TARGET='CFG'
+echo "#!$(which node)" > "$TARGET"
+mtsc -tes2018 -p -o- src/index.ts >> "$TARGET"
+chmod +x "$TARGET"
