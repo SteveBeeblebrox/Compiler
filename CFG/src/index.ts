@@ -66,7 +66,7 @@
     }
     console.log()
 
-    if(tokenSrc) {
+    if(tokenSrc && treeDest) {
         system.writeFile(treeDest,JSON.stringify(LL1.parse(cfg,readTokens(tokenSrc).values()),undefined,2));
     }
 
