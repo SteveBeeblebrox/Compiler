@@ -8,7 +8,7 @@
 // Ideally, we'd optimize those out first, but that's nyi (or maybe compare with first sets?)
 
 (function() {
-    const [cfgSrc,tokenSrc,treeDest] = ['data/regex.ll1.cfg',,,];['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
+    const [cfgSrc,tokenSrc,treeDest] = ['data/regex.cfg',,,];['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
     const cfg = LL1.applyGrammarTransforms(readCFG(cfgSrc));
 
     console.log('# Non-Terminals:');

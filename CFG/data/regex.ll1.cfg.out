@@ -2,7 +2,7 @@
 # 'S', 'Regex', 'Alternation', 'Alternation'', 'Sequence', 'Sequence'', 'Quantifier', 'Quantifier'', 'Primary', 'Primitive', 'Primitive''
 
 # Terminals:
-# '%|%', '+', '*', '(', ')', 'char', '-'
+# '%|%', '*', '+', '(', ')', 'char', '-'
 
 # Rules:
 # (  0)	S -> Regex $
@@ -85,7 +85,7 @@
 # ( 16)	'Primitive' -> λ': {+, *, (, char, %|%, $, )}
 
 # Parse Table:
-#              |       %|%         +         *         (         )      char         -         $
+#              |       %|%         *         +         (         )      char         -         $
 # -----------------------------------------------------------------------------------------------
 # S            |                                       0                   0                    
 # Regex        |                                       1                   1                    
@@ -94,7 +94,7 @@
 # Sequence     |                                       5                   5                    
 # Sequence'    |         7                             6         7         6                   7
 # Quantifier   |                                       8                   8                    
-# Quantifier'  |        11         9        10        11        11        11                  11
+# Quantifier'  |        11        10         9        11        11        11                  11
 # Primary      |                                      12                  13                    
 # Primitive    |                                                          14                    
 # Primitive'   |        16        16        16        16        16        16        15        16
