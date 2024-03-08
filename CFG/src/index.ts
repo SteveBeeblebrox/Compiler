@@ -9,7 +9,7 @@
 
 (function() {
     const [cfgSrc,tokenSrc,treeDest] = ['data/regex.cfg',,,];['data/complicated-first.tok.cfg', 'data/complicated-first.tok','data/parsetree.json']
-    const cfg = LL1.applyGrammarTransforms(readCFG(cfgSrc)));
+    const cfg = LL1.applyGrammarTransforms(readCFG(cfgSrc));
 
     console.log('Non-Terminals:');
     console.log(cfg.getNonTerminals().map(x=>`'${x}'`).join(', '));
