@@ -154,7 +154,11 @@ class CFG {
     public getRuleList(): CFGRule[] {
         return this.rules.entries().flatMap(([lhs,rules])=>rules.flatMap(rhs => [[lhs,rhs]])).toArray() as CFGRule[];
     }
-    
+
+    public getRuleListFor(rhs: NonTerminal): CFGRule[] {
+        return this.rules.get(rhs)!.map(lhs => [rhs,lhs]);
+    }
+
     public toParseTable(): ParseTable {
         const parseTable: ParseTable = new Map(this.getNonTerminals().map(N=>[N,new Map(this.getTerminalsAndEOF().map(a => [a,-1]))]));
         let i = 0;

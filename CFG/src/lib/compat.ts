@@ -6,7 +6,7 @@ declare var fs;
 
 const system = {
     args: process.argv.slice(1),
-    exit: process.exit,
+    exit: process.exit as (status?:number)=>never,
     readFile(path: string): string {
         return fs.readFileSync(path, {encoding:'utf8'});
     },
