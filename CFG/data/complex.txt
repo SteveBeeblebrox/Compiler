@@ -1,0 +1,15 @@
+S -> A B $
+S -> B C $
+A -> A t C x
+A -> g
+B -> y A B
+B -> h
+C -> x C y
+C -> p
+
+
+
+
+# A -> g Q
+# Q -> t C x Q
+# Q -> lambda
