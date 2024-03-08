@@ -185,6 +185,11 @@ class CFG {
         while(cfg.getNonTerminals().includes(name)) name += suffix;
         return name;
     }
+
+    public stringifyRule(rule: CFGRule, lhs = true): string {
+        if(lhs) return `${rule[0]} -> ${this.stringifyRule(rule, false)}`;
+        else return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA) + (this.isStartingRule(rule) ? ' ' + CFG.EOF : '');
+    }
 }
 
 

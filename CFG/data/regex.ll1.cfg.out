@@ -1,0 +1,119 @@
+# Non-Terminals:
+# 'S', 'Regex', 'Alternation', 'Alternation'', 'Sequence', 'Sequence'', 'Quantifier', 'Quantifier'', 'Primary', 'Primitive', 'Primitive''
+
+# Terminals:
+# '%|%', '+', '*', '(', ')', 'char', '-'
+
+# Rules:
+# (  0)	S -> Regex $
+# (  1)	Regex -> Alternation
+# (  2)	Alternation -> Sequence Alternation'
+# (  3)	Alternation' -> %|% Sequence Alternation'
+# (  4)	Alternation' -> λ
+# (  5)	Sequence -> Quantifier Sequence'
+# (  6)	Sequence' -> Quantifier Sequence'
+# (  7)	Sequence' -> λ
+# (  8)	Quantifier -> Primary Quantifier'
+# (  9)	Quantifier' -> +
+# ( 10)	Quantifier' -> *
+# ( 11)	Quantifier' -> λ
+# ( 12)	Primary -> ( Regex )
+# ( 13)	Primary -> Primitive
+# ( 14)	Primitive -> char Primitive'
+# ( 15)	Primitive' -> - char
+# ( 16)	Primitive' -> λ
+
+# Starting Symbol:
+# 'S'
+
+# Derives to Lambda:
+# 'S': false
+# 'Regex': false
+# 'Alternation': false
+# 'Alternation'': true
+# 'Sequence': false
+# 'Sequence'': true
+# 'Quantifier': false
+# 'Quantifier'': true
+# 'Primary': false
+# 'Primitive': false
+# 'Primitive'': true
+
+# First Sets:
+# 'S': {'(','char'}
+# 'Regex': {'(','char'}
+# 'Alternation': {'(','char'}
+# 'Alternation'': {'%|%'}
+# 'Sequence': {'(','char'}
+# 'Sequence'': {'(','char'}
+# 'Quantifier': {'(','char'}
+# 'Quantifier'': {'+','*'}
+# 'Primary': {'(','char'}
+# 'Primitive': {'char'}
+# 'Primitive'': {'-'}
+
+# Follow Sets:
+# 'S': {}
+# 'Regex': {'$',')'}
+# 'Alternation': {'$',')'}
+# 'Alternation'': {'$',')'}
+# 'Sequence': {'%|%','$',')'}
+# 'Sequence'': {'%|%','$',')'}
+# 'Quantifier': {'(','char','%|%','$',')'}
+# 'Quantifier'': {'(','char','%|%','$',')'}
+# 'Primary': {'+','*','(','char','%|%','$',')'}
+# 'Primitive': {'+','*','(','char','%|%','$',')'}
+# 'Primitive'': {'+','*','(','char','%|%','$',')'}
+
+# Predict Sets:
+# (  0)	'S -> Regex $': {(, char}
+# (  1)	'Regex -> Alternation': {(, char}
+# (  2)	'Alternation -> Sequence Alternation'': {(, char}
+# (  3)	'Alternation' -> %|% Sequence Alternation'': {%|%}
+# (  4)	'Alternation' -> λ': {$, )}
+# (  5)	'Sequence -> Quantifier Sequence'': {(, char}
+# (  6)	'Sequence' -> Quantifier Sequence'': {(, char}
+# (  7)	'Sequence' -> λ': {%|%, $, )}
+# (  8)	'Quantifier -> Primary Quantifier'': {(, char}
+# (  9)	'Quantifier' -> +': {+}
+# ( 10)	'Quantifier' -> *': {*}
+# ( 11)	'Quantifier' -> λ': {(, char, %|%, $, )}
+# ( 12)	'Primary -> ( Regex )': {(}
+# ( 13)	'Primary -> Primitive': {char}
+# ( 14)	'Primitive -> char Primitive'': {char}
+# ( 15)	'Primitive' -> - char': {-}
+# ( 16)	'Primitive' -> λ': {+, *, (, char, %|%, $, )}
+
+# Parse Table:
+#              |       %|%         +         *         (         )      char         -         $
+# -----------------------------------------------------------------------------------------------
+# S            |                                       0                   0                    
+# Regex        |                                       1                   1                    
+# Alternation  |                                       2                   2                    
+# Alternation' |         3                                       4                             4
+# Sequence     |                                       5                   5                    
+# Sequence'    |         7                             6         7         6                   7
+# Quantifier   |                                       8                   8                    
+# Quantifier'  |        11         9        10        11        11        11                  11
+# Primary      |                                      12                  13                    
+# Primitive    |                                                          14                    
+# Primitive'   |        16        16        16        16        16        16        15        16
+
+# Formatted Grammar:
+S -> Regex $
+Regex -> Alternation
+Alternation -> Sequence Alternation'
+Alternation' -> %|% Sequence Alternation'
+	| λ
+Sequence -> Quantifier Sequence'
+Sequence' -> Quantifier Sequence'
+	| λ
+Quantifier -> Primary Quantifier'
+Quantifier' -> +
+	| *
+	| λ
+Primary -> ( Regex )
+	| Primitive
+Primitive -> char Primitive'
+Primitive' -> - char
+	| λ
