@@ -46,7 +46,7 @@ class Tree<T> implements TreeArrayMethods<Tree<T>> {
             throw new Error('Cannot take ownership of undefined');
         }
         if (other === this) {
-            throw new Error('Cannot take ownership of self')
+            throw new Error('Cannot take ownership of self');
         }
         if (other.parent !== undefined) {
             throw new Error('Cannot take ownership of a subtree');
