@@ -114,7 +114,7 @@ namespace LL1 {
             if(x === MARKER) {
                 Current = Current.parent!;
             } else if(CFG.isNonTerminal(x)) {
-                let p = P[LLT.get(x)?.get((ts.peek()??{name:CFG.EOF}).name) ?? throws(new Error(`Syntax Error: Unexpected token ${(ts.peek()??{name:CFG.EOF}).name}`))];
+                let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`))];
                 K.push(MARKER);
                 const R = p[1];
                 
@@ -133,12 +133,12 @@ namespace LL1 {
                 Current = Current.at(-1)!;
             } else if(CFG.isTerminalOrEOF(x) || CFG.isLambda(x)) {
                 if(CFG.isTerminalOrEOF(x)) {
-                    if(x !== (ts.peek()??{name:CFG.EOF}).name) {
-                        throw new Error(`Syntax Error: Unexpected token ${(ts.peek()??{name:CFG.EOF}).name} expected ${x}`);
+                    if(x !== ts.peek()?.name as Terminal) {
+                        throw new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`);
                     }
-                    x = ts.pop() ?? CFG.EOF;
+                    x = ts.pop()!;
                 }
-                Current.push(new Tree(x));
+                Current.push(new Tree(x??CFG.EOF_CHARACTER));
             }
         }
     

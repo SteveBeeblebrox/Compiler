@@ -36,18 +36,18 @@
     console.log();
 
     console.log('# First Sets:');
-    cfg.getNonTerminals().forEach(x=>console.log(`# '${x}': {${[...cfg.firstSet([x])[0].values()].map(x=>`'${x}'`)}}`));
+    cfg.getNonTerminals().forEach(x=>console.log(`# '${x}': ${cfg.stringifySet(cfg.firstSet([x])[0])}`));
     console.log();
 
     console.log('# Follow Sets:');
-    cfg.getNonTerminals().forEach(x=>console.log(`# '${x}': {${[...cfg.followSet(x)[0].values()].map(x=>`'${x}'`)}}`));
+    cfg.getNonTerminals().forEach(x=>console.log(`# '${x}': ${cfg.stringifySet(cfg.followSet(x)[0])}`));
     console.log();
 
     console.log('# Predict Sets:');
     i = 0;
     for(const [lhs,rhs] of cfg.getRuleList()) {
         const ruleBody = (rhs.length > 0 ? rhs.join(' ') : CFG.LAMBDA) + (lhs === cfg.startingSymbol ? ' $' : '');
-        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+1,' ')})\t'${lhs} -> ${ruleBody}': {${[...cfg.predictSet([lhs,rhs]).values()].join(', ')}}`); 
+        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length/10)+1,' ')})\t'${lhs} -> ${ruleBody}': ${cfg.stringifySet(cfg.predictSet([lhs,rhs]))}`); 
     }
     console.log();
 
@@ -55,8 +55,8 @@
     try {
         const parseTable = cfg.toParseTable();
         const k = Math.max(...cfg.getNonTerminals().map(x=>x.length));
-        const j = Math.max(...cfg.getTerminalsAndEOF().map(x=>x.length), i%9) + 1;
-        console.log(`# ${''.padEnd(k)} | ${cfg.getTerminalsAndEOF().map(x => x.padStart(j)).join(' ')}`);
+        const j = Math.max(...cfg.getTerminalsAndEOF().map(x=>(x??CFG.EOF_CHARACTER).length), i%9) + 1;
+        console.log(`# ${''.padEnd(k)} | ${cfg.getTerminalsAndEOF().map(x => (x??CFG.EOF_CHARACTER).padStart(j)).join(' ')}`);
         console.log('# '+'-'.repeat(k+3+(j+1)*cfg.getTerminalsAndEOF().length));
         for(const [N,row] of parseTable) {
             console.log(`# ${N.padEnd(k)} | ${row.values().map(x=>(x===-1?' ':x.toString()).padStart(j)).toArray().join(' ')}`);

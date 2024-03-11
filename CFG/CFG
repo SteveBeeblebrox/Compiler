@@ -34,7 +34,7 @@ class CFG {
         return rule === this.startingSymbol;
     }
     static isTerminal(string) {
-        return string.toLowerCase() === string && string.length >= 1 && !this.isEOF(string) && !this.isLambda(string);
+        return !this.isEOF(string) && !this.isLambda(string) && string.toLowerCase() === string && string.length >= 1;
     }
     static isTerminalOrEOF(string) {
         return CFG.isEOF(string) || CFG.isTerminal(string);
@@ -46,7 +46,7 @@ class CFG {
         return string === CFG.LAMBDA;
     }
     static isNonTerminal(string) {
-        return string.toLowerCase() !== string && string.length >= 1 && !this.isEOF(string) && !this.isLambda(string);
+        return !this.isEOF(string) && !this.isLambda(string) && string.toLowerCase() !== string && string.length >= 1;
     }
     derivesToLambda(L, T = []) {
         var _a;
@@ -170,10 +170,16 @@ class CFG {
         if (lhs)
             return `${rule[0]} -> ${this.stringifyRule(rule, false)}`;
         else
-            return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA) + (this.isStartingRule(rule) ? ' ' + CFG.EOF : '');
+            return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA) + (this.isStartingRule(rule) ? ' ' + CFG.EOF_CHARACTER : '');
+    }
+    stringifySet(set) {
+        return `{${set.values().map(c => c === CFG.EOF
+            ? CFG.EOF_CHARACTER
+            : `'${JSON.stringify(c).slice(1, -1).replace(/'/g, '\\\'').replace(/\\"/g, '"')}'`).toArray().join(', ')}}`;
     }
 }
-CFG.EOF = '$';
+CFG.EOF = undefined;
+CFG.EOF_CHARACTER = '$';
 CFG.LAMBDA = '\u03bb';
 class Token {
     constructor(name, value) {
@@ -671,7 +677,7 @@ function readCFG(path, commentExtension = true) {
         ARROW: '->',
         LAMBDA: 'lambda',
         OR: '|',
-        EOF: CFG.EOF
+        EOF: CFG.EOF_CHARACTER
     });
     const text = system.readFile(path);
     let tokens = [];
@@ -873,7 +879,7 @@ var LL1;
         return new CFG(cfg.startingSymbol, newRules, new Set(cfg.getTerminals()));
     }
     function parse(cfg, tokens) {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         const LLT = cfg.toParseTable();
         const P = cfg.getRuleList();
         const ts = createPeekableIterator(tokens);
@@ -888,7 +894,7 @@ var LL1;
                 Current = Current.parent;
             }
             else if (CFG.isNonTerminal(x)) {
-                let p = P[(_c = (_a = LLT.get(x)) === null || _a === void 0 ? void 0 : _a.get(((_b = ts.peek()) !== null && _b !== void 0 ? _b : { name: CFG.EOF }).name)) !== null && _c !== void 0 ? _c : throws(new Error(`Syntax Error: Unexpected token ${((_d = ts.peek()) !== null && _d !== void 0 ? _d : { name: CFG.EOF }).name}`))];
+                let p = P[(_c = (_a = LLT.get(x)) === null || _a === void 0 ? void 0 : _a.get((_b = ts.peek()) === null || _b === void 0 ? void 0 : _b.name)) !== null && _c !== void 0 ? _c : throws(new Error(`Syntax Error: Unexpected token ${(_e = (_d = ts.peek()) === null || _d === void 0 ? void 0 : _d.name) !== null && _e !== void 0 ? _e : 'EOF'}`))];
                 K.push(MARKER);
                 const R = p[1];
                 if (cfg.isStartingRule(p)) {
@@ -906,12 +912,12 @@ var LL1;
             }
             else if (CFG.isTerminalOrEOF(x) || CFG.isLambda(x)) {
                 if (CFG.isTerminalOrEOF(x)) {
-                    if (x !== ((_e = ts.peek()) !== null && _e !== void 0 ? _e : { name: CFG.EOF }).name) {
-                        throw new Error(`Syntax Error: Unexpected token ${((_f = ts.peek()) !== null && _f !== void 0 ? _f : { name: CFG.EOF }).name} expected ${x}`);
+                    if (x !== ((_f = ts.peek()) === null || _f === void 0 ? void 0 : _f.name)) {
+                        throw new Error(`Syntax Error: Unexpected token ${(_h = (_g = ts.peek()) === null || _g === void 0 ? void 0 : _g.name) !== null && _h !== void 0 ? _h : 'EOF'} expected ${x}`);
                     }
-                    x = (_g = ts.pop()) !== null && _g !== void 0 ? _g : CFG.EOF;
+                    x = ts.pop();
                 }
-                Current.push(new Tree(x));
+                Current.push(new Tree(x !== null && x !== void 0 ? x : CFG.EOF_CHARACTER));
             }
         }
         if (T.length !== 1) {
@@ -955,24 +961,24 @@ var LL1;
     cfg.getNonTerminals().forEach(x => console.log(`# '${x}': ${cfg.derivesToLambda(x)}`));
     console.log();
     console.log('# First Sets:');
-    cfg.getNonTerminals().forEach(x => console.log(`# '${x}': {${[...cfg.firstSet([x])[0].values()].map(x => `'${x}'`)}}`));
+    cfg.getNonTerminals().forEach(x => console.log(`# '${x}': ${cfg.stringifySet(cfg.firstSet([x])[0])}`));
     console.log();
     console.log('# Follow Sets:');
-    cfg.getNonTerminals().forEach(x => console.log(`# '${x}': {${[...cfg.followSet(x)[0].values()].map(x => `'${x}'`)}}`));
+    cfg.getNonTerminals().forEach(x => console.log(`# '${x}': ${cfg.stringifySet(cfg.followSet(x)[0])}`));
     console.log();
     console.log('# Predict Sets:');
     i = 0;
     for (const [lhs, rhs] of cfg.getRuleList()) {
         const ruleBody = (rhs.length > 0 ? rhs.join(' ') : CFG.LAMBDA) + (lhs === cfg.startingSymbol ? ' $' : '');
-        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length / 10) + 1, ' ')})\t'${lhs} -> ${ruleBody}': {${[...cfg.predictSet([lhs, rhs]).values()].join(', ')}}`);
+        console.log(`# (${(i++).toString().padStart(~~(cfg.getRuleList().length / 10) + 1, ' ')})\t'${lhs} -> ${ruleBody}': ${cfg.stringifySet(cfg.predictSet([lhs, rhs]))}`);
     }
     console.log();
     console.log('# Parse Table:');
     try {
         const parseTable = cfg.toParseTable();
         const k = Math.max(...cfg.getNonTerminals().map(x => x.length));
-        const j = Math.max(...cfg.getTerminalsAndEOF().map(x => x.length), i % 9) + 1;
-        console.log(`# ${''.padEnd(k)} | ${cfg.getTerminalsAndEOF().map(x => x.padStart(j)).join(' ')}`);
+        const j = Math.max(...cfg.getTerminalsAndEOF().map(x => (x !== null && x !== void 0 ? x : CFG.EOF_CHARACTER).length), i % 9) + 1;
+        console.log(`# ${''.padEnd(k)} | ${cfg.getTerminalsAndEOF().map(x => (x !== null && x !== void 0 ? x : CFG.EOF_CHARACTER).padStart(j)).join(' ')}`);
         console.log('# ' + '-'.repeat(k + 3 + (j + 1) * cfg.getTerminalsAndEOF().length));
         for (const [N, row] of parseTable) {
             console.log(`# ${N.padEnd(k)} | ${row.values().map(x => (x === -1 ? ' ' : x.toString()).padStart(j)).toArray().join(' ')}`);
