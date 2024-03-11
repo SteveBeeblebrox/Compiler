@@ -1,0 +1,255 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var _a, _b, _c;
+var _d, _e;
+class ScannerDefinition {
+    constructor(alphabet = [], tokenTypes = []) {
+        this.alphabet = alphabet;
+        this.tokenTypes = tokenTypes;
+    }
+    createMatchers() {
+        return this.tokenTypes.map(tt => new TokenMatcher(tt, this.alphabet));
+    }
+}
+class TokenType {
+    constructor(name, table, value) {
+        this.name = name;
+        this.table = table;
+        this.value = value;
+    }
+}
+class TokenMatcher {
+    constructor(type, alphabet) {
+        this.type = type;
+        this.alphabet = alphabet;
+        this.state = 0;
+    }
+    reset() {
+        this.state = 0;
+    }
+    accept(byte) {
+        var _a;
+        if (this.state !== TokenMatcher.NO_MATCH) {
+            this.state = (_a = this.type.table[this.state].data[this.alphabet.indexOf(byte)]) !== null && _a !== void 0 ? _a : -1;
+        }
+    }
+    isComplete() {
+        return this.state !== TokenMatcher.NO_MATCH && this.type.table[this.state].accepting;
+    }
+    getType() {
+        return this.type;
+    }
+    isFailed() {
+        return this.state === TokenMatcher.NO_MATCH;
+    }
+}
+TokenMatcher.NO_MATCH = -1;
+fs = require('fs');
+const system = {
+    args: process.argv.slice(1),
+    exit: process.exit,
+    readFile(path) {
+        return fs.readFileSync(path, { encoding: 'utf8' });
+    },
+    writeFile(path, data) {
+        fs.writeFileSync(path, data, { encoding: 'utf8' });
+    },
+    createFileReadStream(path) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const stream = fs.createReadStream(path, { encoding: 'utf8' });
+            void (yield new Promise(function (resolve, reject) {
+                stream.on('readable', resolve);
+                stream.on('error', reject);
+            }));
+            return stream;
+        });
+    },
+    createFileWriteStream(path) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const stream = fs.createWriteStream(path, { encoding: 'utf8' });
+            return stream;
+        });
+    }
+};
+(_a = Object.groupBy) !== null && _a !== void 0 ? _a : (Object.groupBy = function groupBy(values, callback) {
+    return values.reduce((obj, value, index) => {
+        var _a;
+        const key = callback(value, index);
+        obj[key] = [...((_a = obj[key]) !== null && _a !== void 0 ? _a : []), value];
+        return obj;
+    }, {});
+});
+(_b = (_d = Array.prototype).flat) !== null && _b !== void 0 ? _b : (_d.flat = function flat(depth = 1) {
+    return depth ? Array.prototype.reduce.call(this, function (flattened, value) {
+        if (Array.isArray(value)) {
+            flattened.push.apply(flattened, flat.call(value, depth - 1));
+        }
+        else {
+            flattened.push(value);
+        }
+        return flattened;
+    }, []) : Array.prototype.slice.call(this);
+});
+(_c = (_e = Array.prototype).flatMap) !== null && _c !== void 0 ? _c : (_e.flatMap = function flatMap(callback, thisArg) {
+    return Array.prototype.map.call(this, callback, thisArg).flat();
+});
+var AlphabetEncoding;
+(function (AlphabetEncoding) {
+    function decode(encoded) {
+        function unescape(sequence) {
+            const n = +`0${sequence}`;
+            if (Number.isNaN(n))
+                throw new Error(`'${sequence}' is not a valid escape sequence!`);
+            return String.fromCharCode(n);
+        }
+        return encoded === null || encoded === void 0 ? void 0 : encoded.replace(/x.{0,2}/g, unescape);
+    }
+    AlphabetEncoding.decode = decode;
+    function encode(text) {
+        function escape(char) {
+            return `x${char.charCodeAt(0).toString(16).padStart(2, '0')}`;
+        }
+        return text === null || text === void 0 ? void 0 : text.replace(/[^0-9A-Za-wy-z]/g, escape);
+    }
+    AlphabetEncoding.encode = encode;
+})(AlphabetEncoding || (AlphabetEncoding = {}));
+const { decode: alphaDecode, encode: alphaEncode } = AlphabetEncoding;
+function readScannerDefinition(path) {
+    const text = system.readFile(path).trim();
+    if (!text) {
+        throw new Error(`${path} is empty!`);
+    }
+    const language = new ScannerDefinition();
+    const [alphabet, ...body] = text.split('\n').map(x => x.trim());
+    language.alphabet = alphaDecode(alphabet.replace(/\s+/g, '')).split('');
+    for (const line of body) {
+        if (!line || line.startsWith('#')) {
+            continue;
+        }
+        const [src, name, value] = line.split(/\s+/g);
+        language.tokenTypes.push(new TokenType(name, readTokenTable(src), alphaDecode(value)));
+    }
+    return language;
+}
+function readTokenTable(path) {
+    const text = system.readFile(path).trim();
+    if (!text) {
+        throw new Error(`${path} is empty!`);
+    }
+    const table = [];
+    for (const line of text.split('\n').map(x => x.trim())) {
+        if (!line || line.startsWith('#')) {
+            continue;
+        }
+        const [type, id, ...transitions] = line.split(/\s+/g);
+        table[+id] = { accepting: type === '+', data: transitions.map(i => i === 'E' ? null : +i) };
+    }
+    return table;
+}
+class Tape {
+    constructor(pull, initialCount = 0) {
+        this.pull = pull;
+        this.buffer = [];
+        this.index = -1;
+        this.growBuffer(initialCount - 1);
+    }
+    growBuffer(index) {
+        while (this.buffer.length < index + 1) {
+            this.buffer.push(this.pull());
+        }
+    }
+    // Advance to the next value
+    next() {
+        this.growBuffer(++this.index);
+        return this.buffer[this.index];
+    }
+    // Discard all values before the current position
+    erase() {
+        this.buffer.splice(0, this.index + 1); // [0,this.index]
+        this.index = -1;
+    }
+    // Go back n entries
+    rewind(n) {
+        if (this.index - n < -1) {
+            throw new Error('Cannot rewind past end of tape');
+        }
+        this.index -= n;
+    }
+    // Skip n entries (lazy)
+    skip(n) {
+        this.index += n;
+    }
+    // When n=0, returns the current value that the prior next() did; when n>0, acts like a n lookahead
+    top(n = 0) {
+        this.growBuffer(this.index + n);
+        return this.buffer[this.index + n];
+    }
+    toString() {
+        function escape(t) {
+            return `'${JSON.stringify(t).slice(1, -1).replace(/'/g, '\\\'').replace(/\\"/g, '"')}'`;
+        }
+        return `[${[...this.buffer.slice(0, this.index + 1).map(escape)].join(', ')} | ${this.buffer.slice(this.index + 1).map(escape).join(', ')}]`;
+    }
+    // The number of items that can be rewinded back; forward length has little to no meaning
+    get length() {
+        return this.index + 1;
+    }
+}
+;
+(function () {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const [uFile, srcFile, outFile] = system.args.slice(1);
+            const scanner = readScannerDefinition(uFile);
+            const inStream = yield system.createFileReadStream(srcFile);
+            const outStream = yield system.createFileWriteStream(outFile);
+            const tape = new Tape(() => inStream.read(1));
+            let byte;
+            let matchers = scanner.createMatchers();
+            let bestMatch = null;
+            let currentPos = { line: 1, col: 1 };
+            let startPos = Object.assign({}, currentPos);
+            let bytes = [];
+            while (byte = tape.next() || bytes.length) {
+                if (byte) {
+                    bytes.push(byte);
+                    matchers.forEach(matcher => matcher.accept(byte));
+                }
+                const matcher = (_a = matchers.find(matcher => matcher.isComplete())) !== null && _a !== void 0 ? _a : null;
+                if (matchers.every(matcher => matcher.isFailed()) || !byte) {
+                    if (!bestMatch) {
+                        throw new Error('Language matched nothing!');
+                    }
+                    outStream.write(`${bestMatch[0].name} ${alphaEncode((_b = bestMatch[0].value) !== null && _b !== void 0 ? _b : bytes.slice(0, bestMatch[1]).join(''))} ${startPos.line} ${startPos.col}\n`);
+                    matchers.forEach(matcher => matcher.reset());
+                    tape.rewind(bytes.length - bestMatch[1]);
+                    tape.erase();
+                    bytes = [];
+                    startPos = bestMatch[2];
+                    currentPos = Object.assign({}, startPos);
+                    bestMatch = null;
+                }
+                else {
+                    currentPos.col++;
+                    if (byte === '\n') {
+                        currentPos.line++;
+                        currentPos.col = 1;
+                    }
+                    bestMatch = matcher ? [matcher.getType(), bytes.length, Object.assign({}, currentPos)] : bestMatch;
+                }
+            }
+        }
+        catch (e) {
+            console.error(e);
+            system.exit(1);
+        }
+    });
+})();
