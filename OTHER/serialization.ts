@@ -19,8 +19,13 @@ const foo = {a: 1, c: '@Set [[1,3,2]]', d: NaN, e: -Infinity, f: undefined,g: 12
 namespace Serialization {
     const symbolSet = new Set<symbol>();
 
-    export type SerializeOptions = Partial<{sortKeys: boolean, space: string | number, includeFunctions: boolean}>
-    export type SerializableObject = {[toSerializable]: <T,>(this: T, options: SerializeOptions)=>SerializableValue};
+    export type SerializeOptions = Partial<{
+        sortKeys: boolean,
+        space: string | number,
+        includeFunctions: boolean,
+        preserveReferences: boolean
+    }>;
+    export type SerializableObject<T=any> = {[toSerializable]: (this: T, options: SerializeOptions)=>SerializableValue};
     export type SerializableValue = number | boolean | string | null | bigint | undefined | symbol | SerializableValue[] | {[key: string]: SerializableValue} | SerializableObject;
     
     //export type SerializableObjectWithFunctions = {[toSerializable]: <T,>(this: T, options: SerializeOptions)=>SerializableValue};
@@ -36,47 +41,52 @@ namespace Serialization {
         return Object.getOwnPropertySymbols(obj).map(sym => [sym,obj[sym]])
     }
 
-    // Todo implementations of toSerializable for Number, String, Date, etc...
     // without function support, functions in arrays become null!
     // arrayValue.filter(value => typeof value !== 'function' || options.includeFunctions) to just cut them out
     export function serialize(value: SerializableValue, options: SerializeOptions = {}): string {
         function serialize(value: SerializableValue, options: SerializeOptions = {}): string {
             const references = new Map<object| Function,PropertyKey[]>();
             function transform(value: SerializableValue, path: PropertyKey[], options: SerializeOptions): JSONValue {
-                if((typeof value ==='object' && value !== null) || (typeof value === 'function' && options.includeFunctions)) {
-                    if(references.has(value)) {
-                        return `@&:${serialize(references.get(value), {...options,space:0})}`;
-                    } else {
-                        references.set(value, path)
+                try {
+                    if((typeof value ==='object' && value !== null) || (typeof value === 'function' && options.includeFunctions && options.preserveReferences)) {
+                        if(references.has(value)) {
+                            return `@&:${serialize(references.get(value), {...options,space:0})}`;
+                        } else {
+                            references.set(value, path)
+                        }
                     }
-                }
-
-                if(Array.isArray(value)) {
-                    return value.map((value,index) => transform(value,[...path,`${index}`],options));
-                } else if(typeof value === 'object' && value !== null) {
-                    if(toSerializable in value) return `@${Object.getPrototypeOf(value).constructor.name}:${serialize(value[toSerializable](options),{...options,space:0})}`;
-                    const entries = [...getSymbolEntries(value),...Object.entries(value)].map(([key,value])=>[transform(key, [...path,key], options),transform(value, [...path,key], options)]);
-                    return Object.fromEntries(options?.sortKeys ? entries.sort() : entries);
-                } else if(typeof value === 'bigint') {
-                    return `@bigint:${serialize(value.toString())}`;
-                } else if(typeof value === 'symbol') {
-                    const name = value.toString().slice(7,-1);
-                    symbolSet.add(value);
-                    return `@symbol:${serialize([name, Symbol.for(name) === value ? -1 : [...symbolSet.values()].indexOf(value)])}`;
-                } else if(typeof value === 'string') {
-                    return value.replace(/@/g,'@@');
-                } else if(Number.isNaN(value)) {
-                    return '@number:NaN'
-                } else if(value === Infinity) {
-                    return '@number:+Infinity'
-                } else if(value === -Infinity) {
-                    return '@number:-Infinity'
-                } else if(typeof value === 'undefined') {
-                    return '@undefined';
-                } else if(typeof value === 'function' && options.includeFunctions) {
-                    return `@function:${value}`;
-                } else {
-                    return value;
+                    
+                    if(Array.isArray(value)) {
+                        return value.map((value,index) => transform(value,[...path,`${index}`],options));
+                    } else if(typeof value === 'object' && value !== null) {
+                        if(toSerializable in value) return `@${Object.getPrototypeOf(value).constructor.name}:${serialize(value[toSerializable](options),{...options,space:0})}`;
+                        const entries = [...getSymbolEntries(value),...Object.entries(value)].map(([key,value])=>[transform(key, [...path,key], options),transform(value, [...path,key], options)]);
+                        return Object.fromEntries(options?.sortKeys ? entries.sort() : entries);
+                    } else if(typeof value === 'bigint') {
+                        return `@bigint:${serialize(value.toString())}`;
+                    } else if(typeof value === 'symbol') {
+                        const name = value.toString().slice(7,-1);
+                        symbolSet.add(value);
+                        return `@symbol:${serialize([name, Symbol.for(name) === value ? -1 : [...symbolSet.values()].indexOf(value)])}`;
+                    } else if(typeof value === 'string') {
+                        return value.replace(/@/g,'@@');
+                    } else if(Number.isNaN(value)) {
+                        return '@number:NaN'
+                    } else if(value === Infinity) {
+                        return '@number:+Infinity'
+                    } else if(value === -Infinity) {
+                        return '@number:-Infinity'
+                    } else if(typeof value === 'undefined') {
+                        return '@undefined';
+                    } else if(typeof value === 'function' && options.includeFunctions) {
+                        return `@function:${value}`;
+                    } else {
+                        return value;
+                    }
+                } finally {
+                    if(typeof value === 'object' && value !== null && !options.preserveReferences) {
+                        references.delete(value);
+                    }
                 }
             }
             
@@ -188,21 +198,36 @@ class SerializationSet<T extends Serialization.SerializableValue> implements Set
     }
 }
 
-// declare interface Set<T> {
-//     [Serialization.toSerializable]: Serialization.SerializableObject[typeof Serialization.toSerializable];
-// }
+
+declare interface Set<T> extends Serialization.SerializableObject<Set<T>> {}
 Set.prototype[Serialization.toSerializable] = function(this: Set<any>, options: Serialization.SerializeOptions) {
     return (options.sortKeys ? [...this.values()].sort() : [...this.values()]);
 }
 
-// todo, prevent serialize from allowing map<string,function> or set<function>
-// declare interface Map<K extends string,V extends Serialization.SerializableValue> {
-//     [Serialization.toSerializable]: Serialization.SerializableObject[typeof Serialization.toSerializable];
-// }
-Map.prototype[Serialization.toSerializable] = function(this: Set<any>, options: Serialization.SerializeOptions) {
+declare interface Map<K,V> extends Serialization.SerializableObject<Map<K,V>> {}
+Map.prototype[Serialization.toSerializable] = function(this: Map<any,any>, options: Serialization.SerializeOptions) {
     return (options.sortKeys ? [...this.entries()].sort() : [...this.entries()]);
 }
 
+declare interface Date extends Serialization.SerializableObject<Date> {}
+Date.prototype[Serialization.toSerializable] = function(this: Date) {
+    return this.toJSON();
+}
+
+declare interface Number extends Serialization.SerializableObject<Number> {}
+Number.prototype[Serialization.toSerializable] = function(this: Number) {
+    return this.valueOf();
+}
+
+declare interface Boolean extends Serialization.SerializableObject<Boolean> {}
+Boolean.prototype[Serialization.toSerializable] = function(this: Boolean) {
+    return this.valueOf();
+}
+
+declare interface String extends Serialization.SerializableObject<String> {}
+String.prototype[Serialization.toSerializable] = function(this: String) {
+    return this.toString();
+}
 
 //y=Symbol('deserialize');
 // function detransform(value: any): any {
@@ -222,7 +247,11 @@ Map.prototype[Serialization.toSerializable] = function(this: Set<any>, options: 
 // function deserialize(text: string): any {
 //     return detransform(JSON.parse(text))
 // }
-console.log(Serialization.serialize(foo,{space:2,sortKeys:true,includeFunctions:false}));
+
+
+function f() {}
+const r = new Map([[f,1]])
+console.log(Serialization.serialize([z,z],{space:2,sortKeys:true,includeFunctions:true,preserveReferences:false}));
 
 
 const x = new SerializationSet();
