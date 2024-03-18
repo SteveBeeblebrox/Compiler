@@ -6,7 +6,8 @@ declare namespace OpaqueTypes {
 type Opaque<T,Ident> = OpaqueTypes.Opaque<T,Ident>;
 
 class CFG {
-    public static readonly EOF = '$' as Terminal & '$';
+    public static readonly EOF = undefined as unknown as Terminal;
+    public static readonly EOF_CHARACTER = '$';
     public static readonly LAMBDA = '\u03bb';
     constructor(
         public readonly startingSymbol: NonTerminal,
@@ -32,7 +33,7 @@ class CFG {
     }
 
     public static isTerminal(string: string): string is Terminal {
-        return string.toLowerCase() === string && string.length >= 1 && !this.isEOF(string) && !this.isLambda(string);
+        return !this.isEOF(string) && !this.isLambda(string) && string.toLowerCase() === string && string.length >= 1;
     }
     
     public static isTerminalOrEOF(string: string): string is Terminal | typeof CFG.EOF {
@@ -48,7 +49,7 @@ class CFG {
     }
 
     public static isNonTerminal(string: string): string is NonTerminal {
-        return string.toLowerCase() !== string && string.length >= 1 && !this.isEOF(string) && !this.isLambda(string);
+        return !this.isEOF(string) && !this.isLambda(string) && string.toLowerCase() !== string && string.length >= 1;
     }
 
     public derivesToLambda(L: NonTerminal | Terminal, T: Stack<CFGRuleBody> = []): boolean {
@@ -188,7 +189,15 @@ class CFG {
 
     public stringifyRule(rule: CFGRule, lhs = true): string {
         if(lhs) return `${rule[0]} -> ${this.stringifyRule(rule, false)}`;
-        else return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA) + (this.isStartingRule(rule) ? ' ' + CFG.EOF : '');
+        else return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA) + (this.isStartingRule(rule) ? ' ' + CFG.EOF_CHARACTER : '');
+    }
+
+    public stringifySet(set: Set<Terminal | NonTerminal>): string {
+        return `{${set.values().map(
+            c => c === CFG.EOF
+                ? CFG.EOF_CHARACTER
+                : `'${JSON.stringify(c).slice(1,-1).replace(/'/g,'\\\'').replace(/\\"/g,'"')}'`
+        ).toArray().join(', ')}}`;
     }
 }
 

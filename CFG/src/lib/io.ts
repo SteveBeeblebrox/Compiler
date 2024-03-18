@@ -5,7 +5,7 @@ function readCFG(path: string, commentExtension = true): CFG {
         ARROW: '->',
         LAMBDA: 'lambda',
         OR: '|',
-        EOF: CFG.EOF
+        EOF: CFG.EOF_CHARACTER
     });
     const text = system.readFile(path);
     let tokens: string[] = []
