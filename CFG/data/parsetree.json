@@ -2,50 +2,772 @@
   "value": "S",
   "children": [
     {
-      "value": "A",
+      "value": "Regex",
       "children": [
         {
-          "value": "B",
+          "value": "Alternation",
           "children": [
             {
-              "value": {
-                "name": "b"
-              },
-              "children": []
+              "value": "Sequence",
+              "children": [
+                {
+                  "value": "Quantifier",
+                  "children": [
+                    {
+                      "value": "Primary",
+                      "children": [
+                        {
+                          "value": "Primitive",
+                          "children": [
+                            {
+                              "value": {
+                                "name": "char"
+                              },
+                              "children": []
+                            },
+                            {
+                              "value": "Primitive'",
+                              "children": [
+                                {
+                                  "value": "λ",
+                                  "children": []
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "value": "Quantifier'",
+                      "children": [
+                        {
+                          "value": "λ",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "value": "Sequence'",
+                  "children": [
+                    {
+                      "value": "Quantifier",
+                      "children": [
+                        {
+                          "value": "Primary",
+                          "children": [
+                            {
+                              "value": "Primitive",
+                              "children": [
+                                {
+                                  "value": {
+                                    "name": "char"
+                                  },
+                                  "children": []
+                                },
+                                {
+                                  "value": "Primitive'",
+                                  "children": [
+                                    {
+                                      "value": "λ",
+                                      "children": []
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "value": "Quantifier'",
+                          "children": [
+                            {
+                              "value": "λ",
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "value": "Sequence'",
+                      "children": [
+                        {
+                          "value": "Quantifier",
+                          "children": [
+                            {
+                              "value": "Primary",
+                              "children": [
+                                {
+                                  "value": {
+                                    "name": "("
+                                  },
+                                  "children": []
+                                },
+                                {
+                                  "value": "Regex",
+                                  "children": [
+                                    {
+                                      "value": "Alternation",
+                                      "children": [
+                                        {
+                                          "value": "Sequence",
+                                          "children": [
+                                            {
+                                              "value": "Quantifier",
+                                              "children": [
+                                                {
+                                                  "value": "Primary",
+                                                  "children": [
+                                                    {
+                                                      "value": "Primitive",
+                                                      "children": [
+                                                        {
+                                                          "value": {
+                                                            "name": "char"
+                                                          },
+                                                          "children": []
+                                                        },
+                                                        {
+                                                          "value": "Primitive'",
+                                                          "children": [
+                                                            {
+                                                              "value": "λ",
+                                                              "children": []
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "value": "Quantifier'",
+                                                  "children": [
+                                                    {
+                                                      "value": "λ",
+                                                      "children": []
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "value": "Sequence'",
+                                              "children": [
+                                                {
+                                                  "value": "λ",
+                                                  "children": []
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "value": "Alternation'",
+                                          "children": [
+                                            {
+                                              "value": {
+                                                "name": "%|%"
+                                              },
+                                              "children": []
+                                            },
+                                            {
+                                              "value": "Sequence",
+                                              "children": [
+                                                {
+                                                  "value": "Quantifier",
+                                                  "children": [
+                                                    {
+                                                      "value": "Primary",
+                                                      "children": [
+                                                        {
+                                                          "value": "Primitive",
+                                                          "children": [
+                                                            {
+                                                              "value": {
+                                                                "name": "char"
+                                                              },
+                                                              "children": []
+                                                            },
+                                                            {
+                                                              "value": "Primitive'",
+                                                              "children": [
+                                                                {
+                                                                  "value": "λ",
+                                                                  "children": []
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "value": "Quantifier'",
+                                                      "children": [
+                                                        {
+                                                          "value": "λ",
+                                                          "children": []
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "value": "Sequence'",
+                                                  "children": [
+                                                    {
+                                                      "value": "λ",
+                                                      "children": []
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "value": "Alternation'",
+                                              "children": [
+                                                {
+                                                  "value": {
+                                                    "name": "%|%"
+                                                  },
+                                                  "children": []
+                                                },
+                                                {
+                                                  "value": "Sequence",
+                                                  "children": [
+                                                    {
+                                                      "value": "Quantifier",
+                                                      "children": [
+                                                        {
+                                                          "value": "Primary",
+                                                          "children": [
+                                                            {
+                                                              "value": "Primitive",
+                                                              "children": [
+                                                                {
+                                                                  "value": {
+                                                                    "name": "char"
+                                                                  },
+                                                                  "children": []
+                                                                },
+                                                                {
+                                                                  "value": "Primitive'",
+                                                                  "children": [
+                                                                    {
+                                                                      "value": "λ",
+                                                                      "children": []
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "value": "Quantifier'",
+                                                          "children": [
+                                                            {
+                                                              "value": "λ",
+                                                              "children": []
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "value": "Sequence'",
+                                                      "children": [
+                                                        {
+                                                          "value": "λ",
+                                                          "children": []
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "value": "Alternation'",
+                                                  "children": [
+                                                    {
+                                                      "value": {
+                                                        "name": "%|%"
+                                                      },
+                                                      "children": []
+                                                    },
+                                                    {
+                                                      "value": "Sequence",
+                                                      "children": [
+                                                        {
+                                                          "value": "Quantifier",
+                                                          "children": [
+                                                            {
+                                                              "value": "Primary",
+                                                              "children": [
+                                                                {
+                                                                  "value": "Primitive",
+                                                                  "children": [
+                                                                    {
+                                                                      "value": {
+                                                                        "name": "char"
+                                                                      },
+                                                                      "children": []
+                                                                    },
+                                                                    {
+                                                                      "value": "Primitive'",
+                                                                      "children": [
+                                                                        {
+                                                                          "value": "λ",
+                                                                          "children": []
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            },
+                                                            {
+                                                              "value": "Quantifier'",
+                                                              "children": [
+                                                                {
+                                                                  "value": "λ",
+                                                                  "children": []
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "value": "Sequence'",
+                                                          "children": [
+                                                            {
+                                                              "value": "λ",
+                                                              "children": []
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "value": "Alternation'",
+                                                      "children": [
+                                                        {
+                                                          "value": {
+                                                            "name": "%|%"
+                                                          },
+                                                          "children": []
+                                                        },
+                                                        {
+                                                          "value": "Sequence",
+                                                          "children": [
+                                                            {
+                                                              "value": "Quantifier",
+                                                              "children": [
+                                                                {
+                                                                  "value": "Primary",
+                                                                  "children": [
+                                                                    {
+                                                                      "value": "Primitive",
+                                                                      "children": [
+                                                                        {
+                                                                          "value": {
+                                                                            "name": "char"
+                                                                          },
+                                                                          "children": []
+                                                                        },
+                                                                        {
+                                                                          "value": "Primitive'",
+                                                                          "children": [
+                                                                            {
+                                                                              "value": "λ",
+                                                                              "children": []
+                                                                            }
+                                                                          ]
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                },
+                                                                {
+                                                                  "value": "Quantifier'",
+                                                                  "children": [
+                                                                    {
+                                                                      "value": "λ",
+                                                                      "children": []
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            },
+                                                            {
+                                                              "value": "Sequence'",
+                                                              "children": [
+                                                                {
+                                                                  "value": "λ",
+                                                                  "children": []
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "value": "Alternation'",
+                                                          "children": [
+                                                            {
+                                                              "value": "λ",
+                                                              "children": []
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "value": {
+                                    "name": ")"
+                                  },
+                                  "children": []
+                                }
+                              ]
+                            },
+                            {
+                              "value": "Quantifier'",
+                              "children": [
+                                {
+                                  "value": {
+                                    "name": "+"
+                                  },
+                                  "children": []
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "value": "Sequence'",
+                          "children": [
+                            {
+                              "value": "Quantifier",
+                              "children": [
+                                {
+                                  "value": "Primary",
+                                  "children": [
+                                    {
+                                      "value": {
+                                        "name": "("
+                                      },
+                                      "children": []
+                                    },
+                                    {
+                                      "value": "Regex",
+                                      "children": [
+                                        {
+                                          "value": "Alternation",
+                                          "children": [
+                                            {
+                                              "value": "Sequence",
+                                              "children": [
+                                                {
+                                                  "value": "Quantifier",
+                                                  "children": [
+                                                    {
+                                                      "value": "Primary",
+                                                      "children": [
+                                                        {
+                                                          "value": "Primitive",
+                                                          "children": [
+                                                            {
+                                                              "value": {
+                                                                "name": "char"
+                                                              },
+                                                              "children": []
+                                                            },
+                                                            {
+                                                              "value": "Primitive'",
+                                                              "children": [
+                                                                {
+                                                                  "value": "λ",
+                                                                  "children": []
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "value": "Quantifier'",
+                                                      "children": [
+                                                        {
+                                                          "value": "λ",
+                                                          "children": []
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "value": "Sequence'",
+                                                  "children": [
+                                                    {
+                                                      "value": "Quantifier",
+                                                      "children": [
+                                                        {
+                                                          "value": "Primary",
+                                                          "children": [
+                                                            {
+                                                              "value": "Primitive",
+                                                              "children": [
+                                                                {
+                                                                  "value": {
+                                                                    "name": "char"
+                                                                  },
+                                                                  "children": []
+                                                                },
+                                                                {
+                                                                  "value": "Primitive'",
+                                                                  "children": [
+                                                                    {
+                                                                      "value": "λ",
+                                                                      "children": []
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "value": "Quantifier'",
+                                                          "children": [
+                                                            {
+                                                              "value": "λ",
+                                                              "children": []
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "value": "Sequence'",
+                                                      "children": [
+                                                        {
+                                                          "value": "Quantifier",
+                                                          "children": [
+                                                            {
+                                                              "value": "Primary",
+                                                              "children": [
+                                                                {
+                                                                  "value": "Primitive",
+                                                                  "children": [
+                                                                    {
+                                                                      "value": {
+                                                                        "name": "char"
+                                                                      },
+                                                                      "children": []
+                                                                    },
+                                                                    {
+                                                                      "value": "Primitive'",
+                                                                      "children": [
+                                                                        {
+                                                                          "value": "λ",
+                                                                          "children": []
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            },
+                                                            {
+                                                              "value": "Quantifier'",
+                                                              "children": [
+                                                                {
+                                                                  "value": "λ",
+                                                                  "children": []
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "value": "Sequence'",
+                                                          "children": [
+                                                            {
+                                                              "value": "λ",
+                                                              "children": []
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "value": "Alternation'",
+                                              "children": [
+                                                {
+                                                  "value": {
+                                                    "name": "%|%"
+                                                  },
+                                                  "children": []
+                                                },
+                                                {
+                                                  "value": "Sequence",
+                                                  "children": [
+                                                    {
+                                                      "value": "Quantifier",
+                                                      "children": [
+                                                        {
+                                                          "value": "Primary",
+                                                          "children": [
+                                                            {
+                                                              "value": "Primitive",
+                                                              "children": [
+                                                                {
+                                                                  "value": {
+                                                                    "name": "char"
+                                                                  },
+                                                                  "children": []
+                                                                },
+                                                                {
+                                                                  "value": "Primitive'",
+                                                                  "children": [
+                                                                    {
+                                                                      "value": {
+                                                                        "name": "-"
+                                                                      },
+                                                                      "children": []
+                                                                    },
+                                                                    {
+                                                                      "value": {
+                                                                        "name": "char"
+                                                                      },
+                                                                      "children": []
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "value": "Quantifier'",
+                                                          "children": [
+                                                            {
+                                                              "value": "λ",
+                                                              "children": []
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "value": "Sequence'",
+                                                      "children": [
+                                                        {
+                                                          "value": "λ",
+                                                          "children": []
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "value": "Alternation'",
+                                                  "children": [
+                                                    {
+                                                      "value": {
+                                                        "name": "%|%"
+                                                      },
+                                                      "children": []
+                                                    },
+                                                    {
+                                                      "value": "Sequence",
+                                                      "children": [
+                                                        {
+                                                          "value": "λ",
+                                                          "children": []
+                                                        }
+                                                      ]
+                                                    },
+                                                    {
+                                                      "value": "Alternation'",
+                                                      "children": [
+                                                        {
+                                                          "value": "λ",
+                                                          "children": []
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "value": {
+                                        "name": ")"
+                                      },
+                                      "children": []
+                                    }
+                                  ]
+                                },
+                                {
+                                  "value": "Quantifier'",
+                                  "children": [
+                                    {
+                                      "value": "λ",
+                                      "children": []
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "value": "Sequence'",
+                              "children": [
+                                {
+                                  "value": "λ",
+                                  "children": []
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             },
             {
-              "value": {
-                "name": "g"
-              },
-              "children": []
-            },
-            {
-              "value": {
-                "name": "h"
-              },
-              "children": []
+              "value": "Alternation'",
+              "children": [
+                {
+                  "value": "λ",
+                  "children": []
+                }
+              ]
             }
           ]
-        },
-        {
-          "value": "C",
-          "children": [
-            {
-              "value": "λ",
-              "children": []
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "value": "M",
-      "children": [
-        {
-          "value": {
-            "name": "m"
-          },
-          "children": []
         }
       ]
     },
