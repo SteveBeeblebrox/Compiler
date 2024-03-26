@@ -1,0 +1,84 @@
+#!/home/siana/.nvm/versions/node/v21.5.0/bin/node
+var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+};
+var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
+};
+var _Tree_instances, _Tree_parent, _Tree_disown, _Tree_own;
+class Tree {
+    constructor(value) {
+        _Tree_instances.add(this);
+        this.value = value;
+        this.children = [];
+        _Tree_parent.set(this, undefined);
+    }
+    get parent() {
+        return __classPrivateFieldGet(this, _Tree_parent, "f");
+    }
+    push(...items) {
+        return this.children.push(...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree)));
+    }
+    pop() {
+        return __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, this.children.pop());
+    }
+    unshift(...items) {
+        return this.children.unshift(...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree)));
+    }
+    shift() {
+        return __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, this.children.shift());
+    }
+    splice(start, deleteCount, ...items) {
+        return this.children.splice(start, deleteCount, ...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree))).map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, tree));
+    }
+    at(index) {
+        return this.children.at(index);
+    }
+    get length() {
+        return this.children.length;
+    }
+    forEach(callbackfn, thisArg) {
+        if (thisArg !== undefined) {
+            callbackfn = callbackfn.bind(thisArg);
+        }
+        return this.children.forEach((tree, index) => callbackfn(tree, index, this));
+    }
+    values() {
+        return this.children.values();
+    }
+    get [(_Tree_parent = new WeakMap(), _Tree_instances = new WeakSet(), _Tree_disown = function _Tree_disown(other) {
+        if (other !== undefined) {
+            __classPrivateFieldSet(other, _Tree_parent, undefined, "f");
+        }
+        return other;
+    }, _Tree_own = function _Tree_own(other) {
+        if (other === undefined) {
+            throw new Error('Cannot take ownership of undefined');
+        }
+        if (other === this) {
+            throw new Error('Cannot take ownership of self');
+        }
+        if (other.parent !== undefined) {
+            throw new Error('Cannot take ownership of a subtree');
+        }
+        let ancestor = this;
+        do {
+            if (ancestor === other) {
+                throw new Error('Cannot take ownership of ancestor');
+            }
+        } while (ancestor = ancestor.parent);
+        __classPrivateFieldSet(other, _Tree_parent, this, "f");
+        return other;
+    }, Symbol.toStringTag)]() {
+        return 'Tree';
+    }
+    get [Symbol.iterator]() {
+        return this.children[Symbol.iterator];
+    }
+}
+console.log(new Tree(0));
