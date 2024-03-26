@@ -1,7 +1,8 @@
+///#include <peek.ts>
+///#include <tree.ts>
+
 ///#include "lib/types.ts"
-///#include "lib/peek.ts"
 ///#include "lib/io.ts"
-///#include "lib/tree.ts"
 ///#include "lib/ll1.ts"
 
 // Note, some of the optimizations can't see through  A -> B -> C rules

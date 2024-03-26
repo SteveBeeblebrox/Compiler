@@ -10,9 +10,117 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
     return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
 };
-var _a, _b, _c, _d;
-var _e, _f, _g;
 var _Tree_instances, _Tree_parent, _Tree_disown, _Tree_own;
+function createAsyncPeekableIterator(asyncIterable) {
+    let next = asyncIterable[Symbol.asyncIterator]().next();
+    const it = (async function* () {
+        let done = false, value;
+        while (!done) {
+            ({ done, value } = await next);
+            if (!done) {
+                next = asyncIterable[Symbol.asyncIterator]().next();
+                yield value;
+            }
+        }
+    })();
+    it.peek = async function peek() {
+        return (await next).value;
+    };
+    it.pop = async function pop() {
+        return (await it.next()).value;
+    };
+    return it;
+}
+function createPeekableIterator(iterable) {
+    let next = iterable[Symbol.iterator]().next();
+    const it = (function* () {
+        let done = false, value;
+        while (!done) {
+            ({ done, value } = next);
+            if (!done) {
+                next = iterable[Symbol.iterator]().next();
+                yield value;
+            }
+        }
+    })();
+    it.peek = function peek() {
+        return next.value;
+    };
+    it.pop = function pop() {
+        return it.next().value;
+    };
+    return it;
+}
+class Tree {
+    constructor(value) {
+        _Tree_instances.add(this);
+        this.value = value;
+        this.children = [];
+        _Tree_parent.set(this, undefined);
+    }
+    get parent() {
+        return __classPrivateFieldGet(this, _Tree_parent, "f");
+    }
+    push(...items) {
+        return this.children.push(...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree)));
+    }
+    pop() {
+        return __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, this.children.pop());
+    }
+    unshift(...items) {
+        return this.children.unshift(...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree)));
+    }
+    shift() {
+        return __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, this.children.shift());
+    }
+    splice(start, deleteCount, ...items) {
+        return this.children.splice(start, deleteCount, ...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree))).map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, tree));
+    }
+    at(index) {
+        return this.children.at(index);
+    }
+    get length() {
+        return this.children.length;
+    }
+    forEach(callbackfn, thisArg) {
+        if (thisArg !== undefined) {
+            callbackfn = callbackfn.bind(thisArg);
+        }
+        return this.children.forEach((tree, index) => callbackfn(tree, index, this));
+    }
+    values() {
+        return this.children.values();
+    }
+    get [(_Tree_parent = new WeakMap(), _Tree_instances = new WeakSet(), _Tree_disown = function _Tree_disown(other) {
+        if (other !== undefined) {
+            __classPrivateFieldSet(other, _Tree_parent, undefined, "f");
+        }
+        return other;
+    }, _Tree_own = function _Tree_own(other) {
+        if (other === undefined) {
+            throw new Error('Cannot take ownership of undefined');
+        }
+        if (other === this) {
+            throw new Error('Cannot take ownership of self');
+        }
+        if (other.parent !== undefined) {
+            throw new Error('Cannot take ownership of a subtree');
+        }
+        let ancestor = this;
+        do {
+            if (ancestor === other) {
+                throw new Error('Cannot take ownership of ancestor');
+            }
+        } while (ancestor = ancestor.parent);
+        __classPrivateFieldSet(other, _Tree_parent, this, "f");
+        return other;
+    }, Symbol.toStringTag)]() {
+        return 'Tree';
+    }
+    get [Symbol.iterator]() {
+        return this.children[Symbol.iterator];
+    }
+}
 class CFG {
     constructor(startingSymbol, rules, terminals) {
         this.startingSymbol = startingSymbol;
@@ -187,46 +295,6 @@ class Token {
         this.value = value;
     }
 }
-function createAsyncPeekableIterator(asyncIterable) {
-    let next = asyncIterable[Symbol.asyncIterator]().next();
-    const it = (async function* () {
-        let done = false, value;
-        while (!done) {
-            ({ done, value } = await next);
-            if (!done) {
-                next = asyncIterable[Symbol.asyncIterator]().next();
-                yield value;
-            }
-        }
-    })();
-    it.peek = async function peek() {
-        return (await next).value;
-    };
-    it.pop = async function pop() {
-        return (await it.next()).value;
-    };
-    return it;
-}
-function createPeekableIterator(iterable) {
-    let next = iterable[Symbol.iterator]().next();
-    const it = (function* () {
-        let done = false, value;
-        while (!done) {
-            ({ done, value } = next);
-            if (!done) {
-                next = iterable[Symbol.iterator]().next();
-                yield value;
-            }
-        }
-    })();
-    it.peek = function peek() {
-        return next.value;
-    };
-    it.pop = function pop() {
-        return it.next().value;
-    };
-    return it;
-}
 fs = require('fs');
 const system = {
     args: process.argv.slice(1),
@@ -258,40 +326,288 @@ function installPolyfill(base, pollyfill, debug = false) {
         }
     }
 }
-(_a = Object.groupBy) !== null && _a !== void 0 ? _a : (Object.groupBy = function groupBy(values, callback) {
-    return values.reduce((obj, value, index) => {
-        var _a;
-        const key = callback(value, index);
-        obj[key] = [...((_a = obj[key]) !== null && _a !== void 0 ? _a : []), value];
-        return obj;
-    }, {});
-});
-(_b = (_e = Array.prototype).at) !== null && _b !== void 0 ? _b : (_e.at = function at(index) {
-    index *= 1;
-    if (index >= 0) {
-        return this[index];
-    }
-    else if (index < 0) {
-        return this[this.length + index];
-    }
-    else {
-        throw new TypeError(`Argument to at() is not a number`);
-    }
-});
-(_c = (_f = Array.prototype).flat) !== null && _c !== void 0 ? _c : (_f.flat = function flat(depth = 1) {
-    return depth ? Array.prototype.reduce.call(this, function (flattened, value) {
-        if (Array.isArray(value)) {
-            flattened.push.apply(flattened, flat.call(value, depth - 1));
+var ArrayPolyfill;
+(function (ArrayPolyfill) {
+    function at(index) {
+        index *= 1;
+        if (index >= 0) {
+            return this[index];
+        }
+        else if (index < 0) {
+            return this[this.length + index];
         }
         else {
-            flattened.push(value);
+            throw new TypeError(`Argument to at() is not a number`);
         }
-        return flattened;
-    }, []) : Array.prototype.slice.call(this);
-});
-(_d = (_g = Array.prototype).flatMap) !== null && _d !== void 0 ? _d : (_g.flatMap = function flatMap(callback, thisArg) {
-    return Array.prototype.map.call(this, callback, thisArg).flat();
-});
+    }
+    ArrayPolyfill.at = at;
+    function flat(depth = 1) {
+        return depth ? Array.prototype.reduce.call(this, function (flattened, value) {
+            if (Array.isArray(value)) {
+                flattened.push.apply(flattened, flat.call(value, depth - 1));
+            }
+            else {
+                flattened.push(value);
+            }
+            return flattened;
+        }, []) : Array.prototype.slice.call(this);
+    }
+    ArrayPolyfill.flat = flat;
+    function flatMap(callback, thisArg) {
+        return Array.prototype.map.call(this, callback, thisArg).flat();
+    }
+    ArrayPolyfill.flatMap = flatMap;
+})(ArrayPolyfill || (ArrayPolyfill = {}));
+installPolyfill(Array, ArrayPolyfill);
+var AsyncIteratorPolyfill;
+(function (AsyncIteratorPolyfill) {
+    const NO_INITIAL_VALUE = Symbol();
+    async function* map(mapper) {
+        let counter = 0;
+        for await (const value of this) {
+            yield mapper(value, counter);
+            counter++;
+        }
+    }
+    AsyncIteratorPolyfill.map = map;
+    async function* filter(filterer) {
+        let counter = 0;
+        for await (const value of this) {
+            if (filterer(value, counter)) {
+                yield value;
+            }
+            counter++;
+        }
+    }
+    AsyncIteratorPolyfill.filter = filter;
+    async function* take(limit) {
+        let counter = 0;
+        for await (const value of this) {
+            if (counter >= limit)
+                break;
+            yield value;
+            counter++;
+        }
+    }
+    AsyncIteratorPolyfill.take = take;
+    async function* drop(limit) {
+        let counter = 0;
+        for await (const value of this) {
+            if (counter >= limit) {
+                yield value;
+            }
+            counter++;
+        }
+    }
+    AsyncIteratorPolyfill.drop = drop;
+    async function* flatMap(mapper) {
+        let counter = 0;
+        for await (const value of this) {
+            yield* mapper(value, counter);
+            counter++;
+        }
+    }
+    AsyncIteratorPolyfill.flatMap = flatMap;
+    async function reduce(reducer, initialValue = NO_INITIAL_VALUE) {
+        let accumulator = initialValue;
+        let counter = 0;
+        for await (const value of this) {
+            if (accumulator === NO_INITIAL_VALUE) {
+                accumulator = value;
+                continue;
+            }
+            accumulator = reducer(accumulator, value, counter);
+            counter++;
+        }
+        if (accumulator === NO_INITIAL_VALUE) {
+            throw new TypeError('Must specify an initialValue if the iterable is empty.');
+        }
+        return accumulator;
+    }
+    AsyncIteratorPolyfill.reduce = reduce;
+    async function toArray() {
+        const result = [];
+        for await (const x of this) {
+            result.push(x);
+        }
+        return result;
+    }
+    AsyncIteratorPolyfill.toArray = toArray;
+    async function forEach(fn) {
+        let counter = 0;
+        for await (const value of this) {
+            fn(value, counter);
+            counter++;
+        }
+    }
+    AsyncIteratorPolyfill.forEach = forEach;
+    async function some(fn) {
+        let counter = 0;
+        for await (const value of this) {
+            if (fn(value, counter)) {
+                return true;
+            }
+            counter++;
+        }
+        return false;
+    }
+    AsyncIteratorPolyfill.some = some;
+    async function every(fn) {
+        let counter = 0;
+        for await (const value of this) {
+            if (!fn(value, counter)) {
+                return false;
+            }
+            counter++;
+        }
+        return true;
+    }
+    AsyncIteratorPolyfill.every = every;
+    async function find(fn) {
+        let counter = 0;
+        for await (const value of this) {
+            if (fn(value, counter)) {
+                return value;
+            }
+            counter++;
+        }
+        return undefined;
+    }
+    AsyncIteratorPolyfill.find = find;
+})(AsyncIteratorPolyfill || (AsyncIteratorPolyfill = {}));
+installPolyfill({ prototype: Object.getPrototypeOf(Object.getPrototypeOf((async function* () { }).prototype)) }, AsyncIteratorPolyfill, true);
+var IteratorPolyfill;
+(function (IteratorPolyfill) {
+    const NO_INITIAL_VALUE = Symbol();
+    function* map(mapper) {
+        let counter = 0;
+        for (const value of this) {
+            yield mapper(value, counter);
+            counter++;
+        }
+    }
+    IteratorPolyfill.map = map;
+    function* filter(filterer) {
+        let counter = 0;
+        for (const value of this) {
+            if (filterer(value, counter)) {
+                yield value;
+            }
+            counter++;
+        }
+    }
+    IteratorPolyfill.filter = filter;
+    function* take(limit) {
+        let counter = 0;
+        for (const value of this) {
+            if (counter >= limit)
+                break;
+            yield value;
+            counter++;
+        }
+    }
+    IteratorPolyfill.take = take;
+    function* drop(limit) {
+        let counter = 0;
+        for (const value of this) {
+            if (counter >= limit) {
+                yield value;
+            }
+            counter++;
+        }
+    }
+    IteratorPolyfill.drop = drop;
+    function* flatMap(mapper) {
+        let counter = 0;
+        for (const value of this) {
+            yield* mapper(value, counter);
+            counter++;
+        }
+    }
+    IteratorPolyfill.flatMap = flatMap;
+    function reduce(reducer, initialValue = NO_INITIAL_VALUE) {
+        let accumulator = initialValue;
+        let counter = 0;
+        for (const value of this) {
+            if (accumulator === NO_INITIAL_VALUE) {
+                accumulator = value;
+                continue;
+            }
+            accumulator = reducer(accumulator, value, counter);
+            counter++;
+        }
+        if (accumulator === NO_INITIAL_VALUE) {
+            throw new TypeError('Must specify an initialValue if the iterable is empty.');
+        }
+        return accumulator;
+    }
+    IteratorPolyfill.reduce = reduce;
+    function toArray() {
+        const result = [];
+        for (const x of this) {
+            result.push(x);
+        }
+        return result;
+    }
+    IteratorPolyfill.toArray = toArray;
+    function forEach(fn) {
+        let counter = 0;
+        for (const value of this) {
+            fn(value, counter);
+            counter++;
+        }
+    }
+    IteratorPolyfill.forEach = forEach;
+    function some(fn) {
+        let counter = 0;
+        for (const value of this) {
+            if (fn(value, counter)) {
+                return true;
+            }
+            counter++;
+        }
+        return false;
+    }
+    IteratorPolyfill.some = some;
+    function every(fn) {
+        let counter = 0;
+        for (const value of this) {
+            if (!fn(value, counter)) {
+                return false;
+            }
+            counter++;
+        }
+        return true;
+    }
+    IteratorPolyfill.every = every;
+    function find(fn) {
+        let counter = 0;
+        for (const value of this) {
+            if (fn(value, counter)) {
+                return value;
+            }
+            counter++;
+        }
+        return undefined;
+    }
+    IteratorPolyfill.find = find;
+    async function* toAsync() { yield* this; }
+    IteratorPolyfill.toAsync = toAsync;
+})(IteratorPolyfill || (IteratorPolyfill = {}));
+installPolyfill({ prototype: Object.getPrototypeOf(Object.getPrototypeOf((function* () { }).prototype)) }, IteratorPolyfill);
+var ObjectPolyfill;
+(function (ObjectPolyfill) {
+    function groupBy(values, callback) {
+        return values.reduce((obj, value, index) => {
+            var _a;
+            const key = callback(value, index);
+            obj[key] = [...((_a = obj[key]) !== null && _a !== void 0 ? _a : []), value];
+            return obj;
+        }, {});
+    }
+    ObjectPolyfill.groupBy = groupBy;
+})(ObjectPolyfill || (ObjectPolyfill = {}));
+installPolyfill(Object, ObjectPolyfill);
 // Set Polyfill based off of work by
 // Axel Rauschmayer, (c) 2021 MIT License
 // https://github.com/rauschma/set-methods-polyfill
@@ -435,242 +751,6 @@ var SetPolyfill;
     SetPolyfill.takeSymmetricDifference = takeInPlace(symmetricDifference);
 })(SetPolyfill || (SetPolyfill = {}));
 installPolyfill(Set, SetPolyfill);
-var IteratorPolyfill;
-(function (IteratorPolyfill) {
-    const NO_INITIAL_VALUE = Symbol();
-    function* map(mapper) {
-        let counter = 0;
-        for (const value of this) {
-            yield mapper(value, counter);
-            counter++;
-        }
-    }
-    IteratorPolyfill.map = map;
-    function* filter(filterer) {
-        let counter = 0;
-        for (const value of this) {
-            if (filterer(value, counter)) {
-                yield value;
-            }
-            counter++;
-        }
-    }
-    IteratorPolyfill.filter = filter;
-    function* take(limit) {
-        let counter = 0;
-        for (const value of this) {
-            if (counter >= limit)
-                break;
-            yield value;
-            counter++;
-        }
-    }
-    IteratorPolyfill.take = take;
-    function* drop(limit) {
-        let counter = 0;
-        for (const value of this) {
-            if (counter >= limit) {
-                yield value;
-            }
-            counter++;
-        }
-    }
-    IteratorPolyfill.drop = drop;
-    function* flatMap(mapper) {
-        let counter = 0;
-        for (const value of this) {
-            yield* mapper(value, counter);
-            counter++;
-        }
-    }
-    IteratorPolyfill.flatMap = flatMap;
-    function reduce(reducer, initialValue = NO_INITIAL_VALUE) {
-        let accumulator = initialValue;
-        let counter = 0;
-        for (const value of this) {
-            if (accumulator === NO_INITIAL_VALUE) {
-                accumulator = value;
-                continue;
-            }
-            accumulator = reducer(accumulator, value, counter);
-            counter++;
-        }
-        if (accumulator === NO_INITIAL_VALUE) {
-            throw new TypeError('Must specify an initialValue if the iterable is empty.');
-        }
-        return accumulator;
-    }
-    IteratorPolyfill.reduce = reduce;
-    function toArray() {
-        const result = [];
-        for (const x of this) {
-            result.push(x);
-        }
-        return result;
-    }
-    IteratorPolyfill.toArray = toArray;
-    function forEach(fn) {
-        let counter = 0;
-        for (const value of this) {
-            fn(value, counter);
-            counter++;
-        }
-    }
-    IteratorPolyfill.forEach = forEach;
-    function some(fn) {
-        let counter = 0;
-        for (const value of this) {
-            if (fn(value, counter)) {
-                return true;
-            }
-            counter++;
-        }
-        return false;
-    }
-    IteratorPolyfill.some = some;
-    function every(fn) {
-        let counter = 0;
-        for (const value of this) {
-            if (!fn(value, counter)) {
-                return false;
-            }
-            counter++;
-        }
-        return true;
-    }
-    IteratorPolyfill.every = every;
-    function find(fn) {
-        let counter = 0;
-        for (const value of this) {
-            if (fn(value, counter)) {
-                return value;
-            }
-            counter++;
-        }
-        return undefined;
-    }
-    IteratorPolyfill.find = find;
-    async function* toAsync() { yield* this; }
-    IteratorPolyfill.toAsync = toAsync;
-})(IteratorPolyfill || (IteratorPolyfill = {}));
-installPolyfill({ prototype: Object.getPrototypeOf(Object.getPrototypeOf((function* () { }).prototype)) }, IteratorPolyfill);
-var AsyncIteratorPolyfill;
-(function (AsyncIteratorPolyfill) {
-    const NO_INITIAL_VALUE = Symbol();
-    async function* map(mapper) {
-        let counter = 0;
-        for await (const value of this) {
-            yield mapper(value, counter);
-            counter++;
-        }
-    }
-    AsyncIteratorPolyfill.map = map;
-    async function* filter(filterer) {
-        let counter = 0;
-        for await (const value of this) {
-            if (filterer(value, counter)) {
-                yield value;
-            }
-            counter++;
-        }
-    }
-    AsyncIteratorPolyfill.filter = filter;
-    async function* take(limit) {
-        let counter = 0;
-        for await (const value of this) {
-            if (counter >= limit)
-                break;
-            yield value;
-            counter++;
-        }
-    }
-    AsyncIteratorPolyfill.take = take;
-    async function* drop(limit) {
-        let counter = 0;
-        for await (const value of this) {
-            if (counter >= limit) {
-                yield value;
-            }
-            counter++;
-        }
-    }
-    AsyncIteratorPolyfill.drop = drop;
-    async function* flatMap(mapper) {
-        let counter = 0;
-        for await (const value of this) {
-            yield* mapper(value, counter);
-            counter++;
-        }
-    }
-    AsyncIteratorPolyfill.flatMap = flatMap;
-    async function reduce(reducer, initialValue = NO_INITIAL_VALUE) {
-        let accumulator = initialValue;
-        let counter = 0;
-        for await (const value of this) {
-            if (accumulator === NO_INITIAL_VALUE) {
-                accumulator = value;
-                continue;
-            }
-            accumulator = reducer(accumulator, value, counter);
-            counter++;
-        }
-        if (accumulator === NO_INITIAL_VALUE) {
-            throw new TypeError('Must specify an initialValue if the iterable is empty.');
-        }
-        return accumulator;
-    }
-    AsyncIteratorPolyfill.reduce = reduce;
-    async function toArray() {
-        const result = [];
-        for await (const x of this) {
-            result.push(x);
-        }
-        return result;
-    }
-    AsyncIteratorPolyfill.toArray = toArray;
-    async function forEach(fn) {
-        let counter = 0;
-        for await (const value of this) {
-            fn(value, counter);
-            counter++;
-        }
-    }
-    AsyncIteratorPolyfill.forEach = forEach;
-    async function some(fn) {
-        let counter = 0;
-        for await (const value of this) {
-            if (fn(value, counter)) {
-                return true;
-            }
-            counter++;
-        }
-        return false;
-    }
-    AsyncIteratorPolyfill.some = some;
-    async function every(fn) {
-        let counter = 0;
-        for await (const value of this) {
-            if (!fn(value, counter)) {
-                return false;
-            }
-            counter++;
-        }
-        return true;
-    }
-    AsyncIteratorPolyfill.every = every;
-    async function find(fn) {
-        let counter = 0;
-        for await (const value of this) {
-            if (fn(value, counter)) {
-                return value;
-            }
-            counter++;
-        }
-        return undefined;
-    }
-    AsyncIteratorPolyfill.find = find;
-})(AsyncIteratorPolyfill || (AsyncIteratorPolyfill = {}));
-installPolyfill({ prototype: Object.getPrototypeOf(Object.getPrototypeOf((async function* () { }).prototype)) }, AsyncIteratorPolyfill, true);
 function readCFG(path, commentExtension = true) {
     var _a;
     const SPECIAL_SYMBOLS = Object.assign(Object.create(null), {
@@ -728,76 +808,6 @@ function readTokens(path) {
     const text = system.readFile(path);
     // @ts-expect-error
     return text.split('\n').map(line => line.trim()).filter(x => x).map(line => new Token(...line.split(' ', 2)));
-}
-class Tree {
-    constructor(value) {
-        _Tree_instances.add(this);
-        this.value = value;
-        this.children = [];
-        _Tree_parent.set(this, undefined);
-    }
-    get parent() {
-        return __classPrivateFieldGet(this, _Tree_parent, "f");
-    }
-    push(...items) {
-        return this.children.push(...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree)));
-    }
-    pop() {
-        return __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, this.children.pop());
-    }
-    unshift(...items) {
-        return this.children.unshift(...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree)));
-    }
-    shift() {
-        return __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, this.children.shift());
-    }
-    splice(start, deleteCount, ...items) {
-        return this.children.splice(start, deleteCount, ...items.map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_own).call(this, tree))).map(tree => __classPrivateFieldGet(this, _Tree_instances, "m", _Tree_disown).call(this, tree));
-    }
-    at(index) {
-        return this.children.at(index);
-    }
-    get length() {
-        return this.children.length;
-    }
-    forEach(callbackfn, thisArg) {
-        if (thisArg !== undefined) {
-            callbackfn = callbackfn.bind(thisArg);
-        }
-        return this.children.forEach((tree, index) => callbackfn(tree, index, this));
-    }
-    values() {
-        return this.children.values();
-    }
-    get [(_Tree_parent = new WeakMap(), _Tree_instances = new WeakSet(), _Tree_disown = function _Tree_disown(other) {
-        if (other !== undefined) {
-            __classPrivateFieldSet(other, _Tree_parent, undefined, "f");
-        }
-        return other;
-    }, _Tree_own = function _Tree_own(other) {
-        if (other === undefined) {
-            throw new Error('Cannot take ownership of undefined');
-        }
-        if (other === this) {
-            throw new Error('Cannot take ownership of self');
-        }
-        if (other.parent !== undefined) {
-            throw new Error('Cannot take ownership of a subtree');
-        }
-        let ancestor = this;
-        do {
-            if (ancestor === other) {
-                throw new Error('Cannot take ownership of ancestor');
-            }
-        } while (ancestor = ancestor.parent);
-        __classPrivateFieldSet(other, _Tree_parent, this, "f");
-        return other;
-    }, Symbol.toStringTag)]() {
-        return 'Tree';
-    }
-    get [Symbol.iterator]() {
-        return this.children[Symbol.iterator];
-    }
 }
 var LL1;
 (function (LL1) {

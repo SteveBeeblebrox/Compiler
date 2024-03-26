@@ -1,5 +1,5 @@
 ///#pragma once
-///#include "compat.ts"
+///#include <compat.ts>
 function readCFG(path: string, commentExtension = true): CFG {
     const SPECIAL_SYMBOLS = Object.assign(Object.create(null), {
         ARROW: '->',
