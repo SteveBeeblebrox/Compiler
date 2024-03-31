@@ -29,7 +29,7 @@ declare interface AsyncIterator<T, TReturn = any, TNext = undefined> {
 }
 namespace AsyncIteratorPolyfill {
     const NO_INITIAL_VALUE = Symbol();
-    export async function * map<T,U>(this: AsyncIterable<T>, mapper: (value: T, counter: number) => U): AsyncIterator < U > {
+    export async function * map<T,U>(this: AsyncIterator<T>, mapper: (value: T, counter: number) => U): AsyncIterator < U > {
         let counter = 0;
         for await(const value of this) {
             yield mapper(value, counter);
@@ -37,7 +37,7 @@ namespace AsyncIteratorPolyfill {
         }
     }
 
-    export async function* filter<T>(this: AsyncIterable<T>, filterer: (value: T, counter: number) => boolean): AsyncIterator<T> {
+    export async function* filter<T>(this: AsyncIterator<T>, filterer: (value: T, counter: number) => boolean): AsyncIterator<T> {
         let counter = 0;
         for await (const value of this) {
             if (filterer(value, counter)) {
@@ -47,7 +47,7 @@ namespace AsyncIteratorPolyfill {
         }
     }
 
-    export async function* take<T>(this: AsyncIterable<T>, limit: number): AsyncIterator<T> {
+    export async function* take<T>(this: AsyncIterator<T>, limit: number): AsyncIterator<T> {
         let counter = 0;
         for await (const value of this) {
             if (counter >= limit) break;
@@ -56,7 +56,7 @@ namespace AsyncIteratorPolyfill {
         }
     }
 
-    export async function* drop<T>(this: AsyncIterable<T>, limit: number): AsyncIterator<T> {
+    export async function* drop<T>(this: AsyncIterator<T>, limit: number): AsyncIterator<T> {
         let counter = 0;
         for await (const value of this) {
             if (counter >= limit) {
@@ -67,7 +67,7 @@ namespace AsyncIteratorPolyfill {
     }
 
     export async function* flatMap<T,U>(
-        this: AsyncIterable<T>, mapper: (value: T, counter: number) => Iterable<U> | Iterator<U>
+        this: AsyncIterator<T>, mapper: (value: T, counter: number) => Iterable<U> | Iterator<U>
     ): AsyncIterator<U> {
         let counter = 0;
         for await (const value of this) {
@@ -77,7 +77,7 @@ namespace AsyncIteratorPolyfill {
     }
 
     export async function reduce<T,U>(
-        this: AsyncIterable<T>, 
+        this: AsyncIterator<T>, 
         reducer: (accumulator: U, value: T, counter: number) => U,
         initialValue: typeof NO_INITIAL_VALUE | U = NO_INITIAL_VALUE
     ): Promise<U> {
@@ -96,21 +96,21 @@ namespace AsyncIteratorPolyfill {
         }
         return accumulator;
     }
-    export async function toArray<T>(this: AsyncIterable<T>): Promise<Array<T>> {
+    export async function toArray<T>(this: AsyncIterator<T>): Promise<Array<T>> {
         const result: T[] = [];
         for await (const x of this) {
             result.push(x);
         }
         return result;
     }
-    export async function forEach<T>(this: AsyncIterable<T>, fn: (value: T, counter: number) => void): Promise<void> {
+    export async function forEach<T>(this: AsyncIterator<T>, fn: (value: T, counter: number) => void): Promise<void> {
         let counter = 0;
         for await (const value of this) {
             fn(value, counter);
             counter++;
         }
     }
-    export async function some<T>(this: AsyncIterable<T>, fn: (value: T, counter: number) => boolean): Promise<boolean> {
+    export async function some<T>(this: AsyncIterator<T>, fn: (value: T, counter: number) => boolean): Promise<boolean> {
         let counter = 0;
         for await (const value of this) {
             if (fn(value, counter)) {
@@ -120,7 +120,7 @@ namespace AsyncIteratorPolyfill {
         }
         return false;
     }
-    export async function every<T>(this: AsyncIterable<T>, fn: (value: T, counter: number) => boolean): Promise<boolean> {
+    export async function every<T>(this: AsyncIterator<T>, fn: (value: T, counter: number) => boolean): Promise<boolean> {
         let counter = 0;
         for await (const value of this) {
             if (!fn(value, counter)) {
@@ -130,7 +130,7 @@ namespace AsyncIteratorPolyfill {
         }
         return true;
     }
-    export async function find<T>(this: AsyncIterable<T>, fn: (value: T, counter: number) => boolean): Promise<undefined | T> {
+    export async function find<T>(this: AsyncIterator<T>, fn: (value: T, counter: number) => boolean): Promise<undefined | T> {
         let counter = 0;
         for await (const value of this) {
             if (fn(value, counter)) {
@@ -142,5 +142,4 @@ namespace AsyncIteratorPolyfill {
     }
 }
 
-
-installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((async function*(){}).prototype))} as any,AsyncIteratorPolyfill,true);
+installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((async function*(){}).prototype))} as any,AsyncIteratorPolyfill);

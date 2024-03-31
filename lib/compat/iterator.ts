@@ -28,7 +28,7 @@ declare interface Iterator<T, TReturn = any, TNext = undefined> {
 namespace IteratorPolyfill {
     const NO_INITIAL_VALUE = Symbol();
 
-    export function* map<T,U>(this: Iterable<T>, mapper: (value: T, counter: number) => U): Iterator<U> {
+    export function* map<T,U>(this: Iterator<T>, mapper: (value: T, counter: number) => U): Iterator<U> {
         let counter = 0;
         for (const value of this) {
             yield mapper(value, counter);
@@ -36,7 +36,7 @@ namespace IteratorPolyfill {
         }
     }
 
-    export function* filter<T>(this: Iterable<T>, filterer: (value: T, counter: number) => boolean): Iterator<T> {
+    export function* filter<T>(this: Iterator<T>, filterer: (value: T, counter: number) => boolean): Iterator<T> {
         let counter = 0;
         for (const value of this) {
             if (filterer(value, counter)) {
@@ -46,7 +46,7 @@ namespace IteratorPolyfill {
         }
     }
 
-    export function* take<T>(this: Iterable<T>, limit: number): Iterator<T> {
+    export function* take<T>(this: Iterator<T>, limit: number): Iterator<T> {
         let counter = 0;
         for (const value of this) {
             if (counter >= limit) break;
@@ -55,7 +55,7 @@ namespace IteratorPolyfill {
         }
     }
 
-    export function* drop<T>(this: Iterable<T>, limit: number): Iterator<T> {
+    export function* drop<T>(this: Iterator<T>, limit: number): Iterator<T> {
         let counter = 0;
         for (const value of this) {
             if (counter >= limit) {
@@ -66,7 +66,7 @@ namespace IteratorPolyfill {
     }
 
     export function* flatMap<T,U>(
-        this: Iterable<T>, mapper: (value: T, counter: number) => Iterable<U> | Iterator<U>
+        this: Iterator<T>, mapper: (value: T, counter: number) => Iterable<U> | Iterator<U>
     ): Iterator<U> {
         let counter = 0;
         for (const value of this) {
@@ -76,7 +76,7 @@ namespace IteratorPolyfill {
     }
 
     export function reduce<T,U>(
-        this: Iterable<T>, 
+        this: Iterator<T>, 
         reducer: (accumulator: U, value: T, counter: number) => U,
         initialValue: typeof NO_INITIAL_VALUE | U = NO_INITIAL_VALUE
     ): U {
@@ -95,21 +95,21 @@ namespace IteratorPolyfill {
         }
         return accumulator;
     }
-    export function toArray<T>(this: Iterable<T>): Array<T> {
+    export function toArray<T>(this: Iterator<T>): Array<T> {
         const result: T[] = [];
         for (const x of this) {
             result.push(x);
         }
         return result;
     }
-    export function forEach<T>(this: Iterable<T>, fn: (value: T, counter: number) => void): void {
+    export function forEach<T>(this: Iterator<T>, fn: (value: T, counter: number) => void): void {
         let counter = 0;
         for (const value of this) {
             fn(value, counter);
             counter++;
         }
     }
-    export function some<T>(this: Iterable<T>, fn: (value: T, counter: number) => boolean): boolean {
+    export function some<T>(this: Iterator<T>, fn: (value: T, counter: number) => boolean): boolean {
         let counter = 0;
         for (const value of this) {
             if (fn(value, counter)) {
@@ -119,7 +119,7 @@ namespace IteratorPolyfill {
         }
         return false;
     }
-    export function every<T>(this: Iterable<T>, fn: (value: T, counter: number) => boolean): boolean {
+    export function every<T>(this: Iterator<T>, fn: (value: T, counter: number) => boolean): boolean {
         let counter = 0;
         for (const value of this) {
             if (!fn(value, counter)) {
@@ -129,7 +129,7 @@ namespace IteratorPolyfill {
         }
         return true;
     }
-    export function find<T>(this: Iterable<T>, fn: (value: T, counter: number) => boolean): undefined | T {
+    export function find<T>(this: Iterator<T>, fn: (value: T, counter: number) => boolean): undefined | T {
         let counter = 0;
         for (const value of this) {
             if (fn(value, counter)) {
@@ -139,7 +139,7 @@ namespace IteratorPolyfill {
         }
         return undefined;
     }
-    export async function* toAsync<T>(this: Iterable<T>): AsyncIterator<T> { yield* this as any }
+    export async function* toAsync<T>(this: Iterator<T>): AsyncIterator<T> { yield* this as any }
 }
 
 installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((function*(){}).prototype))} as any,IteratorPolyfill);

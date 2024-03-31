@@ -6,6 +6,7 @@ function require() {return {}}
 ///#pragma once
 ///#include <compat.ts>
 ///#include <types.ts>
+///#include <shiftyiters.ts>
 
 class Token {
     constructor(
@@ -23,17 +24,13 @@ namespace RegexEngine {
         return text.split('').every(c => '0123456789abcdef'.includes(c.toLowerCase()));
     }
     export function* tokenize(text: string): IterableIterator<Token> {
-        const LOOKAHEAD_SIZE = 6;
         const iter = text[Symbol.iterator]();
-        const buffer = [...iter.take(LOOKAHEAD_SIZE)];
 
-        while(buffer.length) {
-            const c = buffer.shift();
-            buffer.push(...iter.take(1));
+        let c: char;
+        while((c = iter.shift() as char) !== undefined) {
             switch(c) {
                 case '\\': {
-                    const e = buffer.shift();
-                    buffer.push(...iter.take(1));
+                    const e = iter.shift();
                     switch(e) {
                         case '\\':
                         case '(':
@@ -52,8 +49,7 @@ namespace RegexEngine {
                             yield new Token('char','\n');
                             break;
                         case 'u':
-                            const hex = buffer.splice(0,4).join('');
-                            buffer.push(...iter.take(4));
+                            const hex = iter.take(4).toArray().join('');
                             const n = Number.parseInt(hex,16);
                             if(hex.length != 4 || !isHex(hex) || Number.isNaN(n)) {
                                 throw new Error(`Invalid unicode escape sequence '\\u${hex}'`);
