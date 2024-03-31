@@ -1,8 +1,6 @@
 #!/usr/bin/bash
 //`which sjs` <(mtsc -po- -Ilib $0) $@; exit $?
 
-function require() {return {}}
-
 ///#pragma once
 ///#include <compat.ts>
 ///#include <types.ts>
