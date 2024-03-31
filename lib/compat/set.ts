@@ -11,7 +11,7 @@ namespace SetPolyfill {
 
     export function union<T>(this: Set<T>, other: SetLike<T>): Set<T> {
         validateOther(other);
-        const result = new Set<T>(this);
+        const result = new (this.constructor as SetConstructor)<T>(this);
         for (const elem of other.keys()) {
             result.add(elem);
         }
@@ -29,7 +29,7 @@ namespace SetPolyfill {
             smallerElems = other.keys();
             largerHas = this;
         }
-        const result = new Set<T>();
+        const result = new (this.constructor as SetConstructor)<T>();
         for (const elem of smallerElems) {
             if (largerHas.has(elem)) {
                 result.add(elem);
@@ -40,7 +40,7 @@ namespace SetPolyfill {
 
     export function difference<T>(this: Set<T>, other: SetLike<T>): Set<T> {
         validateOther(other);
-        const result = new Set<T>(this);
+        const result = new (this.constructor as SetConstructor)<T>(this);
         if (this.size <= other.size) {
             for (const elem of this) {
                 if (other.has(elem)) {
@@ -59,7 +59,7 @@ namespace SetPolyfill {
 
     export function symmetricDifference<T>(this: Set<T>, other: SetLike<T>): Set<T> {
         validateOther(other);
-        const result = new Set<T>(this);
+        const result = new (this.constructor as SetConstructor)<T>(this);
         for (const elem of other.keys()) {
             if (this.has(elem)) {
                 result.delete(elem);
