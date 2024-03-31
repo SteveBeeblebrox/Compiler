@@ -143,3 +143,17 @@ namespace AsyncIteratorPolyfill {
 }
 
 installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((async function*(){}).prototype))} as any,AsyncIteratorPolyfill);
+
+// Nonstandard shift()
+
+declare interface AsyncIterator<T, TReturn = any, TNext = undefined> {
+    shift(): T | undefined;
+}
+
+namespace AsyncIteratorShiftPolyfill {
+    export async function shift<T>(this: AsyncIterator<T>): Promise<T | undefined> {
+        return (await this.next()).value;
+    }
+}
+
+installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((async function*(){}).prototype))} as any,AsyncIteratorShiftPolyfill);

@@ -143,3 +143,17 @@ namespace IteratorPolyfill {
 }
 
 installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((function*(){}).prototype))} as any,IteratorPolyfill);
+
+// Nonstandard shift()
+
+declare interface Iterator<T, TReturn = any, TNext = undefined> {
+    shift(): T | undefined;
+}
+
+namespace IteratorShiftPolyfill {
+    export function shift<T>(this: Iterator<T>): T | undefined {
+        return this.next().value;
+    }
+}
+
+installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((function*(){}).prototype))} as any,IteratorShiftPolyfill);

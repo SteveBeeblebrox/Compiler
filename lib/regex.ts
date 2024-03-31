@@ -4,7 +4,6 @@
 ///#pragma once
 ///#include <compat.ts>
 ///#include <types.ts>
-///#include <shiftyiters.ts>
 
 class Token {
     constructor(
@@ -76,4 +75,4 @@ namespace RegexEngine {
     }
 }
 
-console.log([...RegexEngine.tokenize(String.raw`A\s(a-z)*\u00ff`)])
+// console.log([...RegexEngine.tokenize(String.raw`A\s(a-z)*\u00ff`)])
