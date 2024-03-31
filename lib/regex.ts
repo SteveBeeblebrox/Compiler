@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-//`which sjs` <(mtsc -po- -Ilib $0) $@; exit $?
+//`which sjs` <(mtsc -po- -tes2018 -Ilib $0) $@; exit $?
 
 ///#pragma once
 ///#include <compat.ts>
