@@ -3,7 +3,7 @@
 // Axel Rauschmayer, (c) 2021 MIT License
 // https://github.com/rauschma/set-methods-polyfill
 namespace SetPolyfill {
-    interface SetLike<T> {
+    export interface SetLike<T> {
         size: number;
         has(key: T): boolean;
         keys(): IterableIterator<T>;
@@ -123,20 +123,6 @@ namespace SetPolyfill {
             throw new TypeError();
         }
     }
-
-    // Nonstandard
-    function takeInPlace(f: typeof SetPolyfill.union): typeof SetPolyfill.union {
-        return function<T>(this: Set<T>, other: SetLike<T>) {
-            const result = f.bind(this)(other) as Set<T>;
-            this.clear();
-            result.forEach(t=>this.add(t));
-            return this;
-        }
-    }
-    export const takeUnion = takeInPlace(union);
-    export const takeIntersection = takeInPlace(intersection);
-    export const takeDifference = takeInPlace(difference);
-    export const takeSymmetricDifference = takeInPlace(symmetricDifference);
 }
 
 declare interface Set<T> {
@@ -147,11 +133,32 @@ declare interface Set<T> {
     isSubsetOf: typeof SetPolyfill.isSubsetOf;
     isSupersetOf: typeof SetPolyfill.isSupersetOf;
     isDisjointFrom: typeof SetPolyfill.isDisjointFrom;
-
-    takeUnion: typeof SetPolyfill.takeUnion;
-    takeIntersection: typeof SetPolyfill.takeIntersection;
-    takeDifference: typeof SetPolyfill.takeDifference;
-    takeSymmetricDifference: typeof SetPolyfill.takeSymmetricDifference;
 }
 
 installPolyfill(Set,SetPolyfill);
+
+// Nonstandard in-place set methods
+
+namespace InPlaceSetPolyfill {
+    function takeInPlace(f: typeof SetPolyfill.union): typeof SetPolyfill.union {
+        return function<T>(this: Set<T>, other: SetPolyfill.SetLike<T>) {
+            const result = f.bind(this)(other) as Set<T>;
+            this.clear();
+            result.forEach(t=>this.add(t));
+            return this;
+        }
+    }
+    export const takeUnion = takeInPlace(SetPolyfill.union);
+    export const takeIntersection = takeInPlace(SetPolyfill.intersection);
+    export const takeDifference = takeInPlace(SetPolyfill.difference);
+    export const takeSymmetricDifference = takeInPlace(SetPolyfill.symmetricDifference);
+}
+
+declare interface Set<T> {
+    takeUnion: typeof InPlaceSetPolyfill.takeUnion;
+    takeIntersection: typeof InPlaceSetPolyfill.takeIntersection;
+    takeDifference: typeof InPlaceSetPolyfill.takeDifference;
+    takeSymmetricDifference: typeof InPlaceSetPolyfill.takeSymmetricDifference;
+}
+
+installPolyfill(Set,InPlaceSetPolyfill);

@@ -222,21 +222,24 @@ RegExp.prototype[Signature.toSignable] = function(this: RegExp) {
 }
 
 ///#include <compat.ts>
-declare interface SignatureSetSet<T> {
-    union: typeof SetPolyfill.union;
-    intersection: typeof SetPolyfill.intersection;
-    difference: typeof SetPolyfill.difference;
-    symmetricDifference: typeof SetPolyfill.symmetricDifference;
-    isSubsetOf: typeof SetPolyfill.isSubsetOf;
-    isSupersetOf: typeof SetPolyfill.isSupersetOf;
-    isDisjointFrom: typeof SetPolyfill.isDisjointFrom;
+namespace Signature {
+    export declare interface SignatureSet<T> {
+        union: typeof SetPolyfill.union<T>;
+        intersection: typeof SetPolyfill.intersection<T>;
+        difference: typeof SetPolyfill.difference<T>;
+        symmetricDifference: typeof SetPolyfill.symmetricDifference<T>;
+        isSubsetOf: typeof SetPolyfill.isSubsetOf<T>;
+        isSupersetOf: typeof SetPolyfill.isSupersetOf<T>;
+        isDisjointFrom: typeof SetPolyfill.isDisjointFrom<T>;
 
-    takeUnion: typeof SetPolyfill.takeUnion;
-    takeIntersection: typeof SetPolyfill.takeIntersection;
-    takeDifference: typeof SetPolyfill.takeDifference;
-    takeSymmetricDifference: typeof SetPolyfill.takeSymmetricDifference;
+        takeUnion: typeof InPlaceSetPolyfill.takeUnion<T>;
+        takeIntersection: typeof InPlaceSetPolyfill.takeIntersection<T>;
+        takeDifference: typeof InPlaceSetPolyfill.takeDifference<T>;
+        takeSymmetricDifference: typeof InPlaceSetPolyfill.takeSymmetricDifference<T>;
+    }
 }
-
-//@ts-expect-error
 // The pollyfill is typed with this: Set<T> but will also work for this: SignatureSet<T>
+//@ts-expect-error
 installPolyfill(SignatureSet,SetPolyfill);
+//@ts-expect-error
+installPolyfill(SignatureSet,InPlaceSetPolyfill);
