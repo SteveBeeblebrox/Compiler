@@ -75,4 +75,6 @@ namespace RegexEngine {
     }
 }
 
-// console.log([...RegexEngine.tokenize(String.raw`A\s(a-z)*\u00ff`)])
+///#if __MAIN__
+console.log([...RegexEngine.tokenize(String.raw`A\s(a-z)*\u00ff`)])
+///#endif

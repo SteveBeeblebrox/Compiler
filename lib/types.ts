@@ -5,3 +5,16 @@ declare interface String {
     split(s: ''): char[];
     [Symbol.iterator](): IterableIterator<char>;
 }
+
+declare namespace OpaqueTypes {
+    const type: unique symbol;
+    export type Opaque<T,Ident> = T & {[type]:Ident};
+}
+type Opaque<T,Ident> = OpaqueTypes.Opaque<T,Ident>;
+
+type Stack<T> = {
+    push: Array<T>['push'],
+    pop: Array<T>['pop'],
+    length: Array<T>['length'],
+    [Symbol.iterator]: Array<T>[typeof Symbol.iterator]
+}

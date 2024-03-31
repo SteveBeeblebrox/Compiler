@@ -1,6 +1,8 @@
 ///#include <peek.ts>
 ///#include <tree.ts>
 
+///#include <compat.ts>
+
 ///#include "lib/types.ts"
 ///#include "lib/io.ts"
 ///#include "lib/ll1.ts"
