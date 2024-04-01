@@ -2,56 +2,67 @@
   "value": "S",
   "children": [
     {
-      "value": "Regex",
+      "value": "Alternation",
       "children": [
         {
-          "value": "Alternation",
+          "value": "Quantifier",
           "children": [
             {
-              "value": "Sequence",
+              "value": "Primitive",
               "children": [
                 {
-                  "value": "Quantifier",
+                  "value": {
+                    "name": "char",
+                    "value": "a"
+                  },
+                  "children": []
+                },
+                {
+                  "value": "Primitive'",
                   "children": [
                     {
-                      "value": "Primary",
-                      "children": [
-                        {
-                          "value": "Primitive",
-                          "children": [
-                            {
-                              "value": {
-                                "name": "char",
-                                "value": "a"
-                              },
-                              "children": []
-                            },
-                            {
-                              "value": "Primitive'",
-                              "children": [
-                                {
-                                  "value": {
-                                    "name": "%-",
-                                    "value": "-"
-                                  },
-                                  "children": []
-                                },
-                                {
-                                  "value": {
-                                    "name": "char",
-                                    "value": "b"
-                                  },
-                                  "children": []
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      ]
+                      "value": {
+                        "name": "%-",
+                        "value": "-"
+                      },
+                      "children": []
+                    },
+                    {
+                      "value": {
+                        "name": "char",
+                        "value": "b"
+                      },
+                      "children": []
                     }
                   ]
                 }
               ]
+            },
+            {
+              "value": {
+                "name": "%+",
+                "value": "+"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "value": "Alternation'",
+          "children": [
+            {
+              "value": {
+                "name": "%|",
+                "value": "|"
+              },
+              "children": []
+            },
+            {
+              "value": {
+                "name": "char",
+                "value": "d"
+              },
+              "children": []
             }
           ]
         }

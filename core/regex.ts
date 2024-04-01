@@ -17,8 +17,18 @@ namespace RegexEngine {
     export const PARSER = new LL1Parser(GRAMMAR);
 
     PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
+        console.error(`Finalized a ${event.node.value}`);
+    });
+
+    PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
         if(event.node instanceof Tree && event.node.length === 1 && event.node.at(0).value === CFG.LAMBDA_CHARACTER) {
             event.node = null;
+        }
+    });
+
+    PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
+        if(event.node instanceof Tree && event.node.length === 1) {
+            event.node = event.node.pop();
         }
     });
 
@@ -89,7 +99,6 @@ const PARSER = RegexEngine.PARSER;
 PARSER.addEventListener('completenode', function(event: LL1Parser.CompleteNodeEvent) {
     const node = event.node;
     if(node instanceof Tree) {
-        console.error(`Finalized a ${event.node.value}`);
         if(node.value === 'Primitive') {
             if(node.length === 1) {
                 event.node=event.node.at(0)
