@@ -17,39 +17,39 @@
                       "value": "Primary",
                       "children": [
                         {
-                          "value": "RANGE",
-                          "children": []
-                        }
-                      ]
-                    },
-                    {
-                      "value": "Quantifier'",
-                      "children": [
-                        {
-                          "value": "λ",
-                          "children": []
+                          "value": "Primitive",
+                          "children": [
+                            {
+                              "value": {
+                                "name": "char",
+                                "value": "a"
+                              },
+                              "children": []
+                            },
+                            {
+                              "value": "Primitive'",
+                              "children": [
+                                {
+                                  "value": {
+                                    "name": "%-",
+                                    "value": "-"
+                                  },
+                                  "children": []
+                                },
+                                {
+                                  "value": {
+                                    "name": "char",
+                                    "value": "b"
+                                  },
+                                  "children": []
+                                }
+                              ]
+                            }
+                          ]
                         }
                       ]
                     }
                   ]
-                },
-                {
-                  "value": "Sequence'",
-                  "children": [
-                    {
-                      "value": "λ",
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "value": "Alternation'",
-              "children": [
-                {
-                  "value": "λ",
-                  "children": []
                 }
               ]
             }

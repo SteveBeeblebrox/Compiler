@@ -175,13 +175,15 @@ namespace LL1 {
                     const parent = Current.parent;
 
                     // Dispatch event
-                    const event = new CompleteNodeEvent(parent.pop() as StrayTree<TreeT>);
+                    const event = new LL1Parser.CompleteNodeEvent(parent.pop() as StrayTree<TreeT>);
                     this.dispatchEvent(event);
 
                     // Restore connections
-                    parent.push(Current = event.node);
+                    if(event.node != null) {
+                        parent.push(event.node);
+                    }
 
-                    Current = Current.parent!;
+                    Current = parent;
                 } else if(CFG.isNonTerminal(x)) {
                     let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`))];
                     K.push(MARKER);
@@ -218,12 +220,15 @@ namespace LL1 {
             return T.pop()!;
         }
     }
-    export class CompleteNodeEvent extends Event {
-        public static readonly kind = 'completenode';
-        constructor(public node: any) {
-            super(CompleteNodeEvent.kind);
+
+    export namespace LL1Parser {
+        export class CompleteNodeEvent extends Event {
+            public static readonly type = 'completenode';
+            constructor(public node: any) {
+                super(CompleteNodeEvent.type);
+            }
         }
     }
 }
 
-const LL1Parser = LL1.LL1Parser;
+import LL1Parser = LL1.LL1Parser;
