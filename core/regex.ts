@@ -5,21 +5,21 @@
 ///#include <compat.ts>
 ///#include <types.ts>
 
-class Token {
-    constructor(
-        public readonly name: string,
-        public readonly value?: string
-    ) {}
-}
-
-
-
-
+///#include "lex.ts"
+///#include "cfg.ts"
+///#include "ll1.ts"
 
 namespace RegexEngine {
+    const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
+        ///#embed "regex.cfg"
+    ])));
+    
+    const PARSER = new LL1Parser(GRAMMAR);
+
     function isHex(text: string) {
         return text.split('').every(c => '0123456789abcdef'.includes(c.toLowerCase()));
     }
+    
     export function* tokenize(text: string): IterableIterator<Token> {
         const iter = text[Symbol.iterator]();
 
@@ -73,8 +73,16 @@ namespace RegexEngine {
             }
         }
     }
+
+    export function parse(text: string) {
+        return PARSER.parse(tokenize(text));
+    }
 }
 
 ///#if __MAIN__
-console.log([...RegexEngine.tokenize(String.raw`A\s(a-z)*\u00ff`)])
+if(system.args.length == 2) {
+    console.log(JSON.stringify(RegexEngine.parse(system.args[1]),undefined,2));
+} else {
+    throw new Error('Expected a regex as argument one!');
+}
 ///#endif

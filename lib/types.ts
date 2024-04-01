@@ -18,3 +18,8 @@ type Stack<T> = {
     length: Array<T>['length'],
     [Symbol.iterator]: Array<T>[typeof Symbol.iterator]
 }
+
+type JSONPrimitive = number | boolean | string | null;
+type JSONObject = {[key: string]: JSONValue};
+type JSONArrray = JSONValue[];
+type JSONValue = JSONPrimitive | JSONArrray | JSONObject
