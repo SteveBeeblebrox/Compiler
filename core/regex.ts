@@ -20,12 +20,14 @@ namespace RegexEngine {
         console.error(`Finalized a ${event.node.value}`);
     });
 
+    // Remove lambdas
     PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
         if(event.node instanceof Tree && event.node.length === 1 && event.node.at(0).value === CFG.LAMBDA_CHARACTER) {
             event.node = null;
         }
     });
 
+    // Squish tree
     PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
         if(event.node instanceof Tree && event.node.length === 1) {
             event.node = event.node.pop();
