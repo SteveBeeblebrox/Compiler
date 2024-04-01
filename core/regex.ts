@@ -97,17 +97,10 @@ namespace RegexEngine {
     }
 }
 
-const PARSER = RegexEngine.PARSER;
-PARSER.addEventListener('completenode', function(event: LL1Parser.CompleteNodeEvent) {
+RegexEngine.PARSER.addEventListener('completenode', function(event: LL1Parser.CompleteNodeEvent) {
     const node = event.node;
     if(node instanceof Tree) {
-        if(node.value === 'Primitive') {
-            if(node.length === 1) {
-                event.node=event.node.at(0)
-            } else {
-                //event.node=new Tree('RANGE');
-            }
-        }
+        
     }
 })
 
