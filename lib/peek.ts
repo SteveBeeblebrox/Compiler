@@ -1,7 +1,6 @@
 ///#pragma once
 type PeekableIterableIterator<T> = IterableIterator<T> & {
     peek: () => T | undefined;
-    pop: () => T | undefined;
 }
 
 function createAsyncPeekableIterator<T>(asyncIterable: AsyncIterable<T>): PeekableAsyncIterableIterator<T> {
@@ -22,16 +21,12 @@ function createAsyncPeekableIterator<T>(asyncIterable: AsyncIterable<T>): Peekab
     it.peek = async function peek() {
         return (await next).value;
     }
-    it.pop = async function pop() {
-        return (await it.next()).value;
-    }
 
     return it;
 }
 
 type PeekableAsyncIterableIterator<T> = AsyncIterableIterator<T> & {
     peek: () => Promise<T | undefined>;
-    pop: () => Promise<T | undefined>;
 }
 
 function createPeekableIterator<T>(iterable: Iterable<T>): PeekableIterableIterator<T> {
@@ -51,9 +46,6 @@ function createPeekableIterator<T>(iterable: Iterable<T>): PeekableIterableItera
 
     it.peek = function peek() {
         return next.value;
-    }
-    it.pop = function pop() {
-        return it.next().value;
     }
 
     return it;

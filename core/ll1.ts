@@ -140,10 +140,11 @@ namespace LL1 {
         return parseTable;
     }
 
-    export class LL1Parser {
+    export class LL1Parser extends EventTarget {
         private readonly parseTable: LL1ParseTable
         private readonly cfg: CFG
         constructor(cfg: CFG) {
+            super();
             this.cfg = transform(cfg);
             this.parseTable = createParseTable(this.cfg);
         }
@@ -170,6 +171,16 @@ namespace LL1 {
             while(K.length) {
                 let x: StackT | Token = K.pop()!;
                 if(x === MARKER) {
+                    // Hold a reference to the current parrent
+                    const parent = Current.parent;
+
+                    // Dispatch event
+                    const event = new CompleteNodeEvent(parent.pop() as StrayTree<TreeT>);
+                    this.dispatchEvent(event);
+
+                    // Restore connections
+                    parent.push(Current = event.node);
+
                     Current = Current.parent!;
                 } else if(CFG.isNonTerminal(x)) {
                     let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`))];
@@ -194,7 +205,7 @@ namespace LL1 {
                         if(x !== ts.peek()?.name as Terminal) {
                             throw new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`);
                         }
-                        x = ts.pop()!;
+                        x = ts.shift()!;
                     }
                     Current.push(new Tree(x??CFG.EOF_CHARACTER));
                 }
@@ -205,6 +216,12 @@ namespace LL1 {
             }
         
             return T.pop()!;
+        }
+    }
+    export class CompleteNodeEvent extends Event {
+        public static readonly kind = 'completenode';
+        constructor(public node: any) {
+            super(CompleteNodeEvent.kind);
         }
     }
 }

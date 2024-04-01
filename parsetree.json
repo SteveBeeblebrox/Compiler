@@ -1,0 +1,65 @@
+{
+  "value": "S",
+  "children": [
+    {
+      "value": "Regex",
+      "children": [
+        {
+          "value": "Alternation",
+          "children": [
+            {
+              "value": "Sequence",
+              "children": [
+                {
+                  "value": "Quantifier",
+                  "children": [
+                    {
+                      "value": "Primary",
+                      "children": [
+                        {
+                          "value": "RANGE",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "value": "Quantifier'",
+                      "children": [
+                        {
+                          "value": "λ",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "value": "Sequence'",
+                  "children": [
+                    {
+                      "value": "λ",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "value": "Alternation'",
+              "children": [
+                {
+                  "value": "λ",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "value": "$",
+      "children": []
+    }
+  ]
+}

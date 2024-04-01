@@ -14,7 +14,7 @@ namespace RegexEngine {
         ///#embed "regex.cfg"
     ])));
     
-    const PARSER = new LL1Parser(GRAMMAR);
+    export const PARSER = new LL1Parser(GRAMMAR);
 
     function isHex(text: string) {
         return text.split('').every(c => '0123456789abcdef'.includes(c.toLowerCase()));
@@ -79,10 +79,26 @@ namespace RegexEngine {
     }
 }
 
+const PARSER = RegexEngine.PARSER;
+PARSER.addEventListener('completenode', function(event: LL1.CompleteNodeEvent) {
+    console.error(`Finalized a ${event.node.value}`);
+    const node = event.node;
+    if(node instanceof Tree) {
+        if(node.value === 'Primitive') {
+            if(node.length === 1) {
+                event.node=event.node.at(0)
+            } else {
+                event.node=new Tree('RANGE');
+            }
+        }
+    }
+
+})
+
 ///#if __MAIN__
 if(system.args.length == 2) {
     console.log(JSON.stringify(RegexEngine.parse(system.args[1]),undefined,2));
 } else {
-    throw new Error('Expected a regex as argument one!');
+    throw new Error('Expected one regex argument!');
 }
 ///#endif
