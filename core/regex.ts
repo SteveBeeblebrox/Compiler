@@ -99,8 +99,8 @@ namespace RegexEngine {
         },
         Quantifier(node) {
             switch((node.at(1).value as Token).name) {
-                case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode(node.shift() as RegexNode)])
-                case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode)
+                case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode(node.shift() as RegexNode)]);
+                case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode);
             }
         },
         Primary(node) {
