@@ -18,23 +18,18 @@
                   "children": []
                 },
                 {
-                  "value": "Primitive'",
-                  "children": [
-                    {
-                      "value": {
-                        "name": "%-",
-                        "value": "-"
-                      },
-                      "children": []
-                    },
-                    {
-                      "value": {
-                        "name": "char",
-                        "value": "b"
-                      },
-                      "children": []
-                    }
-                  ]
+                  "value": {
+                    "name": "%-",
+                    "value": "-"
+                  },
+                  "children": []
+                },
+                {
+                  "value": {
+                    "name": "char",
+                    "value": "b"
+                  },
+                  "children": []
                 }
               ]
             },
@@ -48,23 +43,25 @@
           ]
         },
         {
-          "value": "Alternation'",
-          "children": [
-            {
-              "value": {
-                "name": "%|",
-                "value": "|"
-              },
-              "children": []
-            },
-            {
-              "value": {
-                "name": "char",
-                "value": "d"
-              },
-              "children": []
-            }
-          ]
+          "value": {
+            "name": "%|",
+            "value": "|"
+          },
+          "children": []
+        },
+        {
+          "value": {
+            "name": "char",
+            "value": "d"
+          },
+          "children": []
+        },
+        {
+          "value": {
+            "name": "%|",
+            "value": "|"
+          },
+          "children": []
         }
       ]
     },

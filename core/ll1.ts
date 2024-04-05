@@ -9,7 +9,13 @@
 
 namespace LL1 {
     export type LL1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
-    type ParseTree = StrayTree<NonTerminal | Token | typeof CFG.EOF_CHARACTER | typeof CFG.LAMBDA_CHARACTER>;
+    
+    type SyntaxTransforms<ASTNodeType> = Map<NonTerminal | '*', undefined | ((node: ParseTree<ASTNodeType>)=>typeof node | ASTNodeType | ASTNodeType[] | null)>;
+
+    type TreeT<ASTNodeType=never> = NonTerminal | Token | typeof CFG.EOF_CHARACTER | typeof CFG.LAMBDA_CHARACTER | ASTNodeType;
+
+    export type ParseTree<R=never> = StrayTree<TreeT<R>>;
+
     function convertLeftRecursion(cfg: CFG): CFG {
         const newRules = new Map<NonTerminal,CFGRuleBody[]>()
     
@@ -140,11 +146,10 @@ namespace LL1 {
         return parseTable;
     }
 
-    export class LL1Parser extends EventTarget {
-        private readonly parseTable: LL1ParseTable
-        private readonly cfg: CFG
-        constructor(cfg: CFG) {
-            super();
+    export class LL1Parser<ASTNodeType=never> {
+        private readonly parseTable: LL1ParseTable;
+        private readonly cfg: CFG;
+        constructor(cfg: CFG, private readonly sdt: SyntaxTransforms<ASTNodeType> = new Map()) {
             this.cfg = transform(cfg);
             this.parseTable = createParseTable(this.cfg);
         }
@@ -154,18 +159,17 @@ namespace LL1 {
         public getParseTable() {
             return this.parseTable;
         }
-        public parse(tokens: Iterator<Token>): ParseTree {
+        public parse(tokens: Iterator<Token>): ParseTree<ASTNodeType> {
             const LLT = this.parseTable;
             const P = this.cfg.getRuleList();
             const ts = createPeekableIterator(tokens);
             const MARKER = Symbol();
         
-            type TreeT = NonTerminal | Token | typeof CFG.EOF_CHARACTER | typeof CFG.LAMBDA_CHARACTER;
-            const T: StrayTree<TreeT> = new Tree<TreeT>(undefined as unknown as Token) as StrayTree<TreeT>;
-            type StackT = NonTerminal | Terminal | typeof MARKER | typeof CFG.LAMBDA_CHARACTER
+            const T: ParseTree<ASTNodeType> = new Tree<TreeT>(undefined as unknown as Token) as ParseTree<ASTNodeType>;
+            type StackT = NonTerminal | Terminal | typeof MARKER | typeof CFG.LAMBDA_CHARACTER;
             const K: Stack<StackT> = [];
         
-            let Current: Tree<TreeT> = T;
+            let Current: Tree<TreeT<ASTNodeType>> = T;
             K.push(this.cfg.startingSymbol);
         
             while(K.length) {
@@ -174,15 +178,34 @@ namespace LL1 {
                     // Hold a reference to the current parrent
                     const parent = Current.parent;
 
-                    // Dispatch event
-                    const event = new LL1Parser.CompleteNodeEvent(parent.pop() as StrayTree<TreeT>);
-                    this.dispatchEvent(event);
-
-                    // Restore connections
-                    if(event.node != null) {
-                        parent.push(event.node);
+                    // Disjoin completed node
+                    const node = parent.pop() as StrayTree<NonTerminal>;
+                    let rvalue: any = node;
+                    
+                    // Apply wildcard transforms
+                    if(this.sdt.has('*')) {
+                        rvalue = this.sdt.get('*')(node);
+                        if(rvalue === undefined) {
+                            rvalue = node;
+                        }
                     }
 
+                    // Apply NonTerminal specific transforms
+                    if(rvalue === node && this.sdt.has(node.value)) {
+                        rvalue = this.sdt.get(node.value)(node);
+                        if(rvalue === undefined) {
+                            rvalue = node;
+                        }
+                    }
+                    
+                    // Restore connections
+                    if(Array.isArray(rvalue)) {
+                        parent.push(...rvalue);
+                    } else if(rvalue != null) {
+                        parent.push(rvalue);
+                    }
+
+                    // Continue parsing
                     Current = parent;
                 } else if(CFG.isNonTerminal(x)) {
                     let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`))];
@@ -222,12 +245,7 @@ namespace LL1 {
     }
 
     export namespace LL1Parser {
-        export class CompleteNodeEvent extends Event {
-            public static readonly type = 'completenode';
-            constructor(public node: any) {
-                super(CompleteNodeEvent.type);
-            }
-        }
+        
     }
 }
 

@@ -10,29 +10,62 @@
 ///#include "ll1.ts"
 
 namespace RegexEngine {
+    namespace Nodes {
+        export abstract class RegexNode extends Tree<string> {
+            constructor() {
+                super(undefined);
+                this.value = this.constructor.name;
+            }
+        }
+        
+        export class AltNode extends RegexNode {
+            constructor(private readonly nodes: RegexNode[]) {super();}
+        }
+        
+        export class SeqNode extends RegexNode {
+            constructor(private readonly nodes: RegexNode[]) {super();}
+        }
+        
+        export class RangeNode extends RegexNode {
+            constructor(private readonly min: char, private readonly max: char) {super();}
+        }
+        
+        export class KleenNode extends RegexNode {
+            constructor(private readonly node: RegexNode) {super();}
+        }
+        
+        export class CharNode extends RegexNode {
+            constructor(private readonly char: char) {super();}
+        }
+        
+        export class LambdaNode extends RegexNode {
+        }
+    }
+    import RegexNode = Nodes.RegexNode;
+
     const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
     ])));
-    
-    export const PARSER = new LL1Parser(GRAMMAR);
 
-    PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
-        console.error(`Finalized a ${event.node.value}`);
-    });
-
-    // Remove lambdas
-    PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
-        if(event.node instanceof Tree && event.node.length === 1 && event.node.at(0).value === CFG.LAMBDA_CHARACTER) {
-            event.node = null;
+    export const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Map(Object.entries({
+        '*'(node: LL1.ParseTree<any>) {
+            if(node.length === 1) {
+                if(node.at(0).value === CFG.LAMBDA_CHARACTER) {
+                    // Remove empty lambdas
+                    return null;
+                } else {
+                    // Squish tree
+                    return node.pop();
+                }
+            } else if(typeof node.value === 'string' && node.value.endsWith('\'')) {
+                // Simplify generated nodes
+                return node.splice(0,node.length);
+            }
+        },
+        Primitive(node) {
+            
         }
-    });
-
-    // Squish tree
-    PARSER.addEventListener(LL1Parser.CompleteNodeEvent.type, function(event: LL1Parser.CompleteNodeEvent) {
-        if(event.node instanceof Tree && event.node.length === 1) {
-            event.node = event.node.pop();
-        }
-    });
+    }) as any));
 
     function isHex(text: string) {
         return text.split('').every(c => '0123456789abcdef'.includes(c.toLowerCase()));
@@ -96,13 +129,6 @@ namespace RegexEngine {
         return PARSER.parse(tokenize(text));
     }
 }
-
-RegexEngine.PARSER.addEventListener('completenode', function(event: LL1Parser.CompleteNodeEvent) {
-    const node = event.node;
-    if(node instanceof Tree) {
-        
-    }
-})
 
 ///#if __MAIN__
 if(system.args.length == 2) {
