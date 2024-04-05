@@ -86,7 +86,7 @@ namespace RegexEngine {
             }
         },
         Sequence(node) {
-            return new AstNodes.SeqNode([...node] as RegexNode[]);
+            return new AstNodes.SeqNode([...node] as RegexNode[]); // Todo, flatten this?
         },
         Alternation(node) {
             const l = node.length;
@@ -96,7 +96,7 @@ namespace RegexEngine {
             if(2*children.length-1 !== l) {
                 children.push(new AstNodes.LambdaNode());
             }
-            return new AstNodes.AltNode(children);
+            return new AstNodes.AltNode(children); // Todo, flatten this?
         },
         Quantifier(node) {
             switch((node.at(1).value as Token).name) {
