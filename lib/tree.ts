@@ -107,7 +107,7 @@ class Tree<T> implements TreeArrayMethods<Tree<T>> {
         return 'Tree';
     }
 
-    get [Symbol.iterator]() {
-        return this.children[Symbol.iterator];
+    [Symbol.iterator]() {
+        return this.children[Symbol.iterator]();
     }
 }

@@ -1,73 +1,43 @@
 {
-  "value": "S",
-  "children": [
+  "value": "AltNode",
+  "nodes": [
     {
-      "value": "Alternation",
-      "children": [
+      "value": "SeqNode",
+      "nodes": [
         {
-          "value": "Quantifier",
-          "children": [
-            {
-              "value": "Primitive",
-              "children": [
-                {
-                  "value": {
-                    "name": "char",
-                    "value": "a"
-                  },
-                  "children": []
-                },
-                {
-                  "value": {
-                    "name": "%-",
-                    "value": "-"
-                  },
-                  "children": []
-                },
-                {
-                  "value": {
-                    "name": "char",
-                    "value": "b"
-                  },
-                  "children": []
-                }
-              ]
-            },
-            {
-              "value": {
-                "name": "%+",
-                "value": "+"
-              },
-              "children": []
-            }
-          ]
+          "value": "RangeNode",
+          "min": "a",
+          "max": "b"
         },
         {
-          "value": {
-            "name": "%|",
-            "value": "|"
-          },
-          "children": []
-        },
-        {
-          "value": {
-            "name": "char",
-            "value": "d"
-          },
-          "children": []
-        },
-        {
-          "value": {
-            "name": "%|",
-            "value": "|"
-          },
-          "children": []
+          "value": "KleenNode",
+          "node": {
+            "value": "RangeNode",
+            "min": "a",
+            "max": "b"
+          }
         }
       ]
     },
     {
-      "value": "$",
-      "children": []
+      "value": "AltNode",
+      "nodes": [
+        {
+          "value": "SeqNode",
+          "nodes": [
+            {
+              "value": "CharNode",
+              "char": "d"
+            },
+            {
+              "value": "WildcharNode"
+            }
+          ]
+        },
+        {
+          "value": "LambdaNode"
+        }
+      ]
     }
   ]
 }

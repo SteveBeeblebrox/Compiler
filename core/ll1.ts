@@ -10,11 +10,13 @@
 namespace LL1 {
     export type LL1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
     
-    type SyntaxTransforms<ASTNodeType> = Map<NonTerminal | '*', undefined | ((node: ParseTree<ASTNodeType>)=>typeof node | ASTNodeType | ASTNodeType[] | null)>;
+    type SyntaxTransformer<ASTNodeType extends Tree<unknown>> = (node: ParseTree<ASTNodeType>)=>typeof node | ASTNodeType | ASTNodeType[] | null
 
-    type TreeT<ASTNodeType=never> = NonTerminal | Token | typeof CFG.EOF_CHARACTER | typeof CFG.LAMBDA_CHARACTER | ASTNodeType;
+    export type SyntaxTransformerMap<ASTNodeType extends Tree<unknown>> = Map<NonTerminal | '*', SyntaxTransformer<ASTNodeType>>;
 
-    export type ParseTree<R=never> = StrayTree<TreeT<R>>;
+    type TreeT<ASTNodeType extends Tree<unknown>=never> = NonTerminal | Token | typeof CFG.EOF_CHARACTER | typeof CFG.LAMBDA_CHARACTER | ASTNodeType;
+
+    export type ParseTree<ASTNodeType extends Tree<unknown>=never> = StrayTree<TreeT<ASTNodeType>>;
 
     function convertLeftRecursion(cfg: CFG): CFG {
         const newRules = new Map<NonTerminal,CFGRuleBody[]>()
@@ -146,12 +148,14 @@ namespace LL1 {
         return parseTable;
     }
 
-    export class LL1Parser<ASTNodeType=never> {
+    export class LL1Parser<ASTNodeType extends Tree<unknown>=never> {
         private readonly parseTable: LL1ParseTable;
         private readonly cfg: CFG;
-        constructor(cfg: CFG, private readonly sdt: SyntaxTransforms<ASTNodeType> = new Map()) {
+        private readonly sdt: SyntaxTransformerMap<ASTNodeType>; 
+        constructor(cfg: CFG, sdt: {[key in NonTerminal | '*']: SyntaxTransformer<ASTNodeType>} | SyntaxTransformerMap<ASTNodeType> = new Map()) {
             this.cfg = transform(cfg);
             this.parseTable = createParseTable(this.cfg);
+            this.sdt = sdt instanceof Map ? sdt : new Map(Object.entries(sdt)) as SyntaxTransformerMap<ASTNodeType>;
         }
         public getCFG() {
             return this.cfg;
