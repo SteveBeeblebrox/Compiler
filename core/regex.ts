@@ -91,7 +91,6 @@ namespace RegexEngine {
         Alternation(node) {
             const l = node.length;
             const children = node.splice(0,node.length).filter(x=>x instanceof RegexNode) as RegexNode[];
-            console.error(children.length, node.length)
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
             if(2*children.length-1 !== l) {
                 children.push(new AstNodes.LambdaNode());
