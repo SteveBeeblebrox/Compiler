@@ -22,11 +22,17 @@ namespace RegexEngine {
         
         export class AltNode extends RegexNode {
             constructor(private readonly nodes: RegexNode[]) {super();}
+            public getChildNodes() {
+                return [...this.nodes];
+            } 
             // chain in parallel
         }
         
         export class SeqNode extends RegexNode {
             constructor(private readonly nodes: RegexNode[]) {super();}
+            public getChildNodes() {
+                return [...this.nodes];
+            } 
             // lambda # a # b # c # ... # z # lambda
         }
         
@@ -86,7 +92,7 @@ namespace RegexEngine {
             }
         },
         Sequence(node) {
-            return new AstNodes.SeqNode([...node] as RegexNode[]); // Todo, flatten this?
+            return new AstNodes.SeqNode([...node].flatMap(node => node instanceof AstNodes.SeqNode ? node.getChildNodes() as RegexNode[] : [node] as RegexNode[]) as RegexNode[]);
         },
         Alternation(node) {
             const l = node.length;

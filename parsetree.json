@@ -2,40 +2,23 @@
   "value": "AltNode",
   "nodes": [
     {
+      "value": "CharNode",
+      "char": "a"
+    },
+    {
       "value": "SeqNode",
       "nodes": [
         {
-          "value": "RangeNode",
-          "min": "a",
-          "max": "b"
+          "value": "CharNode",
+          "char": "a"
         },
         {
-          "value": "KleenNode",
-          "node": {
-            "value": "RangeNode",
-            "min": "a",
-            "max": "b"
-          }
-        }
-      ]
-    },
-    {
-      "value": "AltNode",
-      "nodes": [
-        {
-          "value": "SeqNode",
-          "nodes": [
-            {
-              "value": "CharNode",
-              "char": "d"
-            },
-            {
-              "value": "WildcharNode"
-            }
-          ]
+          "value": "CharNode",
+          "char": "b"
         },
         {
-          "value": "LambdaNode"
+          "value": "CharNode",
+          "char": "c"
         }
       ]
     }
