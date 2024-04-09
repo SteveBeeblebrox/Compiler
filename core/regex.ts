@@ -92,7 +92,7 @@ namespace RegexEngine {
             }
         },
         Sequence(node) {
-            return new AstNodes.SeqNode([...node].flatMap(node => node instanceof AstNodes.SeqNode ? node.getChildNodes() as RegexNode[] : [node] as RegexNode[]) as RegexNode[]);
+            return new AstNodes.SeqNode([...node].flatMap(node => node instanceof AstNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]);
         },
         Alternation(node) {
             const l = node.length;
