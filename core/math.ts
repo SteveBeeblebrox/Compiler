@@ -80,10 +80,8 @@ const prefixGrammar = CFG.fromString(`
 let parser: LL1Parser<any>;
 
 if('prefix'.startsWith(system.args[1])) {
-    class VargOperator extends Tree<any> {
-        constructor(operator: string, public args: Tree<any>[]) {
-            super(operator);
-        }
+    class VargOperator extends Tree {
+        constructor(public readonly operator: string, public args: Tree[]) {super();}
     }
     parser = new LL1Parser<any>(prefixGrammar, new Map(Object.entries({
         '*'(node: LL1.ParseTree<any>) {
@@ -108,10 +106,8 @@ if('prefix'.startsWith(system.args[1])) {
         }
     })) as LL1.SyntaxTransformerMap<any>);
 } else if('infix'.startsWith(system.args[1])) {
-    class Operator extends Tree<any> {
-        constructor(operator: string, public lhs: Tree<any>, public rhs: Tree<any>) {
-            super(operator);
-        }
+    class Operator extends Tree {
+        constructor(public readonly operator: string, public lhs: Tree, public rhs: Tree) {super();}
     }
     parser = new LL1Parser<any>(infixGrammar, new Map(Object.entries({
         '*'(node: LL1.ParseTree<any>) {
