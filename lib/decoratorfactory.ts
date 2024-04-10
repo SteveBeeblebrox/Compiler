@@ -2,7 +2,7 @@
 namespace DecoratorFactory {
     export const addLazyDecoratorSymbol = Symbol('addLazyDecorator');
     function isDecoratorContext(arg: unknown): arg is DecoratorContext {
-        return typeof arg === 'object' && arg !== null && ['kind','name'].every(key=>Object.hasOwn(arg,key))
+        return typeof arg === 'object' && arg !== null && ['kind','name'].every(key=>Object.hasOwn(arg,key));
     }
     function isFactoryCall(...args: unknown[]) {
         return !((typeof args[0] === 'function' || typeof args[0] === 'undefined') && isDecoratorContext(args[1])); 
@@ -24,5 +24,12 @@ namespace DecoratorFactory {
         return decorate;
     }
     export type Class<A extends Array<unknown> = any[], R = any> = new (...args: A) => R;
-    export type Function<A extends Array<unknown> = any[], R = any> = (...args: A) => R
+    export type Function<A extends Array<unknown> = any[], R = any> = (...args: A) => R;
+
+    export function getPropertyDescriptor(o: any, p: PropertyKey): PropertyDescriptor | undefined {
+        if(o == null) {
+            return undefined;
+        }
+        return Object.getOwnPropertyDescriptor(o, p) ?? getPropertyDescriptor(Object.getPrototypeOf(o),p);
+    }
 }

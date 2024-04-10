@@ -3,5 +3,5 @@
 ///#include <decoratorfactory.ts>
 
 const enumerable = DecoratorFactory.decorator((_,context: ClassGetterDecoratorContext | ClassFieldDecoratorContext | ClassAccessorDecoratorContext, enumerable: boolean = true) => context.addInitializer(function() {
-    Object.defineProperty(this, context.name, {...Object.getOwnPropertyDescriptor(Object.getPrototypeOf(this),context.name), enumerable});
+    Object.defineProperty(this, context.name, {...DecoratorFactory.getPropertyDescriptor(this,context.name), enumerable});
 }));
