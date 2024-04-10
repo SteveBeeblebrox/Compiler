@@ -10,13 +10,9 @@
 namespace LL1 {
     export type LL1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
     
-    type SyntaxTransformer<ASTNodeType extends Tree<unknown>> = (node: ParseTree<ASTNodeType>)=>typeof node | ASTNodeType | ASTNodeType[] | null
+    type SyntaxTransformer<ASTNodeType extends Tree> = (node: ParseTreeNode)=>typeof node | ASTNodeType | ASTNodeType[] | null
 
-    export type SyntaxTransformerMap<ASTNodeType extends Tree<unknown>> = Map<NonTerminal | '*', SyntaxTransformer<ASTNodeType>>;
-
-    type TreeT<ASTNodeType extends Tree<unknown>=never> = NonTerminal | Token | typeof CFG.EOF_CHARACTER | typeof CFG.LAMBDA_CHARACTER | ASTNodeType;
-
-    export type ParseTree<ASTNodeType extends Tree<unknown>=never> = StrayTree<TreeT<ASTNodeType>>;
+    export type SyntaxTransformerMap<ASTNodeType extends Tree> = Map<NonTerminal | '*', SyntaxTransformer<ASTNodeType>>;
 
     function convertLeftRecursion(cfg: CFG): CFG {
         const newRules = new Map<NonTerminal,CFGRuleBody[]>()
@@ -148,7 +144,7 @@ namespace LL1 {
         return parseTable;
     }
 
-    export class LL1Parser<ASTNodeType extends Tree<unknown>=never> {
+    export class LL1Parser<ASTNodeType extends Tree=never> {
         private readonly parseTable: LL1ParseTable;
         private readonly cfg: CFG;
         private readonly sdt: SyntaxTransformerMap<ASTNodeType>; 
@@ -163,17 +159,17 @@ namespace LL1 {
         public getParseTable() {
             return this.parseTable;
         }
-        public parse(tokens: Iterator<Token>): ParseTree<ASTNodeType> {
+        public parse(tokens: Iterable<Token>): LL1Parser.ParseResult<ASTNodeType> {
             const LLT = this.parseTable;
             const P = this.cfg.getRuleList();
             const ts = createPeekableIterator(tokens);
             const MARKER = Symbol();
         
-            const T: ParseTree<ASTNodeType> = new Tree<TreeT>(undefined as unknown as Token) as ParseTree<ASTNodeType>;
+            const T: ParseTree = new ParseTreeNode();
             type StackT = NonTerminal | Terminal | typeof MARKER | typeof CFG.LAMBDA_CHARACTER;
             const K: Stack<StackT> = [];
         
-            let Current: Tree<TreeT<ASTNodeType>> = T;
+            let Current: ParseTree = T;
             K.push(this.cfg.startingSymbol);
         
             while(K.length) {
@@ -183,7 +179,7 @@ namespace LL1 {
                     const parent = Current.parent;
 
                     // Disjoin completed node
-                    const node = parent.pop() as StrayTree<NonTerminal>;
+                    const node = parent.pop() as ParseTreeNode;
                     let rvalue: any = node;
                     
                     // Apply wildcard transforms
@@ -195,8 +191,8 @@ namespace LL1 {
                     }
 
                     // Apply NonTerminal specific transforms
-                    if(rvalue === node && this.sdt.has(node.value)) {
-                        rvalue = this.sdt.get(node.value)(node);
+                    if(rvalue === node && this.sdt.has(node.name as NonTerminal)) {
+                        rvalue = this.sdt.get(node.name as NonTerminal)(node);
                         if(rvalue === undefined) {
                             rvalue = node;
                         }
@@ -226,17 +222,17 @@ namespace LL1 {
                         K.push(CFG.LAMBDA_CHARACTER);
                     }
         
-                    const n = new Tree<TreeT>(x);
+                    const n: ParseTree = new ParseTreeNode(x);
                     Current.push(n);
-                    Current = Current.at(-1)!;
-                } else if(CFG.isTerminalOrEOF(x) || CFG.isLambda(x)) {
-                    if(CFG.isTerminalOrEOF(x)) {
-                        if(x !== ts.peek()?.name as Terminal) {
-                            throw new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`);
-                        }
-                        x = ts.shift()!;
+                    Current = Current.at(-1)! as ParseTree;
+                } else if(CFG.isTerminalOrEOF(x)) {
+                    if(x !== ts.peek()?.name as Terminal) {
+                        throw new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`);
                     }
-                    Current.push(new Tree(x??CFG.EOF_CHARACTER));
+                    x = ts.shift()!;
+                    Current.push(x instanceof Token ? new ParseTreeTokenLeaf(x.name as Terminal, x.value) : new ParseTreeEOFLeaf());
+                } else if(CFG.isLambda(x)) {
+                    Current.push(new ParseTreeLambdaLeaf());
                 }
             }
         
@@ -244,13 +240,63 @@ namespace LL1 {
                 throw new Error(`Syntax Error`);
             }
         
-            return T.pop()!;
+            return T.pop()! as ParseResult<ASTNodeType>;
         }
     }
 
     export namespace LL1Parser {
+        export abstract class AbstractParseTree<NameType extends string = string> extends Tree {
+            constructor(public readonly name?: NameType) {super();}
+        }
+
+        export class ParseTreeNode extends AbstractParseTree<NonTerminal> implements ArrayTreeMethods {
+            constructor(name?: NonTerminal) {super(name);}
+            public override get parent() {
+                return super.parent as ParseTree;
+            }
+
+            public get length() {
+                return super[Tree.treeLength];
+            }
+
+            public at = super[Tree.at];
+            public values = super[Tree.values];
+            public push = super[Tree.push];
+            public unshift = super[Tree.unshift];
+            public pop = super[Tree.pop];
+            public shift = super[Tree.shift];
+            public splice = super[Tree.splice];
+            public [Symbol.iterator] = super[Tree.iterator];
         
+            @enumerable
+            public get children() {
+                return [...this];
+            }
+        }
+
+        export class ParseTreeLambdaLeaf extends AbstractParseTree<typeof CFG.LAMBDA_CHARACTER> {
+            constructor() {super(CFG.LAMBDA_CHARACTER);}
+        }
+
+        export class ParseTreeEOFLeaf extends AbstractParseTree<typeof CFG.EOF_CHARACTER> {
+            constructor() {super(CFG.EOF_CHARACTER);}
+        }
+
+        export class ParseTreeTokenLeaf extends AbstractParseTree<Terminal> {
+            constructor(name: Terminal, public value?: string) {super(name);}
+        }
+
+        export type ParseTreeLeaf = ParseTreeLambdaLeaf | ParseTreeEOFLeaf | ParseTreeTokenLeaf;
+        export type ParseTree = NestedTree<ParseTreeNode, ParseTreeNode | ParseTreeLeaf, false> & {parent?: ParseTree};
+        export type ParseResult<ASTNodeType extends Tree = never> = ASTNodeType | StrayTree<ParseTree>;
     }
+
+    import ParseTree = LL1Parser.ParseTree;
+    import ParseTreeNode = LL1Parser.ParseTreeNode;
+    import ParseTreeLambdaLeaf = LL1Parser.ParseTreeLambdaLeaf;
+    import ParseTreeEOFLeaf = LL1Parser.ParseTreeEOFLeaf;
+    import ParseTreeTokenLeaf = LL1Parser.ParseTreeTokenLeaf;
+    export import ParseResult = LL1Parser.ParseResult;
 }
 
 import LL1Parser = LL1.LL1Parser;

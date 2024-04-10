@@ -11,13 +11,8 @@
 
 namespace RegexEngine {
     namespace AstNodes {
-        export abstract class RegexNode extends Tree<string> {
-            constructor() {
-                super(undefined);
-                this.value = this.constructor.name;
-                // @ts-ignore TODO, refactor a base type for Tree
-                delete this.children;
-            }
+        export abstract class RegexNode extends Tree {
+            public readonly name = this.constructor.name;
         }
         
         export class AltNode extends RegexNode {
@@ -67,22 +62,22 @@ namespace RegexEngine {
     ])));
 
     export const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Map(Object.entries({
-        '*'(node: LL1.ParseTree<any>) {
+        '*'(node: LL1Parser.ParseTreeNode) {
             if(node.length === 1) {
-                if(node.at(0).value === CFG.LAMBDA_CHARACTER) {
+                if(node.at(0) instanceof LL1Parser.ParseTreeLambdaLeaf) {
                     // Remove empty lambdas
                     return null;
-                } else if(node.value !== 'Primitive') {
+                } else if(node.name !== 'Primitive') {
                     // Squish tree
                     return node.pop();
                 }
-            } else if(typeof node.value === 'string' && node.value.endsWith('\'')) {
+            } else if(node.name.endsWith('\'')) {
                 // Simplify generated nodes
                 return node.splice(0,node.length);
             }
         },
         Primitive(node) {
-            const [first,,second] = [...node].map(x=>x.value) as (Token|undefined)[];
+            const [first,,second] = [...node] as LL1Parser.ParseTreeTokenLeaf[];
             if(first.name === 'char' && second?.name === 'char') {
                 return new AstNodes.RangeNode(first.value as char, second.value as char);
             } else if(first.name === 'char') {
@@ -104,9 +99,12 @@ namespace RegexEngine {
             return new AstNodes.AltNode(children); // Todo, flatten this?
         },
         Quantifier(node) {
-            switch((node.at(1).value as Token).name) {
-                case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode(node.shift() as RegexNode)]);
-                case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode);
+            const mod = node.at(1);
+            if(mod instanceof LL1Parser.ParseTreeTokenLeaf) {
+                switch(mod.name) {
+                    case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode(node.shift() as RegexNode)]);
+                    case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode);
+                }
             }
         },
         Primary(node) {
