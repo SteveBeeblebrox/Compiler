@@ -1,113 +1,169 @@
 ///#pragma once
-declare interface TreeArrayMethods<T> {
-    push: Array<T>['push'];
-    pop: Array<T>['pop'];
 
-    unshift: Array<T>['unshift'];
-    shift: Array<T>['shift'];
+///#include <decorators.ts>
 
-    splice: Array<T>['splice'];
+namespace TreeUtil {
+    export type SubTree<K extends Tree = Tree> = K & { parent: Tree };
+    export type StrayTree<K extends Tree = Tree> = K & { parent: undefined };
 
-    at: Array<T>['at'];
+    abstract class TreeInternals {
+        protected static readonly treeLength = Symbol('Tree.treeLength');
+        protected static readonly values = Symbol('Tree.values');
+        protected static readonly at = Symbol('Tree.at');
+        protected static readonly push = Symbol('Tree.push');
+        protected static readonly unshift = Symbol('Tree.unshift');
+        protected static readonly pop = Symbol('Tree.pop');
+        protected static readonly shift = Symbol('Tree.shift');
+        protected static readonly splice = Symbol('Tree.splice');
+        protected static readonly iterator = Symbol('Tree.iterator');
+        protected static readonly forEach = Symbol('Tree.forEach');
+    }
 
-    length: Array<T>['length'];
+    export abstract class Tree extends TreeInternals {
+        readonly #children: SubTree<Tree>[] = [];
+        #parent: Tree | undefined = undefined;
 
-    values: Array<T>['values'];
+        get parent(): Tree | undefined {
+            return this.#parent;
+        }
+
+        #disown(other: undefined): undefined;
+        #disown(other: Tree): StrayTree<Tree>;
+        #disown(other: Tree | undefined): StrayTree<Tree> | undefined;
+        #disown(other: Tree | undefined): StrayTree<Tree> | undefined {
+            if (other !== undefined) {
+                other.#parent = undefined;
+            }
+            return other as StrayTree<Tree> | undefined;
+        }
+
+        #own(other: undefined): never;
+        #own(other: Tree): SubTree<Tree>;
+        #own(other: Tree | undefined): SubTree<Tree>;
+        #own(other: Tree | undefined): SubTree<Tree> {
+            if (other === undefined) {
+                throw new Error('Cannot take ownership of undefined');
+            }
+            if (other === this) {
+                throw new Error('Cannot take ownership of self');
+            }
+            if (other.parent !== undefined) {
+                throw new Error('Cannot take ownership of a subtree');
+            }
+
+            let ancestor: Tree | undefined = this;
+            do {
+                if (ancestor === other) {
+                    throw new Error('Cannot take ownership of ancestor');
+                }
+            } while (ancestor = ancestor.parent);
+
+            other.#parent = this;
+            return other as SubTree<Tree>;
+        }
+
+        protected [TreeInternals.push](...items: Tree[]): number {
+            return this.#children.push(...items.map(tree => this.#own(tree)));
+        }
+        protected [TreeInternals.pop](): StrayTree<Tree> | undefined {
+            return this.#disown(this.#children.pop());
+        }
+
+        protected [TreeInternals.unshift](...items: Tree[]): number {
+            return this.#children.unshift(...items.map(tree => this.#own(tree)));
+        }
+        protected [TreeInternals.shift](): StrayTree<Tree> | undefined {
+            return this.#disown(this.#children.shift());
+        }
+
+        protected [TreeInternals.splice](start: number, deleteCount?: number | undefined): StrayTree<Tree>[];
+        protected [TreeInternals.splice](start: number, deleteCount: number, ...items: Tree[]): StrayTree<Tree>[];
+        protected [TreeInternals.splice](start: number, deleteCount: number, ...items: Tree[]): StrayTree<Tree>[] {
+            return this.#children.splice(start, deleteCount, ...items.map(tree => this.#own(tree))).map(tree => this.#disown(tree));
+        }
+
+        protected [TreeInternals.at](index: number): SubTree<Tree> | undefined {
+            return this.#children.at(index) as SubTree<Tree> | undefined;
+        }
+
+        protected get [TreeInternals.treeLength](): number {
+            return this.#children.length;
+        }
+
+        protected [TreeInternals.forEach](callbackfn: (value: SubTree<Tree>, index: number, parent: Tree) => void, thisArg?: any): void {
+            if (thisArg !== undefined) {
+                callbackfn = callbackfn.bind(thisArg);
+            }
+            return this.#children.forEach((tree, index) => callbackfn(tree, index, this));
+        }
+
+        protected [TreeInternals.values](): IterableIterator<Tree> {
+            return this.#children.values();
+        }
+
+        public get [Symbol.toStringTag]() {
+            return this.constructor.name;
+        }
+
+        protected [TreeInternals.iterator]() {
+            return this.#children[Symbol.iterator]();
+        }
+    }
+
+    type NestedTreeModifier<T,TreeType extends Tree> =
+        T extends SubTree ? SubTree<NestedTree<TreeType>>
+        : T extends StrayTree ? StrayTree<NestedTree<TreeType>>
+        : T extends Tree ? NestedTree<TreeType>
+        : T extends (...args: infer ParameterTypes)=>infer ReturnType ? (...args: NestedTreeModifier<ParameterTypes,TreeType>)=>NestedTreeModifier<ReturnType,TreeType>
+        : T extends [...any] ? ({[K in keyof T]: NestedTreeModifier<T[K],TreeType>})
+        : T
+    ;
+
+    export type NestedTree<TreeType extends Tree, SubTreeType extends Tree = TreeType, Upward extends boolean = true> = Tree & {
+        [key in keyof (Upward extends true ? TreeType : Omit<TreeType,'parent'>)]: NestedTreeModifier<TreeType[key],SubTreeType>
+    }
 }
 
-type SubTree<T, K extends Tree<T> = Tree<T>> = K & { parent: Tree<T> };
-type StrayTree<T, K extends Tree<T> = Tree<T>> = K & { parent: undefined };
+import NestedTree = TreeUtil.NestedTree;
+import Tree = TreeUtil.Tree;
+import SubTree = TreeUtil.SubTree;
+import StrayTree = TreeUtil.StrayTree;
 
-class Tree<T> implements TreeArrayMethods<Tree<T>> {
-    private readonly children: SubTree<T, typeof this>[] = [];
-    #parent: typeof this | undefined = undefined;
-    constructor(
-        public value: T
-    ) { }
-
-    get parent(): typeof this | undefined {
-        return this.#parent;
+type ArrayTreeMethods = Pick<Array<Tree>, 'length' | 'values' | 'at' | 'push' | 'unshift' | 'pop' | 'shift' | 'splice' | typeof Symbol.iterator>;
+class ArrayTree extends Tree implements ArrayTreeMethods {
+    public get length() {
+        return super[Tree.treeLength];
     }
 
-    #disown(other: undefined): undefined;
-    #disown(other: typeof this): StrayTree<T, typeof this>;
-    #disown(other: typeof this | undefined): StrayTree<T, typeof this> | undefined;
-    #disown(other: typeof this | undefined): StrayTree<T, typeof this> | undefined {
-        if (other !== undefined) {
-            other.#parent = undefined;
-        }
-        return other as StrayTree<T, typeof this> | undefined;
+    public at = super[Tree.at];
+    public values = super[Tree.values];
+    public push = super[Tree.push];
+    public unshift = super[Tree.unshift];
+    public pop = super[Tree.pop];
+    public shift = super[Tree.shift];
+    public splice = super[Tree.splice];
+    public [Symbol.iterator] = super[Tree.iterator];
+
+    @enumerable
+    public get children() {
+        return [...this];
+    }
+}
+
+class BinaryTree extends Tree {
+    public set left(value: Tree) {
+        this[Tree.splice](0,1,value);
+    }
+    @enumerable
+    public get left(): SubTree<Tree> | undefined {
+        return this[Tree.at](0);
     }
 
-    #own(other: undefined): never;
-    #own(other: Tree<T>): SubTree<T, typeof this>;
-    #own(other: Tree<T> | undefined): SubTree<T, typeof this>;
-    #own(other: Tree<T> | undefined): SubTree<T, typeof this> {
-        if (other === undefined) {
-            throw new Error('Cannot take ownership of undefined');
-        }
-        if (other === this) {
-            throw new Error('Cannot take ownership of self');
-        }
-        if (other.parent !== undefined) {
-            throw new Error('Cannot take ownership of a subtree');
-        }
-
-        let ancestor: typeof this | undefined = this;
-        do {
-            if (ancestor === other) {
-                throw new Error('Cannot take ownership of ancestor');
-            }
-        } while (ancestor = ancestor.parent);
-
-        other.#parent = this;
-        return other as SubTree<T, typeof this>;
+    public set right(value: Tree) {
+        this[Tree.splice](1,1,value);
     }
-
-    push(...items: typeof this[]): number {
-        return this.children.push(...items.map(tree => this.#own(tree)));
-    }
-    pop(): StrayTree<T, typeof this> | undefined {
-        return this.#disown(this.children.pop());
-    }
-
-    unshift(...items: typeof this[]): number {
-        return this.children.unshift(...items.map(tree => this.#own(tree)));
-    }
-    shift(): StrayTree<T, typeof this> | undefined {
-        return this.#disown(this.children.shift());
-    }
-
-    splice(start: number, deleteCount?: number | undefined): StrayTree<T, typeof this>[];
-    splice(start: number, deleteCount: number, ...items: typeof this[]): StrayTree<T, typeof this>[];
-    splice(start: number, deleteCount: number, ...items: typeof this[]): StrayTree<T, typeof this>[] {
-        return this.children.splice(start, deleteCount, ...items.map(tree => this.#own(tree))).map(tree => this.#disown(tree));
-    }
-
-    at(index: number): SubTree<T, typeof this> | undefined {
-        return this.children.at(index) as SubTree<T, typeof this> | undefined;
-    }
-
-    get length(): number {
-        return this.children.length;
-    }
-
-    forEach(callbackfn: (value: SubTree<T, typeof this>, index: number, parent: typeof this) => void, thisArg?: any): void {
-        if (thisArg !== undefined) {
-            callbackfn = callbackfn.bind(thisArg);
-        }
-        return this.children.forEach((tree, index) => callbackfn(tree, index, this));
-    }
-
-    values(): IterableIterator<typeof this> {
-        return this.children.values();
-    }
-
-    get [Symbol.toStringTag]() {
-        return 'Tree';
-    }
-
-    [Symbol.iterator]() {
-        return this.children[Symbol.iterator]();
+    @enumerable
+    public get right(): SubTree<Tree> | undefined {
+        return this[Tree.at](1);
     }
 }

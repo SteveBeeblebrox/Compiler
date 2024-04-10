@@ -4,7 +4,8 @@ type PeekableIterableIterator<T> = IterableIterator<T> & {
 }
 
 function createAsyncPeekableIterator<T>(asyncIterable: AsyncIterable<T>): PeekableAsyncIterableIterator<T> {
-    let next = asyncIterable[Symbol.asyncIterator]().next();
+    let iter: AsyncIterator<T> = asyncIterable[Symbol.asyncIterator]();
+    let next = iter.next();
 
     const it = (async function*() {
         let done: boolean | undefined = false, value;
@@ -12,7 +13,7 @@ function createAsyncPeekableIterator<T>(asyncIterable: AsyncIterable<T>): Peekab
             ({ done, value } = await next);
 
             if(!done) {
-                next = asyncIterable[Symbol.asyncIterator]().next();
+                next = iter.next();
                 yield value;
             }
         }
@@ -30,7 +31,8 @@ type PeekableAsyncIterableIterator<T> = AsyncIterableIterator<T> & {
 }
 
 function createPeekableIterator<T>(iterable: Iterable<T>): PeekableIterableIterator<T> {
-    let next = iterable[Symbol.iterator]().next();
+    let iter: Iterator<T> = iterable[Symbol.iterator]();
+    let next = iter.next();
 
     const it = (function*() {
         let done: boolean | undefined = false, value;
@@ -38,7 +40,7 @@ function createPeekableIterator<T>(iterable: Iterable<T>): PeekableIterableItera
             ({ done, value } = next);
 
             if(!done) {
-                next = iterable[Symbol.iterator]().next();
+                next = iter.next();
                 yield value;
             }
         }

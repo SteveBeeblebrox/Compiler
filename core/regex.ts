@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-//`which sjs` <(mtsc -po- -tes2018 -Ilib $0) $@; exit $?
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
 
 ///#pragma once
 ///#include <compat.ts>
@@ -11,13 +11,8 @@
 
 namespace RegexEngine {
     namespace AstNodes {
-        export abstract class RegexNode extends Tree<string> {
-            constructor() {
-                super(undefined);
-                this.value = this.constructor.name;
-                // @ts-ignore TODO, refactor a base type for Tree
-                delete this.children;
-            }
+        export abstract class RegexNode extends Tree {
+            public readonly name = this.constructor.name;
         }
         
         export class AltNode extends RegexNode {
@@ -72,22 +67,22 @@ namespace RegexEngine {
     ])));
 
     export const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Map(Object.entries({
-        '*'(node: LL1.ParseTree<any>) {
+        '*'(node: LL1Parser.ParseTreeNode) {
             if(node.length === 1) {
-                if(node.at(0).value === CFG.LAMBDA_CHARACTER) {
+                if(node.at(0) instanceof LL1Parser.ParseTreeLambdaLeaf) {
                     // Remove empty lambdas
                     return null;
-                } else if(node.value !== 'Primitive') {
+                } else if(node.name !== 'Primitive') {
                     // Squish tree
                     return node.pop();
                 }
-            } else if(typeof node.value === 'string' && node.value.endsWith('\'')) {
+            } else if(node.name.endsWith('\'')) {
                 // Simplify generated nodes
                 return node.splice(0,node.length);
             }
         },
         Primitive(node) {
-            const [first,,second] = [...node].map(x=>x.value) as (Token|undefined)[];
+            const [first,,second] = [...node] as LL1Parser.ParseTreeTokenLeaf[];
             if(first.name === 'char' && second?.name === 'char') {
                 return new AstNodes.RangeNode(first.value as char, second.value as char);
             } else if(first.name === 'char') {
@@ -109,9 +104,12 @@ namespace RegexEngine {
             return new AstNodes.AltNode(children); // Todo, flatten this?
         },
         Quantifier(node) {
-            switch((node.at(1).value as Token).name) {
-                case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode(node.shift() as RegexNode)]);
-                case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode);
+            const mod = node.at(1);
+            if(mod instanceof LL1Parser.ParseTreeTokenLeaf) {
+                switch(mod.name) {
+                    case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode(node.shift() as RegexNode)]);
+                    case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode);
+                }
             }
         },
         Primary(node) {
@@ -186,9 +184,17 @@ namespace RegexEngine {
 }
 
 ///#if __MAIN__
-if(system.args.length == 2) {
-    console.log(JSON.stringify(RegexEngine.parse(system.args[1]),undefined,2));
+///#include <graphviz.ts>
+
+if(system.args.length === 2 || system.args.length === 3) {
+    const format = system.args[2]??'json';
+    const ast = RegexEngine.parse(system.args[1]);
+    if(format === 'json') {
+        console.log(JSON.stringify(ast,undefined,2));
+    } else if(format === 'graphviz' || format === 'dot') {
+        console.log(Graphviz.serialize(ast));
+    }
 } else {
-    throw new Error('Expected one regex argument!');
+    throw new Error('Expected one regex argument and an optional format argument!');
 }
 ///#endif
