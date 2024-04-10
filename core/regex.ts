@@ -34,21 +34,25 @@ namespace RegexEngine {
                 return [...this.nodes];
             } 
             // lambda # a # b # c # ... # z # lambda
+            // Chandler
         }
         
         export class RangeNode extends RegexNode {
             constructor(private readonly min: char, private readonly max: char) {super();}
             // lambda # char for each char # lambda
+            // Chandler
         }
         
         export class KleenNode extends RegexNode {
             constructor(private readonly node: RegexNode) {super();}
             // lambda # node with loopback # lambda
+            // Chandler
         }
         
         export class CharNode extends RegexNode {
             constructor(private readonly char: char) {super();}
             // lambda # char # lambda
+            // Chandler
         }
 
         export class WildcharNode extends RegexNode {
@@ -58,6 +62,7 @@ namespace RegexEngine {
         
         export class LambdaNode extends RegexNode {
             // lambda # lambda # lambda
+            // Chandler
         }
     }
     import RegexNode = AstNodes.RegexNode;
