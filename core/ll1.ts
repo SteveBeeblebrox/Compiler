@@ -152,7 +152,7 @@ namespace LL1 {
         private readonly parseTable: LL1ParseTable;
         private readonly cfg: CFG;
         private readonly sdt: SyntaxTransformerMap<ASTNodeType>; 
-        constructor(cfg: CFG, sdt: {[key in NonTerminal | '*']: SyntaxTransformer<ASTNodeType>} | SyntaxTransformerMap<ASTNodeType> = new Map()) {
+        constructor(cfg: CFG, sdt: {[key in NonTerminal | '*']?: SyntaxTransformer<ASTNodeType>} | SyntaxTransformerMap<ASTNodeType> = new Map()) {
             this.cfg = transform(cfg);
             this.parseTable = createParseTable(this.cfg);
             this.sdt = sdt instanceof Map ? sdt : new Map(Object.entries(sdt)) as SyntaxTransformerMap<ASTNodeType>;
@@ -212,7 +212,7 @@ namespace LL1 {
                     // Continue parsing
                     Current = parent;
                 } else if(CFG.isNonTerminal(x)) {
-                    let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`))];
+                    let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`))] ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`));
                     K.push(MARKER);
                     const R = p[1];
                     
