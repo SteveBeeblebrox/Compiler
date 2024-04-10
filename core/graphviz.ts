@@ -36,6 +36,10 @@ namespace Graphviz {
         const data = []
         data.push('digraph {');
 
+        function stringifyAttributes(attributes: GraphvizAttributes) {
+            
+        }
+
         function recurse(obj: any, parent?: NodeName) {
             if(!nodes.has(obj)) {
                 nodes.set(obj,`Node${iter.shift()}`);
