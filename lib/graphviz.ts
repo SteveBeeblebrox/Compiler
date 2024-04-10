@@ -5,7 +5,7 @@
 
 // Todo, property labels on edges
 namespace Graphviz {
-    // Note label overrides attributs.label
+    // Note label overrides attributes.label which overrides using Symbol.toStringTag
     export const label = Symbol('Graphviz.label');
     export const children = Symbol('Graphviz.children');
     export const attributes = Symbol('Graphviz.attributes');
@@ -50,6 +50,8 @@ namespace Graphviz {
             
             if(Graphviz.label in obj)
                 attributes.label = obj[Graphviz.label];
+
+            attributes.label ??= Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj);
 
 
             data.push(`\t${name}[${Object.entries(attributes).map(([key,value])=>`${key}=${JSON.stringify(value)}`).join(', ')}]`);

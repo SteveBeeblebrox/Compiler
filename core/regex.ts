@@ -179,9 +179,17 @@ namespace RegexEngine {
 }
 
 ///#if __MAIN__
-if(system.args.length == 2) {
-    console.log(JSON.stringify(RegexEngine.parse(system.args[1]),undefined,2));
+///#include <graphviz.ts>
+
+if(system.args.length === 2 || system.args.length === 3) {
+    const format = system.args[2]??'json';
+    const ast = RegexEngine.parse(system.args[1]);
+    if(format === 'json') {
+        console.log(JSON.stringify(ast,undefined,2));
+    } else if(format === 'graphviz' || format === 'dot') {
+        console.log(Graphviz.serialize(ast));
+    }
 } else {
-    throw new Error('Expected one regex argument!');
+    throw new Error('Expected one regex argument and an optional format argument!');
 }
 ///#endif
