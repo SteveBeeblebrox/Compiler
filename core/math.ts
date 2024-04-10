@@ -84,26 +84,26 @@ if('prefix'.startsWith(system.args[1])) {
         constructor(public readonly operator: string, public args: Tree[]) {super();}
     }
     parser = new LL1Parser<any>(prefixGrammar, new Map(Object.entries({
-        '*'(node: LL1.ParseTree<any>) {
-            if(node.length === 1) {
-                if(node.at(0).value === CFG.LAMBDA_CHARACTER) {
-                    // Remove empty lambdas
-                    return null;
-                } else {
-                    // Squish tree
-                    return node.pop();
-                }
-            } else if(typeof node.value === 'string' && node.value.endsWith('\'')) {
-                // Simplify generated nodes
-                return node.splice(0,node.length);
-            }
-        },
-        PrefixExpr(node) {
-            return new VargOperator(node.at(1).value.value, node.at(2).splice(0,node.at(2).length));
-        },
-        S(node) {
-            return node.shift();
-        }
+        // '*'(node: LL1.ParseTree<any>) {
+        //     if(node.length === 1) {
+        //         if(node.at(0).value === CFG.LAMBDA_CHARACTER) {
+        //             // Remove empty lambdas
+        //             return null;
+        //         } else {
+        //             // Squish tree
+        //             return node.pop();
+        //         }
+        //     } else if(typeof node.value === 'string' && node.value.endsWith('\'')) {
+        //         // Simplify generated nodes
+        //         return node.splice(0,node.length);
+        //     }
+        // },
+        // PrefixExpr(node) {
+        //     return new VargOperator(node.at(1).value.value, node.at(2).splice(0,node.at(2).length));
+        // },
+        // S(node) {
+        //     return node.shift();
+        // }
     })) as LL1.SyntaxTransformerMap<any>);
 } else if('infix'.startsWith(system.args[1])) {
     class Operator extends Tree {
@@ -141,4 +141,25 @@ if('prefix'.startsWith(system.args[1])) {
     throw new Error(`Unknown mode: '${system.args[1]}'`);
 }
 
-console.log(JSON.stringify(parser.parse(tokens[Symbol.iterator]()),void 0,2));
+const ast = parser.parse(tokens);
+
+function deepKeys(o: any): string[] {
+    const seen = new Set<any>();
+    function recurse(o: any) {
+        if(seen.has(o)) {
+            return [];
+        } else {
+            seen.add(o);
+            return [...new Set(Object.entries(o).flatMap(function([key,value]) {
+                return [key,...recurse(value)];
+            }))];
+        }
+    }
+
+    return recurse(o);
+}
+
+const keys = new Set(deepKeys(ast).sort());
+keys.delete('children');
+keys.add('children');
+console.log(JSON.stringify(parser.parse(tokens[Symbol.iterator]()),[...keys],2));
