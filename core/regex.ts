@@ -11,13 +11,8 @@
 
 namespace RegexEngine {
     namespace AstNodes {
-        export abstract class RegexNode extends Tree<string> {
-            constructor() {
-                super(undefined);
-                this.value = this.constructor.name;
-                // @ts-ignore TODO, refactor a base type for Tree
-                delete this.children;
-            }
+        export abstract class RegexNode extends Tree {
+            public readonly name = this.constructor.name;
         }
         
         export class AltNode extends RegexNode {
