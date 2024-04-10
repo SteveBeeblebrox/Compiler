@@ -119,8 +119,8 @@ namespace TreeUtil {
         : T
     ;
 
-    export type NestedTree<TreeType extends Tree> = Tree & {
-        [key in keyof TreeType]: NestedTreeModifier<TreeType[key],TreeType>
+    export type NestedTree<TreeType extends Tree, SubTreeType extends Tree = TreeType, Upward extends boolean = true> = Tree & {
+        [key in keyof (Upward extends true ? TreeType : Omit<TreeType,'parent'>)]: NestedTreeModifier<TreeType[key],SubTreeType>
     }
 }
 
