@@ -127,7 +127,7 @@ namespace TreeUtil {
 import NestedTree = TreeUtil.NestedTree;
 import Tree = TreeUtil.Tree;
 import SubTree = TreeUtil.SubTree;
-import StayTree = TreeUtil.StrayTree;
+import StrayTree = TreeUtil.StrayTree;
 
 type ArrayTreeMethods = Pick<Array<Tree>, 'length' | 'values' | 'at' | 'push' | 'unshift' | 'pop' | 'shift' | 'splice' | typeof Symbol.iterator>;
 class ArrayTree extends Tree implements ArrayTreeMethods {
