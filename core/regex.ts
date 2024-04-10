@@ -5,6 +5,8 @@
 ///#include <compat.ts>
 ///#include <types.ts>
 
+///#include <graphviz.ts>
+
 ///#include "lex.ts"
 ///#include "cfg.ts"
 ///#include "ll1.ts"
@@ -35,19 +37,27 @@ namespace RegexEngine {
         export class RangeNode extends RegexNode {
             constructor(private readonly min: char, private readonly max: char) {super();}
             // lambda # char for each char # lambda
-            // Chandler
+            get [Graphviz.children]() {
+                return {
+                    min: {[Graphviz.label]: this.min},
+                    max: {[Graphviz.label]: this.max},
+                }
+            }
         }
         
         export class KleenNode extends RegexNode {
             constructor(private readonly node: RegexNode) {super();}
             // lambda # node with loopback # lambda
-            // Chandler
+            readonly [Graphviz.label] = '*';
         }
         
         export class CharNode extends RegexNode {
             constructor(private readonly char: char) {super();}
-            // lambda # char # lambda
-            // Chandler
+            get [Graphviz.children]() {
+                return {
+                    char: {[Graphviz.label]: this.char},
+                }
+            }
         }
 
         export class WildcharNode extends RegexNode {
@@ -57,7 +67,7 @@ namespace RegexEngine {
         
         export class LambdaNode extends RegexNode {
             // lambda # lambda # lambda
-            // Chandler
+            readonly [Graphviz.label] = CFG.LAMBDA_CHARACTER;
         }
     }
     import RegexNode = AstNodes.RegexNode;
@@ -184,8 +194,6 @@ namespace RegexEngine {
 }
 
 ///#if __MAIN__
-///#include <graphviz.ts>
-
 if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);

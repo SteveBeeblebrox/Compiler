@@ -35,3 +35,15 @@ namespace ArrayPolyfill {
 }
 
 installPolyfill(Array,ArrayPolyfill);
+
+declare interface ArrayConstructor {
+    entries<T>(arr: ArrayLike<T>): [number,T][];
+}
+
+namespace ArrayConstructorPolyfill {
+    export function entries<T>(arr: ArrayLike<T>) {
+        return Array.prototype.map.apply(arr, [(t,i)=>[i,t]]);
+    }
+}
+
+installPolyfill({prototype: Array} as any, ArrayConstructorPolyfill)

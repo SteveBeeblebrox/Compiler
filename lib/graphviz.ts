@@ -11,7 +11,7 @@ namespace Graphviz {
     export const attributes = Symbol('Graphviz.attributes');
 
     export type Graphable = Partial<{
-        [children]: Iterable<Graphable>,
+        [children]: string[] | {[key: string]: Graphable},
         [label]: string,
         [attributes]: GraphvizAttributes
     }>;
@@ -25,7 +25,7 @@ namespace Graphviz {
 
     type NodeName = `Node${number}`;
 
-    export function serialize(obj: Graphable, {output}: GraphvizOptions = {}): string {
+    export function serialize(obj: object & Graphable, {output}: GraphvizOptions = {}): string {
         const iter = (function*() {
             let start = 0;
             while(true) yield start++;
@@ -36,14 +36,18 @@ namespace Graphviz {
         const data = []
         data.push('digraph {');
 
-        function stringifyAttributes(attributes: GraphvizAttributes) {
-            
+        function stringifyAttributes(attributes?: GraphvizAttributes) {
+            return attributes ? `[${Object.entries(attributes).map(([key,value])=>`${key}=${JSON.stringify(value)}`).join(', ')}]` : '';
         }
 
-        function recurse(obj: any, parent?: NodeName) {
+        function recurse(parent: NodeName | undefined, edge: string | undefined, obj: any): NodeName {
+            if(typeof obj !== 'object' || obj === null)
+                return;
+            
             if(!nodes.has(obj)) {
                 nodes.set(obj,`Node${iter.shift()}`);
             }
+            
             const name: NodeName = nodes.get(obj);
 
             const attributes: GraphvizAttributes = obj[Graphviz.attributes] ?? {};
@@ -54,18 +58,27 @@ namespace Graphviz {
             attributes.label ??= Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj);
 
 
-            data.push(`\t${name}[${Object.entries(attributes).map(([key,value])=>`${key}=${JSON.stringify(value)}`).join(', ')}]`);
+            data.push(`\t${name}${stringifyAttributes(attributes)}`);
 
             if(parent != null) {
-                 data.push(`\t${parent}->${name}`);
+                data.push(`${parent}->${name}${stringifyAttributes({label: edge})}`);
             }
 
-            for(const child of obj?.[Graphviz.children] ?? []) {
-                recurse(child,name);
+            const keys: string[] | object = obj[Graphviz.children] ?? Object.keys(obj);
+            for(const [key, child] of Object.entries(Array.isArray(keys) ? obj : keys)) {
+                if(!Array.isArray(keys) || keys.includes(key)) {
+                    if(Array.isArray(child)) {
+                        for(const [i,arrayChild] of Array.entries(child)) {
+                            recurse(name,`${key}[${i}]`,arrayChild);
+                        }
+                    } else {
+                        recurse(name,key,child);
+                    }
+                }
             }
         }
 
-        recurse(obj);
+        recurse(null,null,obj);
 
         data.push('}');
         const text = data.join('\n');
@@ -77,22 +90,3 @@ namespace Graphviz {
         return text;
     }
 }
-
-///#if __MAIN__
-
-function makeNode(name, ...children) {
-    return {
-        [Graphviz.label]: name,
-        [Graphviz.children]: children,
-        [Graphviz.attributes]: {
-            color: 'blue'
-        }
-    }
-}
-
-const E = makeNode('E');
-const node = makeNode('A', makeNode('B', makeNode('C'), makeNode('D'),E), E,E)
-
-console.log(Graphviz.serialize(node));
-
-///#endif
