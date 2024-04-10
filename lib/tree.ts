@@ -102,7 +102,7 @@ namespace TreeUtil {
         }
 
         public get [Symbol.toStringTag]() {
-            return 'Tree';
+            return this.constructor.name;
         }
 
         protected [TreeInternals.iterator]() {
@@ -148,10 +148,6 @@ class ArrayTree extends Tree implements ArrayTreeMethods {
     public get children() {
         return [...this];
     }
-    
-    public override get [Symbol.toStringTag]() {
-        return 'ArrayTree';
-    }
 }
 
 class BinaryTree extends Tree {
@@ -169,9 +165,5 @@ class BinaryTree extends Tree {
     @enumerable
     public get right(): SubTree<Tree> | undefined {
         return this[Tree.at](1);
-    }
-
-    public override get [Symbol.toStringTag]() {
-        return 'BinaryTree';
     }
 }
