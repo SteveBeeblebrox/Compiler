@@ -24,7 +24,7 @@ namespace RegexEngine {
         }
         export type NFAContext = {
             createState:()=>NFAState,
-            alphabet: char[]
+            readonly alphabet: char[]
         }
         export interface NFAConvertible {
             toNFA(ctx: NFAContext): NFA;
