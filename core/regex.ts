@@ -49,7 +49,18 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // chain in parallel
-                throw new Error('NYI');
+                let nfa: NFA;
+                nfa.start = ctx.createState();
+                nfa.end = ctx.createState();
+                for (var ch of this.getChildNodes()) {
+                    let cnfa = ch.toNFA(ctx);
+                    nfa.lambdaEdges.push([nfa.start, cnfa.start]);
+                    nfa.lambdaEdges.push([nfa.end, cnfa.end]);
+                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
+                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
+                }
+                return nfa;
+                // throw new Error('NYI');
             }
         }
         
@@ -63,7 +74,21 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // lambda # a # b # c # ... # z # lambda
-                throw new Error('NYI');
+                let nfa: NFA;
+                nfa.start = ctx.createState();
+                let cs = nfa.start;
+                nfa.lambdaEdges.push([nfa.start, cs]);
+                for (var rn of this.getChildNodes()) {
+                    let cnfa = rn.toNFA(ctx);
+                    nfa.lambdaEdges.push([cs, cnfa.start]);
+                    cs = cnfa.end;
+                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
+                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
+                }
+                nfa.end = ctx.createState();
+                nfa.lambdaEdges.push([cs, nfa.end]);
+                return nfa;
+                // throw new Error('NYI');
             }
         }
         
@@ -80,7 +105,21 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // lambda # char for each char # lambda
-                throw new Error('NYI');
+                let nfa: NFA;
+                nfa.start = ctx.createState();
+                nfa.end = ctx.createState();
+                let i = ctx.alphabet.find(e => e == this.min);
+                while (ctx.alphabet[i] != this.max) {
+                    let ch = new CharNode(ctx.alphabet[i]);
+                    let cnfa = ch.toNFA(ctx);
+                    nfa.lambdaEdges.push([nfa.start, cnfa.start]);
+                    nfa.lambdaEdges.push([nfa.end, cnfa.end]);
+                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
+                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
+                    i += 1;
+                }
+                return nfa;
+                // throw new Error('NYI');
             }
         }
         
@@ -92,7 +131,18 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // lambda # node with loopback # lambda
-                throw new Error('NYI');
+                let nfa: NFA;
+                nfa.start = ctx.createState();
+                nfa.end = ctx.createState();
+                let cnfa = this.node.toNFA(ctx);
+                nfa.lambdaEdges.push([nfa.start, cnfa.start]);
+                nfa.lambdaEdges.push([nfa.end, cnfa.end]);
+                nfa.lambdaEdges.push([cnfa.start, cnfa.end]);
+                nfa.lambdaEdges.push([cnfa.end, cnfa.start]);
+                nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
+                nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
+                return nfa
+                // throw new Error('NYI');
             }
         }
         
@@ -105,7 +155,13 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof CharNode>,this>)(this.char);
             }
             public toNFA(ctx: NFAContext): NFA {
-                throw new Error('NYI');
+                // let stateone = ctx.createState();
+                let nfa: NFA;
+                nfa.start = ctx.createState();
+                nfa.end = ctx.createState();
+                nfa.structuralEdges.push([ctx.alphabet[0], nfa.start, nfa.end]);
+                return nfa;
+                // throw new Error('NYI');
             }
         }
 
@@ -116,7 +172,18 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof WildcharNode>,this>)();
             }
             public toNFA(ctx: NFAContext): NFA {
-                throw new Error('NYI');
+                let nfa: NFA;
+                nfa.start = ctx.createState();
+                nfa.end = ctx.createState();
+                for (var c of ctx.alphabet) {
+                    let ch = new CharNode(c);
+                    let cnfa = ch.toNFA(ctx);
+                    nfa.lambdaEdges.push([nfa.start, cnfa.start]);
+                    nfa.lambdaEdges.push([nfa.end, cnfa.end]);
+                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
+                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
+                }
+                return nfa;
             }
         }
         
@@ -127,7 +194,11 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof LambdaNode>,this>)();
             }
             public toNFA(ctx: NFAContext): NFA {
-                throw new Error('NYI');
+                let nfa: NFA;
+                nfa.start = ctx.createState();
+                nfa.end = ctx.createState();
+                nfa.lambdaEdges.push([nfa.start, nfa.end]);
+                return nfa;
             }
         }
     }
@@ -258,6 +329,7 @@ namespace RegexEngine {
 if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);
+    // console.log(JSON.stringify(ast.TreeNodes.toNFA()))
     if(format === 'json') {
         console.log(JSON.stringify(ast,undefined,2));
     } else if(format === 'graphviz' || format === 'dot') {
