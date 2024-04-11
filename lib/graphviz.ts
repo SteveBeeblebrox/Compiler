@@ -36,7 +36,7 @@ namespace Graphviz {
 
         const nodes = new Map<Graphable,NodeName>();
 
-        const data = []
+        const data = [];
         data.push('digraph {');
 
         function stringifyAttributes(attributes?: GraphvizAttributes) {
