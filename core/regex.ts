@@ -12,10 +12,32 @@
 ///#include "ll1.ts"
 
 namespace RegexEngine {
-    namespace AstNodes {
-        export abstract class RegexNode extends Tree {
+    namespace NFAGen {
+        export type NFAState = Opaque<number,'NFAState'>
+        export type LambdaEdge = [start: NFAState, end: NFAState];
+        export type StructuralEdge = [char, ...LambdaEdge];
+        export type NFA = {
+            start: NFAState,
+            end: NFAState,
+            structuralEdges: StructuralEdge[],
+            lambdaEdges: LambdaEdge[]
+        }
+        export type NFAContext = {
+            createState:()=>NFAState,
+            alphabet: char[]
+        }
+        export interface NFAConvertible {
+            toNFA(ctx: NFAContext): NFA;
+        }
+    }
+    namespace TreeNodes {
+        export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
             public readonly name = this.constructor.name;
             public abstract clone(): typeof this;
+            public toNFA(ctx: NFAGen.NFAContext): NFAGen.NFA {
+                ///#warning toNFA NYI
+                throw new Error('NYI');
+            }
         }
         
         export class AltNode extends RegexNode {
@@ -45,8 +67,8 @@ namespace RegexEngine {
             // lambda # char for each char # lambda
             get [Graphviz.children]() {
                 return {
-                    min: {[Graphviz.label]: this.min},
-                    max: {[Graphviz.label]: this.max},
+                    min: Graphviz.text(this.min),
+                    max: Graphviz.text(this.max),
                 }
             }
             public override clone() {
@@ -65,10 +87,8 @@ namespace RegexEngine {
         
         export class CharNode extends RegexNode {
             constructor(private readonly char: char) {super();}
-            get [Graphviz.children]() {
-                return {
-                    char: {[Graphviz.label]: this.char},
-                }
+            get [Graphviz.label]() {
+                return this.char;
             }
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof CharNode>,this>)(this.char);
@@ -91,13 +111,13 @@ namespace RegexEngine {
             }
         }
     }
-    import RegexNode = AstNodes.RegexNode;
+    import RegexNode = TreeNodes.RegexNode;
 
     const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
     ])));
 
-    export const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Map(Object.entries({
+    const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Map(Object.entries({
         '*'(node: LL1Parser.ParseTreeNode) {
             if(node.length === 1) {
                 if(node.at(0) instanceof LL1Parser.ParseTreeLambdaLeaf) {
@@ -115,31 +135,31 @@ namespace RegexEngine {
         Primitive(node) {
             const [first,,second] = [...node] as LL1Parser.ParseTreeTokenLeaf[];
             if(first.name === 'char' && second?.name === 'char') {
-                return new AstNodes.RangeNode(first.value as char, second.value as char);
+                return new TreeNodes.RangeNode(first.value as char, second.value as char);
             } else if(first.name === 'char') {
-                return new AstNodes.CharNode(first.value as char);
+                return new TreeNodes.CharNode(first.value as char);
             } else if(first.name === '%.') {
-                return new AstNodes.WildcharNode();
+                return new TreeNodes.WildcharNode();
             }
         },
         Sequence(node) {
-            return new AstNodes.SeqNode([...node].flatMap(node => node instanceof AstNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]);
+            return new TreeNodes.SeqNode([...node].flatMap(node => node instanceof TreeNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]);
         },
         Alternation(node) {
             const l = node.length;
             const children = node.splice(0,node.length).filter(x=>x instanceof RegexNode) as RegexNode[];
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
             if(2*children.length-1 !== l) {
-                children.push(new AstNodes.LambdaNode());
+                children.push(new TreeNodes.LambdaNode());
             }
-            return new AstNodes.AltNode(children); // Todo, flatten this?
+            return new TreeNodes.AltNode(children); // Todo, flatten this?
         },
         Quantifier(node) {
             const mod = node.at(1);
             if(mod instanceof LL1Parser.ParseTreeTokenLeaf) {
                 switch(mod.name) {
-                    case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode((node.shift() as RegexNode).clone())]);
-                    case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode);
+                    case '%+': return new TreeNodes.SeqNode([node.at(0) as RegexNode, new TreeNodes.KleenNode((node.shift() as RegexNode).clone())]);
+                    case '%*': return new TreeNodes.KleenNode(node.shift() as RegexNode);
                 }
             }
         },

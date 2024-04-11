@@ -2,7 +2,7 @@
 
 ///#include <decorators.ts>
 
-namespace TreeUtil {
+namespace Trees {
     export type SubTree<K extends Tree = Tree> = K & { parent: Tree };
     export type StrayTree<K extends Tree = Tree> = K & { parent: undefined };
 
@@ -124,10 +124,10 @@ namespace TreeUtil {
     }
 }
 
-import NestedTree = TreeUtil.NestedTree;
-import Tree = TreeUtil.Tree;
-import SubTree = TreeUtil.SubTree;
-import StrayTree = TreeUtil.StrayTree;
+import NestedTree = Trees.NestedTree;
+import Tree = Trees.Tree;
+import SubTree = Trees.SubTree;
+import StrayTree = Trees.StrayTree;
 
 type ArrayTreeMethods = Pick<Array<Tree>, 'length' | 'values' | 'at' | 'push' | 'unshift' | 'pop' | 'shift' | 'splice' | typeof Symbol.iterator>;
 class ArrayTree extends Tree implements ArrayTreeMethods {
