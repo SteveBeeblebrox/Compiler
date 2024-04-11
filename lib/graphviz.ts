@@ -10,7 +10,7 @@ namespace Graphviz {
     export const attributes = Symbol('Graphviz.attributes');
 
     export function text(text: string, attributes: GraphvizAttributes = {}): Graphable {
-        return {...attributes, [Graphviz.label]: text}
+        return {...attributes, [Graphviz.label]: text};
     }
 
     export type Graphable = object & Partial<{
