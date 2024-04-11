@@ -15,13 +15,17 @@ namespace RegexEngine {
     namespace AstNodes {
         export abstract class RegexNode extends Tree {
             public readonly name = this.constructor.name;
+            public abstract clone(): typeof this;
         }
         
         export class AltNode extends RegexNode {
             constructor(private readonly nodes: RegexNode[]) {super();}
             public getChildNodes() {
                 return [...this.nodes];
-            } 
+            }
+            public override clone() {
+                return new (this.constructor as Constructor<ConstructorParameters<typeof AltNode>,this>)(this.nodes.map(node=>node.clone()));
+            }
             // chain in parallel
         }
         
@@ -29,9 +33,11 @@ namespace RegexEngine {
             constructor(private readonly nodes: RegexNode[]) {super();}
             public getChildNodes() {
                 return [...this.nodes];
-            } 
+            }
+            public override clone() {
+                return new (this.constructor as Constructor<ConstructorParameters<typeof SeqNode>,this>)(this.nodes.map(node=>node.clone()));
+            }
             // lambda # a # b # c # ... # z # lambda
-            // Chandler
         }
         
         export class RangeNode extends RegexNode {
@@ -43,12 +49,18 @@ namespace RegexEngine {
                     max: {[Graphviz.label]: this.max},
                 }
             }
+            public override clone() {
+                return new (this.constructor as Constructor<ConstructorParameters<typeof RangeNode>,this>)(this.min,this.max);
+            }
         }
         
         export class KleenNode extends RegexNode {
             constructor(private readonly node: RegexNode) {super();}
             // lambda # node with loopback # lambda
             readonly [Graphviz.label] = '*';
+            public override clone() {
+                return new (this.constructor as Constructor<ConstructorParameters<typeof KleenNode>,this>)(this.node.clone());
+            }
         }
         
         export class CharNode extends RegexNode {
@@ -58,16 +70,25 @@ namespace RegexEngine {
                     char: {[Graphviz.label]: this.char},
                 }
             }
+            public override clone() {
+                return new (this.constructor as Constructor<ConstructorParameters<typeof CharNode>,this>)(this.char);
+            }
         }
 
         export class WildcharNode extends RegexNode {
             // maybe refactor as a range node or just add one for each char
             // TODO, it might be better to support wildchars and charsets in the matcher to reduce nfa size?
+            public override clone() {
+                return new (this.constructor as Constructor<ConstructorParameters<typeof WildcharNode>,this>)();
+            }
         }
         
         export class LambdaNode extends RegexNode {
             // lambda # lambda # lambda
             readonly [Graphviz.label] = CFG.LAMBDA_CHARACTER;
+            public override clone() {
+                return new (this.constructor as Constructor<ConstructorParameters<typeof LambdaNode>,this>)();
+            }
         }
     }
     import RegexNode = AstNodes.RegexNode;
@@ -117,7 +138,7 @@ namespace RegexEngine {
             const mod = node.at(1);
             if(mod instanceof LL1Parser.ParseTreeTokenLeaf) {
                 switch(mod.name) {
-                    case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode(node.shift() as RegexNode)]);
+                    case '%+': return new AstNodes.SeqNode([node.at(0) as RegexNode, new AstNodes.KleenNode((node.shift() as RegexNode).clone())]);
                     case '%*': return new AstNodes.KleenNode(node.shift() as RegexNode);
                 }
             }

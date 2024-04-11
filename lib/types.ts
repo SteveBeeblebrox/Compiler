@@ -23,3 +23,5 @@ type JSONPrimitive = number | boolean | string | null;
 type JSONObject = {[key: string]: JSONValue};
 type JSONArrray = JSONValue[];
 type JSONValue = JSONPrimitive | JSONArrray | JSONObject
+
+type Constructor<ParameterTypes extends any[],ThisType>=new(...args: ParameterTypes)=>ThisType;
