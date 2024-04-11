@@ -30,14 +30,13 @@ namespace RegexEngine {
             toNFA(ctx: NFAContext): NFA;
         }
     }
+    import NFAContext = NFAGen.NFAContext;
+    import NFA = NFAGen.NFA;
     namespace TreeNodes {
         export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
             public readonly name = this.constructor.name;
             public abstract clone(): typeof this;
-            public toNFA(ctx: NFAGen.NFAContext): NFAGen.NFA {
-                ///#warning toNFA NYI
-                throw new Error('NYI');
-            }
+            public abstract toNFA(ctx: NFAContext): NFA;
         }
         
         export class AltNode extends RegexNode {
@@ -48,7 +47,10 @@ namespace RegexEngine {
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof AltNode>,this>)(this.nodes.map(node=>node.clone()));
             }
-            // chain in parallel
+            public toNFA(ctx: NFAContext): NFA {
+                // chain in parallel
+                throw new Error('NYI');
+            }
         }
         
         export class SeqNode extends RegexNode {
@@ -59,12 +61,14 @@ namespace RegexEngine {
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof SeqNode>,this>)(this.nodes.map(node=>node.clone()));
             }
-            // lambda # a # b # c # ... # z # lambda
+            public toNFA(ctx: NFAContext): NFA {
+                // lambda # a # b # c # ... # z # lambda
+                throw new Error('NYI');
+            }
         }
         
         export class RangeNode extends RegexNode {
             constructor(private readonly min: char, private readonly max: char) {super();}
-            // lambda # char for each char # lambda
             get [Graphviz.children]() {
                 return {
                     min: Graphviz.text(this.min),
@@ -74,14 +78,21 @@ namespace RegexEngine {
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof RangeNode>,this>)(this.min,this.max);
             }
+            public toNFA(ctx: NFAContext): NFA {
+                // lambda # char for each char # lambda
+                throw new Error('NYI');
+            }
         }
         
         export class KleenNode extends RegexNode {
             constructor(private readonly node: RegexNode) {super();}
-            // lambda # node with loopback # lambda
             readonly [Graphviz.label] = '*';
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof KleenNode>,this>)(this.node.clone());
+            }
+            public toNFA(ctx: NFAContext): NFA {
+                // lambda # node with loopback # lambda
+                throw new Error('NYI');
             }
         }
         
@@ -93,6 +104,9 @@ namespace RegexEngine {
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof CharNode>,this>)(this.char);
             }
+            public toNFA(ctx: NFAContext): NFA {
+                throw new Error('NYI');
+            }
         }
 
         export class WildcharNode extends RegexNode {
@@ -101,6 +115,9 @@ namespace RegexEngine {
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof WildcharNode>,this>)();
             }
+            public toNFA(ctx: NFAContext): NFA {
+                throw new Error('NYI');
+            }
         }
         
         export class LambdaNode extends RegexNode {
@@ -108,6 +125,9 @@ namespace RegexEngine {
             readonly [Graphviz.label] = CFG.LAMBDA_CHARACTER;
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof LambdaNode>,this>)();
+            }
+            public toNFA(ctx: NFAContext): NFA {
+                throw new Error('NYI');
             }
         }
     }
