@@ -9,11 +9,11 @@ namespace AlphabetEncoding {
         }
         return encoded?.replace(/x.{0,2}/g, unescape);
     }
-    export function encode(text: string): string {
+    export function encode(text: string, force: boolean): string {
         function escape(char: string) {
             return `x${char.charCodeAt(0).toString(16).padStart(2,'0')}`;
         }
-        return text?.replace(/[^0-9A-Za-wy-z]/g, escape);
+        return force ? text[Symbol.iterator]().map(escape).toArray().join('') : text?.replace(/[^0-9A-Za-wy-z]/g, escape);
     }
 }
 
