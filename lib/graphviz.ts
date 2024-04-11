@@ -14,7 +14,7 @@ namespace Graphviz {
         return {...attributes, [Graphviz.label]: text}
     }
 
-    export type Graphable = Partial<{
+    export type Graphable = object & Partial<{
         [children]: string[] | {[key: string]: Graphable},
         [label]: string,
         [attributes]: GraphvizAttributes
@@ -29,7 +29,7 @@ namespace Graphviz {
 
     type NodeName = `Node${number}`;
 
-    export function serialize(obj: object & Graphable, {output}: GraphvizOptions = {}): string {
+    export function serialize(obj: Graphable, {output}: GraphvizOptions = {}): string {
         const iter = (function*() {
             let start = 0;
             while(true) yield start++;
