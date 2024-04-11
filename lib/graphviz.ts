@@ -3,7 +3,6 @@
 
 ///#include <compat.ts>
 
-// Todo, property labels on edges
 namespace Graphviz {
     // Note label overrides attributes.label which overrides using Symbol.toStringTag
     export const label = Symbol('Graphviz.label');
