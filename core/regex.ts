@@ -33,6 +33,10 @@ namespace RegexEngine {
                 return this.iter.shift();
             }
 
+            public createStates(n: number = 1): NFAState[] {
+                return [...this.iter.shift(n)];
+            }
+
             public lambdaWrap(nfa: NFA) {
                 ///#warning lambdaWrap nyi
                 return nfa;
@@ -356,10 +360,15 @@ namespace RegexEngine {
 
     export function compile(text: string, alphabet: char[]): NFA {
         const ctx = new NFAContext(alphabet);
+        const [start,end] = ctx.createStates(2);
         const ast = RegexEngine.parse(text);
         const nfa = ast.toNFA(ctx);
-        ///#warning ensure state 0 is start and 1 is end, add 2x lambdas
-        return {...nfa};
+        return {
+            start,
+            end,
+            lambdaEdges: [[start, nfa.start], ...nfa.lambdaEdges, [end, nfa.end]],
+            structuralEdges: [...nfa.structuralEdges]
+        };
     }
 }
 
@@ -367,12 +376,14 @@ namespace RegexEngine {
 if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);
-    if(format === 'json') {
+    if('json'.startsWith(format)) {
         console.log(JSON.stringify(ast,undefined,2));
-    } else if(format === 'graphviz' || format === 'dot') {
+    } else if('graphviz'.startsWith(format) || 'dot'.startsWith(format)) {
         console.log(Graphviz.serialize(ast));
-    } else if(format === 'nfa') {
+    } else if('nfa'.startsWith(format)) {
         console.log(RegexEngine.compile(system.args[1], ['a','b','c','d']));
+    } else {
+        throw new Error(`Unknown format '${format}'!`)
     }
 } else {
     throw new Error('Expected one regex argument and an optional format argument!');
