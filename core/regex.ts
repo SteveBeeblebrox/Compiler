@@ -14,7 +14,7 @@
 
 namespace RegexEngine {
     namespace NFAGen {
-        export type NFAState = Opaque<number,'NFAState'>
+        type NFAState = Opaque<number,'NFAState'>
         export type LambdaEdge = [start: NFAState, end: NFAState];
         export type StructuralEdge = [...LambdaEdge, char];
         export type NFA = {
