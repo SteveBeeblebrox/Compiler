@@ -12,7 +12,7 @@
 ///#include "ll1.ts"
 
 namespace RegexEngine {
-    namespace NFAGen {
+    export namespace NFAGen {
         export type NFAState = Opaque<number,'NFAState'>
         export type LambdaEdge = [start: NFAState, end: NFAState];
         export type StructuralEdge = [char, ...LambdaEdge];
@@ -21,6 +21,11 @@ namespace RegexEngine {
             end: NFAState,
             structuralEdges: StructuralEdge[],
             lambdaEdges: LambdaEdge[]
+        }
+        let counter:number = 0
+        export function createState() {
+            let state: NFAState = counter++ as NFAState;
+            return (state);
         }
         export type NFAContext = {
             createState:()=>NFAState,
@@ -32,7 +37,7 @@ namespace RegexEngine {
     }
     import NFAContext = NFAGen.NFAContext;
     import NFA = NFAGen.NFA;
-    namespace TreeNodes {
+    export namespace TreeNodes {
         export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
             public readonly name = this.constructor.name;
             public abstract clone(): typeof this;
@@ -49,13 +54,17 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // chain in parallel
-                let nfa: NFA;
-                nfa.start = ctx.createState();
-                nfa.end = ctx.createState();
+                let nfa: NFA = {start:ctx.createState(), 
+                    end:ctx.createState(), 
+                    structuralEdges:[],
+                    lambdaEdges:[]
+                };
+                // nfa.start = ctx.createState();
+                // nfa.end = ctx.createState();
                 for (var ch of this.getChildNodes()) {
                     let cnfa = ch.toNFA(ctx);
                     nfa.lambdaEdges.push([nfa.start, cnfa.start]);
-                    nfa.lambdaEdges.push([nfa.end, cnfa.end]);
+                    nfa.lambdaEdges.push([cnfa.end, nfa.end]);
                     nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
                     nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
                 }
@@ -156,10 +165,14 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // let stateone = ctx.createState();
-                let nfa: NFA;
-                nfa.start = ctx.createState();
-                nfa.end = ctx.createState();
-                nfa.structuralEdges.push([ctx.alphabet[0], nfa.start, nfa.end]);
+                let nfa: NFA = {start:ctx.createState(), 
+                    end:ctx.createState(), 
+                    structuralEdges:[],
+                    lambdaEdges:[]
+                };
+                // nfa.start = ctx.createState();
+                // nfa.end = ctx.createState();
+                nfa.structuralEdges.push([this.char, nfa.start, nfa.end]);
                 return nfa;
                 // throw new Error('NYI');
             }
@@ -204,7 +217,7 @@ namespace RegexEngine {
     }
     import RegexNode = TreeNodes.RegexNode;
 
-    const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
+    export const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
     ])));
 
@@ -329,7 +342,13 @@ namespace RegexEngine {
 if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);
-    // console.log(JSON.stringify(ast.TreeNodes.toNFA()))
+    let ctx: RegexEngine.NFAGen.NFAContext = {createState:RegexEngine.NFAGen.createState, alphabet:[...RegexEngine.GRAMMAR.getTerminals()] as char[]};
+
+    // ctx.alphabet = [...RegexEngine.GRAMMAR.getTerminals()];
+    for (var ch of (RegexEngine.GRAMMAR.getTerminals())) {
+        ctx.alphabet.push(ch as char);
+    }
+    console.log(JSON.stringify((ast as RegexEngine.TreeNodes.RegexNode).toNFA(ctx) ,undefined,2));
     if(format === 'json') {
         console.log(JSON.stringify(ast,undefined,2));
     } else if(format === 'graphviz' || format === 'dot') {
