@@ -189,7 +189,7 @@ namespace LL1 {
                             rvalue = node;
                         }
                     }
-                    
+
                     // Apply wildcard transforms
                     if(rvalue === node && this.sdt.has('*')) {
                         rvalue = this.sdt.get('*')(node);
@@ -197,7 +197,6 @@ namespace LL1 {
                             rvalue = node;
                         }
                     }
-
                     
                     // Restore connections
                     if(Array.isArray(rvalue)) {
