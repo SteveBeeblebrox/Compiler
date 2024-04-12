@@ -357,7 +357,7 @@ if(system.args.length === 2 || system.args.length === 3) {
     } else if('graphviz'.startsWith(format) || 'dot'.startsWith(format)) {
         console.log(Graphviz.serialize(ast));
     } else if('nfa'.startsWith(format)) {
-        console.log(nfaToGraphviz(RegexEngine.compile(system.args[1], ['a','b','c','d'])));
+        console.log(nfaToGraphviz(RegexEngine.compile(system.args[1], [...range('a','d')])));
     } else {
         throw new Error(`Unknown format '${format}'!`)
     }
