@@ -12,7 +12,7 @@
 ///#include "ll1.ts"
 
 namespace RegexEngine {
-    export namespace NFAGen {
+    namespace NFAGen {
         export type NFAState = Opaque<number,'NFAState'>
         export type LambdaEdge = [start: NFAState, end: NFAState];
         export type StructuralEdge = [char, ...LambdaEdge];
@@ -22,14 +22,21 @@ namespace RegexEngine {
             structuralEdges: StructuralEdge[],
             lambdaEdges: LambdaEdge[]
         }
-        let counter:number = 0
-        export function createState() {
-            let state: NFAState = counter++ as NFAState;
-            return (state);
-        }
-        export type NFAContext = {
-            createState:()=>NFAState,
-            readonly alphabet: char[]
+        export class NFAContext {
+            constructor(public readonly alphabet: ReadonlyArray<char>) {}
+        
+            private readonly iter = (function*(i = 0) {
+                while(true) yield i++ as NFAState;
+            })();
+        
+            public createState(): NFAState {
+                return this.iter.shift();
+            }
+
+            public lambdaWrap(nfa: NFA) {
+                ///#warning lambdaWrap nyi
+                return nfa;
+            }
         }
         export interface NFAConvertible {
             toNFA(ctx: NFAContext): NFA;
@@ -37,7 +44,7 @@ namespace RegexEngine {
     }
     import NFAContext = NFAGen.NFAContext;
     import NFA = NFAGen.NFA;
-    export namespace TreeNodes {
+    namespace TreeNodes {
         export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
             public readonly name = this.constructor.name;
             public abstract clone(): typeof this;
@@ -227,7 +234,7 @@ namespace RegexEngine {
     }
     import RegexNode = TreeNodes.RegexNode;
 
-    export const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
+    const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
     ])));
 
@@ -343,8 +350,16 @@ namespace RegexEngine {
         }
     }
 
-    export function parse(text: string) {
-        return PARSER.parse(tokenize(text));
+    export function parse(text: string): RegexNode {
+        return PARSER.parse(tokenize(text)) as RegexNode;
+    }
+
+    export function compile(text: string, alphabet: char[]): NFA {
+        const ctx = new NFAContext(alphabet);
+        const ast = RegexEngine.parse(text);
+        const nfa = ast.toNFA(ctx);
+        ///#warning ensure state 0 is start and 1 is end, add 2x lambdas
+        return {...nfa};
     }
 }
 
@@ -352,17 +367,12 @@ namespace RegexEngine {
 if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);
-    let ctx: RegexEngine.NFAGen.NFAContext = {createState:RegexEngine.NFAGen.createState, alphabet:[...RegexEngine.GRAMMAR.getTerminals()] as char[]};
-
-    // ctx.alphabet = [...RegexEngine.GRAMMAR.getTerminals()];
-    for (var ch of (RegexEngine.GRAMMAR.getTerminals())) {
-        ctx.alphabet.push(ch as char);
-    }
-    console.log(JSON.stringify((ast as RegexEngine.TreeNodes.RegexNode).toNFA(ctx) ,undefined,2));
     if(format === 'json') {
         console.log(JSON.stringify(ast,undefined,2));
     } else if(format === 'graphviz' || format === 'dot') {
         console.log(Graphviz.serialize(ast));
+    } else if(format === 'nfa') {
+        console.log(RegexEngine.compile(system.args[1], ['a','b','c','d']));
     }
 } else {
     throw new Error('Expected one regex argument and an optional format argument!');
