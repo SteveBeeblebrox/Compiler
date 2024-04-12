@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug JS File",
+            "program": "${file}",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "type": "node",
+            "runtimeExecutable": "/usr/local/bin/sjs",
+            "runtimeArgs": ["--inspect"],
+            "outputCapture": "std",
+            "attachSimplePort": 9229
+        }
+    ],
+    "compounds": []
+}
