@@ -46,7 +46,7 @@ namespace RegexEngine {
             toNFA(ctx: NFAContext): NFA;
         }
     }
-    import NFAContext = NFAGen.NFAContext;
+    export import NFAContext = NFAGen.NFAContext;
     export import NFA = NFAGen.NFA;
     namespace TreeNodes {
         export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
@@ -82,8 +82,7 @@ namespace RegexEngine {
                 return nfa;
                 // throw new Error('NYI');
             }
-        }
-        
+        }        
         export class SeqNode extends RegexNode {
             constructor(private readonly nodes: RegexNode[]) {super();}
             public getChildNodes() {
@@ -236,7 +235,7 @@ namespace RegexEngine {
             }
         }
     }
-    import RegexNode = TreeNodes.RegexNode;
+    export import RegexNode = TreeNodes.RegexNode;
 
     const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
@@ -386,6 +385,7 @@ function nfaToGraphviz(nfa: RegexEngine.NFA) {
     for(const edge of nfa.lambdaEdges) {
         data.push(`\t${edge[0]}->${edge[1]}[label=${JSON.stringify(CFG.LAMBDA_CHARACTER)}]`);
     }
+
     for(const edge of nfa.structuralEdges) {
         data.push(`\t${edge[1]}->${edge[2]}[label=${JSON.stringify(edge[0])}]`);
     }
@@ -394,7 +394,7 @@ function nfaToGraphviz(nfa: RegexEngine.NFA) {
     return data.join('\n')
 }
 
-if(system.args.length === 2 || system.args.length === 3) {
+/*if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);
     if('json'.startsWith(format)) {
@@ -408,5 +408,30 @@ if(system.args.length === 2 || system.args.length === 3) {
     }
 } else {
     throw new Error('Expected one regex argument and an optional format argument!');
+}*/
+
+async function dump(name: string, node: RegexEngine.RegexNode) {
+    //@ts-expect-error
+    const dot = new system.Command('dot', {
+        args: ['-Tpng', `-odata/${name}.png`],
+        stdin: 'piped'
+    }).spawn();
+    
+    const writer = dot.stdin.getWriter()
+    await writer.write(new TextEncoder().encode(nfaToGraphviz(node.toNFA(new RegexEngine.NFAContext(['a','b','c','d','e','f'])))));
+    await writer.ready;
+    await writer.close();
 }
+
+// Creates pngs in data/
+dump('alt', RegexEngine.parse('a|b'));
+dump('seq', RegexEngine.parse('ab')); // has a 0->0 lambda edge?
+// dump('range', RegexEngine.parse('a-d')); // hangs
+dump('kleen', RegexEngine.parse('a*')); // has arrows in wrong direction
+dump('char', RegexEngine.parse('a'));
+dump('dot', RegexEngine.parse('.')); // also wrong direction
+dump('lambda', RegexEngine.parse('a|'));
+
+// console.log(RegexEngine.parse('ab').toNFA(new RegexEngine.NFAContext(['a','b','c'])))
+
 ///#endif
