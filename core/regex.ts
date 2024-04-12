@@ -47,7 +47,7 @@ namespace RegexEngine {
         }
     }
     import NFAContext = NFAGen.NFAContext;
-    import NFA = NFAGen.NFA;
+    export import NFA = NFAGen.NFA;
     namespace TreeNodes {
         export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
             public readonly name = this.constructor.name;
@@ -366,13 +366,34 @@ namespace RegexEngine {
         return {
             start,
             end,
-            lambdaEdges: [[start, nfa.start], ...nfa.lambdaEdges, [end, nfa.end]],
+            lambdaEdges: [[start, nfa.start], ...nfa.lambdaEdges, [nfa.end, end]],
             structuralEdges: [...nfa.structuralEdges]
         };
     }
 }
 
 ///#if __MAIN__
+function nfaToGraphviz(nfa: RegexEngine.NFA) {
+    const data = [];
+    data.push('digraph {');
+    data.push('\trankdir="LR"')
+    data.push('\tnode[shape=circle]');
+    data.push(`\t-1[label="",shape=plaintext]`);
+    data.push(`\t-1->${nfa.start}`)
+    data.push(`\t${nfa.start}`);
+    data.push(`\t${nfa.end}[shape=doublecircle]`);
+
+    for(const edge of nfa.lambdaEdges) {
+        data.push(`\t${edge[0]}->${edge[1]}[label=${JSON.stringify(CFG.LAMBDA_CHARACTER)}]`);
+    }
+    for(const edge of nfa.structuralEdges) {
+        data.push(`\t${edge[1]}->${edge[2]}[label=${JSON.stringify(edge[0])}]`);
+    }
+
+    data.push('}');
+    return data.join('\n')
+}
+
 if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);
@@ -381,7 +402,7 @@ if(system.args.length === 2 || system.args.length === 3) {
     } else if('graphviz'.startsWith(format) || 'dot'.startsWith(format)) {
         console.log(Graphviz.serialize(ast));
     } else if('nfa'.startsWith(format)) {
-        console.log(RegexEngine.compile(system.args[1], ['a','b','c','d']));
+        console.log(nfaToGraphviz(RegexEngine.compile(system.args[1], ['a','b','c','d'])));
     } else {
         throw new Error(`Unknown format '${format}'!`)
     }
