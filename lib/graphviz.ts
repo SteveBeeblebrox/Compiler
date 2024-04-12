@@ -28,6 +28,10 @@ namespace Graphviz {
 
     type NodeName = `Node${number}`;
 
+    function stringifyAttributes(attributes?: GraphvizAttributes) {
+        return attributes ? `[${Object.entries(attributes).map(([key,value])=>`${key}=${JSON.stringify(value)}`).join(', ')}]` : '';
+    }
+
     export function serialize(obj: Graphable, {output}: GraphvizOptions = {}): string {
         const iter = (function*() {
             let start = 0;
@@ -38,10 +42,6 @@ namespace Graphviz {
 
         const data = [];
         data.push('digraph {');
-
-        function stringifyAttributes(attributes?: GraphvizAttributes) {
-            return attributes ? `[${Object.entries(attributes).map(([key,value])=>`${key}=${JSON.stringify(value)}`).join(', ')}]` : '';
-        }
 
         function recurse(parent: NodeName | undefined, edge: string | undefined, obj: any): NodeName {
             if(typeof obj !== 'object' || obj === null)
