@@ -4,6 +4,7 @@
 ///#pragma once
 ///#include <compat.ts>
 ///#include <types.ts>
+///#include <range.ts>
 
 ///#include <graphviz.ts>
 
@@ -15,15 +16,14 @@ namespace RegexEngine {
     namespace NFAGen {
         export type NFAState = Opaque<number,'NFAState'>
         export type LambdaEdge = [start: NFAState, end: NFAState];
-        export type StructuralEdge = [char, ...LambdaEdge];
+        export type StructuralEdge = [...LambdaEdge, char];
         export type NFA = {
             start: NFAState,
             end: NFAState,
-            structuralEdges: StructuralEdge[],
-            lambdaEdges: LambdaEdge[]
+            edges: (StructuralEdge | LambdaEdge)[],
         }
         export class NFAContext {
-            constructor(public readonly alphabet: ReadonlyArray<char>) {}
+            constructor(public readonly alphabet: ReadonlySet<char>) {}
         
             private readonly iter = (function*(i = 0) {
                 while(true) yield i++ as NFAState;
@@ -64,23 +64,16 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof AltNode>,this>)(this.nodes.map(node=>node.clone()));
             }
             public toNFA(ctx: NFAContext): NFA {
-                // chain in parallel
-                let nfa: NFA = {start:ctx.createState(), 
-                    end:ctx.createState(), 
-                    structuralEdges:[],
-                    lambdaEdges:[]
-                };
-                // nfa.start = ctx.createState();
-                // nfa.end = ctx.createState();
-                for (var ch of this.getChildNodes()) {
-                    let cnfa = ch.toNFA(ctx);
-                    nfa.lambdaEdges.push([nfa.start, cnfa.start]);
-                    nfa.lambdaEdges.push([cnfa.end, nfa.end]);
-                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
-                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
+                const [start,end] = ctx.createStates(2);
+                const nfa = {start, end, edges: []};
+
+                for(const subgraph of this.nodes[Symbol.iterator]().map(node => node.toNFA(ctx))) {
+                    nfa.edges.push([start,subgraph.start]);
+                    nfa.edges.push(...subgraph.edges);
+                    nfa.edges.push([subgraph.end,end]);
                 }
-                return nfa;
-                // throw new Error('NYI');
+
+                return ctx.lambdaWrap(nfa);
             }
         }        
         export class SeqNode extends RegexNode {
@@ -92,24 +85,18 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof SeqNode>,this>)(this.nodes.map(node=>node.clone()));
             }
             public toNFA(ctx: NFAContext): NFA {
-                // lambda # a # b # c # ... # z # lambda
-                let nfa: NFA = {start:ctx.createState(), 
-                    end:ctx.createState(), 
-                    structuralEdges:[],
-                    lambdaEdges:[]
-                };
-                let cs = nfa.start;
-                nfa.lambdaEdges.push([nfa.start, cs]);
-                for (var rn of this.getChildNodes()) {
-                    let cnfa = rn.toNFA(ctx);
-                    nfa.lambdaEdges.push([cs, cnfa.start]);
-                    cs = cnfa.end;
-                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
-                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
+                const [start,end] = ctx.createStates(2);
+                const nfa = {start, end, edges: []};
+
+                let prev = nfa.start;
+                for(const subgraph of this.nodes[Symbol.iterator]().map(node => node.toNFA(ctx))) {
+                    nfa.edges.push([prev,subgraph.start])
+                    nfa.edges.push(...subgraph.edges);
+                    prev = subgraph.end;
                 }
-                nfa.lambdaEdges.push([cs, nfa.end]);
-                return nfa;
-                // throw new Error('NYI');
+                nfa.edges.push([prev,nfa.end]);
+
+                return ctx.lambdaWrap(nfa);
             }
         }
         
@@ -125,24 +112,12 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof RangeNode>,this>)(this.min,this.max);
             }
             public toNFA(ctx: NFAContext): NFA {
-                // lambda # char for each char # lambda
-                let nfa: NFA = {start:ctx.createState(), 
-                    end:ctx.createState(), 
-                    structuralEdges:[],
-                    lambdaEdges:[]
-                };
-                let i = ctx.alphabet.find(e => e == this.min);
-                while (ctx.alphabet[i] != this.max) {
-                    let ch = new CharNode(ctx.alphabet[i]);
-                    let cnfa = ch.toNFA(ctx);
-                    nfa.lambdaEdges.push([nfa.start, cnfa.start]);
-                    nfa.lambdaEdges.push([nfa.end, cnfa.end]);
-                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
-                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
-                    i += 1;
-                }
-                return nfa;
-                // throw new Error('NYI');
+                const [start,end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: range(this.min, this.max).filter(char => ctx.alphabet.has(char)).map(char => [start,end,char] as NFAGen.StructuralEdge).toArray()
+                });
             }
         }
         
@@ -157,8 +132,10 @@ namespace RegexEngine {
                 let nfa: NFA = {start:ctx.createState(), 
                     end:ctx.createState(), 
                     structuralEdges:[],
-                    lambdaEdges:[]
+                    lambdaEdges:[],
+                    edges: []
                 };
+                return nfa;
                 let cnfa = this.node.toNFA(ctx);
                 nfa.lambdaEdges.push([nfa.start, cnfa.start]);
                 nfa.lambdaEdges.push([nfa.end, cnfa.end]);
@@ -180,58 +157,42 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof CharNode>,this>)(this.char);
             }
             public toNFA(ctx: NFAContext): NFA {
-                // let stateone = ctx.createState();
-                let nfa: NFA = {start:ctx.createState(), 
-                    end:ctx.createState(), 
-                    structuralEdges:[],
-                    lambdaEdges:[]
-                };
-                // nfa.start = ctx.createState();
-                // nfa.end = ctx.createState();
-                nfa.structuralEdges.push([this.char, nfa.start, nfa.end]);
-                return nfa;
-                // throw new Error('NYI');
+                const [start, end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: [[start,end,this.char]]
+                });
             }
         }
 
         export class WildcharNode extends RegexNode {
-            // maybe refactor as a range node or just add one for each char
             // TODO, it might be better to support wildchars and charsets in the matcher to reduce nfa size?
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof WildcharNode>,this>)();
             }
             public toNFA(ctx: NFAContext): NFA {
-                let nfa: NFA = {start:ctx.createState(), 
-                    end:ctx.createState(), 
-                    structuralEdges:[],
-                    lambdaEdges:[]
-                };
-                for (var c of ctx.alphabet) {
-                    let ch = new CharNode(c);
-                    let cnfa = ch.toNFA(ctx);
-                    nfa.lambdaEdges.push([nfa.start, cnfa.start]);
-                    nfa.lambdaEdges.push([nfa.end, cnfa.end]);
-                    nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
-                    nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
-                }
-                return nfa;
+                const [start,end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: ctx.alphabet.values().map(char => [start, end, char] as NFAGen.StructuralEdge).toArray()
+                });
             }
         }
         
         export class LambdaNode extends RegexNode {
-            // lambda # lambda # lambda
             readonly [Graphviz.label] = CFG.LAMBDA_CHARACTER;
             public override clone() {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof LambdaNode>,this>)();
             }
             public toNFA(ctx: NFAContext): NFA {
-                let nfa: NFA = {start:ctx.createState(), 
-                    end:ctx.createState(), 
-                    structuralEdges:[],
-                    lambdaEdges:[]
-                };
-                nfa.lambdaEdges.push([nfa.start, nfa.end]);
-                return nfa;
+                const [start,end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: [[start,end]]
+                });
             }
         }
     }
@@ -358,15 +319,14 @@ namespace RegexEngine {
     }
 
     export function compile(text: string, alphabet: char[]): NFA {
-        const ctx = new NFAContext(alphabet);
+        const ctx = new NFAContext(new Set(alphabet));
         const [start,end] = ctx.createStates(2);
         const ast = RegexEngine.parse(text);
         const nfa = ast.toNFA(ctx);
         return {
             start,
             end,
-            lambdaEdges: [[start, nfa.start], ...nfa.lambdaEdges, [nfa.end, end]],
-            structuralEdges: [...nfa.structuralEdges]
+            edges: [[start, nfa.start], ...nfa.edges, [nfa.end, end]],
         };
     }
 }
@@ -377,17 +337,13 @@ function nfaToGraphviz(nfa: RegexEngine.NFA) {
     data.push('digraph {');
     data.push('\trankdir="LR"')
     data.push('\tnode[shape=circle]');
-    data.push(`\t-1[label="",shape=plaintext]`);
+    data.push(`\t-1[label="",shape=plaintext,fixedsize=true,width=0.02,height=0.02]`);
     data.push(`\t-1->${nfa.start}`)
     data.push(`\t${nfa.start}`);
     data.push(`\t${nfa.end}[shape=doublecircle]`);
 
-    for(const edge of nfa.lambdaEdges) {
-        data.push(`\t${edge[0]}->${edge[1]}[label=${JSON.stringify(CFG.LAMBDA_CHARACTER)}]`);
-    }
-
-    for(const edge of nfa.structuralEdges) {
-        data.push(`\t${edge[1]}->${edge[2]}[label=${JSON.stringify(edge[0])}]`);
+    for(const edge of nfa.edges) {
+        data.push(`\t${edge[0]}->${edge[1]}[label=${JSON.stringify(edge[2] ?? CFG.LAMBDA_CHARACTER)}]`);
     }
 
     data.push('}');
@@ -418,13 +374,14 @@ async function dump(name: string, node: RegexEngine.RegexNode) {
     }).spawn();
     
     const writer = dot.stdin.getWriter()
-    await writer.write(new TextEncoder().encode(nfaToGraphviz(node.toNFA(new RegexEngine.NFAContext(['a','b','c','d','e','f'])))));
+    await writer.write(new TextEncoder().encode(nfaToGraphviz(node.toNFA(new RegexEngine.NFAContext(new Set(['a','b','c','d','e','f']))))));
     await writer.ready;
     await writer.close();
 }
 
 // Creates pngs in data/
 dump('alt', RegexEngine.parse('a|b'));
+dump('complexalt', RegexEngine.parse('ab|c-d'));
 dump('seq', RegexEngine.parse('ab')); // has a 0->0 lambda edge?
 // dump('range', RegexEngine.parse('a-d')); // hangs
 dump('kleen', RegexEngine.parse('a*')); // has arrows in wrong direction
