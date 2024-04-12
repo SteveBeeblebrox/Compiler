@@ -83,8 +83,11 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // lambda # a # b # c # ... # z # lambda
-                let nfa: NFA;
-                nfa.start = ctx.createState();
+                let nfa: NFA = {start:ctx.createState(), 
+                    end:ctx.createState(), 
+                    structuralEdges:[],
+                    lambdaEdges:[]
+                };
                 let cs = nfa.start;
                 nfa.lambdaEdges.push([nfa.start, cs]);
                 for (var rn of this.getChildNodes()) {
@@ -94,7 +97,6 @@ namespace RegexEngine {
                     nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
                     nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
                 }
-                nfa.end = ctx.createState();
                 nfa.lambdaEdges.push([cs, nfa.end]);
                 return nfa;
                 // throw new Error('NYI');
@@ -114,9 +116,11 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // lambda # char for each char # lambda
-                let nfa: NFA;
-                nfa.start = ctx.createState();
-                nfa.end = ctx.createState();
+                let nfa: NFA = {start:ctx.createState(), 
+                    end:ctx.createState(), 
+                    structuralEdges:[],
+                    lambdaEdges:[]
+                };
                 let i = ctx.alphabet.find(e => e == this.min);
                 while (ctx.alphabet[i] != this.max) {
                     let ch = new CharNode(ctx.alphabet[i]);
@@ -140,9 +144,11 @@ namespace RegexEngine {
             }
             public toNFA(ctx: NFAContext): NFA {
                 // lambda # node with loopback # lambda
-                let nfa: NFA;
-                nfa.start = ctx.createState();
-                nfa.end = ctx.createState();
+                let nfa: NFA = {start:ctx.createState(), 
+                    end:ctx.createState(), 
+                    structuralEdges:[],
+                    lambdaEdges:[]
+                };
                 let cnfa = this.node.toNFA(ctx);
                 nfa.lambdaEdges.push([nfa.start, cnfa.start]);
                 nfa.lambdaEdges.push([nfa.end, cnfa.end]);
@@ -185,9 +191,11 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof WildcharNode>,this>)();
             }
             public toNFA(ctx: NFAContext): NFA {
-                let nfa: NFA;
-                nfa.start = ctx.createState();
-                nfa.end = ctx.createState();
+                let nfa: NFA = {start:ctx.createState(), 
+                    end:ctx.createState(), 
+                    structuralEdges:[],
+                    lambdaEdges:[]
+                };
                 for (var c of ctx.alphabet) {
                     let ch = new CharNode(c);
                     let cnfa = ch.toNFA(ctx);
@@ -207,9 +215,11 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof LambdaNode>,this>)();
             }
             public toNFA(ctx: NFAContext): NFA {
-                let nfa: NFA;
-                nfa.start = ctx.createState();
-                nfa.end = ctx.createState();
+                let nfa: NFA = {start:ctx.createState(), 
+                    end:ctx.createState(), 
+                    structuralEdges:[],
+                    lambdaEdges:[]
+                };
                 nfa.lambdaEdges.push([nfa.start, nfa.end]);
                 return nfa;
             }
