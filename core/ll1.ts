@@ -182,14 +182,6 @@ namespace LL1 {
                     const node = parent.pop() as ParseTreeNode;
                     let rvalue: any = node;
                     
-                    // Apply wildcard transforms
-                    if(this.sdt.has('*')) {
-                        rvalue = this.sdt.get('*')(node);
-                        if(rvalue === undefined) {
-                            rvalue = node;
-                        }
-                    }
-
                     // Apply NonTerminal specific transforms
                     if(rvalue === node && this.sdt.has(node.name as NonTerminal)) {
                         rvalue = this.sdt.get(node.name as NonTerminal)(node);
@@ -197,6 +189,15 @@ namespace LL1 {
                             rvalue = node;
                         }
                     }
+                    
+                    // Apply wildcard transforms
+                    if(rvalue === node && this.sdt.has('*')) {
+                        rvalue = this.sdt.get('*')(node);
+                        if(rvalue === undefined) {
+                            rvalue = node;
+                        }
+                    }
+
                     
                     // Restore connections
                     if(Array.isArray(rvalue)) {

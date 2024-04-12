@@ -207,7 +207,7 @@ namespace RegexEngine {
                 if(node.at(0) instanceof LL1Parser.ParseTreeLambdaLeaf) {
                     // Remove empty lambdas
                     return null;
-                } else if(node.name !== 'Primitive') {
+                } else {
                     // Squish tree
                     return node.pop();
                 }
@@ -227,6 +227,7 @@ namespace RegexEngine {
             }
         },
         Sequence(node) {
+            if(node.length === 1) return node.shift()
             return new TreeNodes.SeqNode([...node].flatMap(node => node instanceof TreeNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]);
         },
         Alternation(node) {
