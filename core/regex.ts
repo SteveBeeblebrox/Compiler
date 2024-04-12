@@ -37,9 +37,13 @@ namespace RegexEngine {
                 return [...this.iter.shift(n)];
             }
 
-            public lambdaWrap(nfa: NFA) {
-                ///#warning lambdaWrap nyi
-                return nfa;
+            public lambdaWrap(nfa: NFA): NFA {
+                const [start, end] = this.createStates(2);
+                return {
+                    start,
+                    end,
+                    edges: [[start,nfa.start], ...nfa.edges, [nfa.end,end]]
+                }
             }
         }
         export interface NFAConvertible {
