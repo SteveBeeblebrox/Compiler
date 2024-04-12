@@ -148,10 +148,20 @@ installPolyfill({prototype: Object.getPrototypeOf(Object.getPrototypeOf((functio
 
 declare interface Iterator<T, TReturn = any, TNext = undefined> {
     shift(): T | undefined;
+    shift(n: number): IterableIterator<T | undefined>;
 }
 
 namespace IteratorShiftPolyfill {
-    export function shift<T>(this: Iterator<T>): T | undefined {
+    export function shift<T>(this: Iterator<T>): T | undefined;
+    export function shift<T>(this: Iterator<T>, n: number): IterableIterator<T | undefined>;
+    export function shift<T>(this: Iterator<T>, n?: number): T | undefined | IterableIterator<T | undefined> {
+        if(n !== undefined) {
+            return (function*(this: Iterator<T>) {
+                for(let i = 0; i < n; i++) {
+                    yield this.shift();
+                }
+            }).apply(this);
+        }
         return this.next().value;
     }
 }
