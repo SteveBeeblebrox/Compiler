@@ -128,23 +128,18 @@ namespace RegexEngine {
                 return new (this.constructor as Constructor<ConstructorParameters<typeof KleenNode>,this>)(this.node.clone());
             }
             public toNFA(ctx: NFAContext): NFA {
-                // lambda # node with loopback # lambda
-                let nfa: NFA = {start:ctx.createState(), 
-                    end:ctx.createState(), 
-                    structuralEdges:[],
-                    lambdaEdges:[],
-                    edges: []
-                };
-                return nfa;
-                let cnfa = this.node.toNFA(ctx);
-                nfa.lambdaEdges.push([nfa.start, cnfa.start]);
-                nfa.lambdaEdges.push([nfa.end, cnfa.end]);
-                nfa.lambdaEdges.push([cnfa.start, cnfa.end]);
-                nfa.lambdaEdges.push([cnfa.end, cnfa.start]);
-                nfa.structuralEdges = [...nfa.structuralEdges, ...cnfa.structuralEdges];
-                nfa.lambdaEdges = [...nfa.lambdaEdges, ...cnfa.lambdaEdges];
-                return nfa
-                // throw new Error('NYI');
+                const state = ctx.createState();
+                const nfa = {start: state, end: state, edges: []};
+
+                const subgraph = this.node.toNFA(ctx);
+
+                nfa.edges.push([state, subgraph.start]);
+
+                nfa.edges.push(...subgraph.edges);
+
+                nfa.edges.push([subgraph.end, state]);
+
+                return ctx.lambdaWrap(nfa);
             }
         }
         
@@ -350,7 +345,7 @@ function nfaToGraphviz(nfa: RegexEngine.NFA) {
     return data.join('\n')
 }
 
-/*if(system.args.length === 2 || system.args.length === 3) {
+if(system.args.length === 2 || system.args.length === 3) {
     const format = system.args[2]??'json';
     const ast = RegexEngine.parse(system.args[1]);
     if('json'.startsWith(format)) {
@@ -364,10 +359,11 @@ function nfaToGraphviz(nfa: RegexEngine.NFA) {
     }
 } else {
     throw new Error('Expected one regex argument and an optional format argument!');
-}*/
+}
 
+/*
 async function dump(name: string, node: RegexEngine.RegexNode) {
-    //@ts-expect-error
+    //@ts-ignore
     const dot = new system.Command('dot', {
         args: ['-Tpng', `-odata/${name}.png`],
         stdin: 'piped'
@@ -382,13 +378,13 @@ async function dump(name: string, node: RegexEngine.RegexNode) {
 // Creates pngs in data/
 dump('alt', RegexEngine.parse('a|b'));
 dump('complexalt', RegexEngine.parse('ab|c-d'));
-dump('seq', RegexEngine.parse('ab')); // has a 0->0 lambda edge?
-// dump('range', RegexEngine.parse('a-d')); // hangs
-dump('kleen', RegexEngine.parse('a*')); // has arrows in wrong direction
+dump('seq', RegexEngine.parse('ab'));
+dump('range', RegexEngine.parse('a-d'));
+dump('kleen', RegexEngine.parse('a*'));
 dump('char', RegexEngine.parse('a'));
-dump('dot', RegexEngine.parse('.')); // also wrong direction
+dump('dot', RegexEngine.parse('.'));
 dump('lambda', RegexEngine.parse('a|'));
 
 // console.log(RegexEngine.parse('ab').toNFA(new RegexEngine.NFAContext(['a','b','c'])))
-
+*/
 ///#endif
