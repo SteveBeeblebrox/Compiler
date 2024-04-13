@@ -9,7 +9,7 @@ namespace AlphabetEncoding {
         }
         return encoded?.replace(/x.{0,2}/g, unescape);
     }
-    export function encode(text: string, force: boolean): string {
+    export function encode(text: string, force: boolean = false): string {
         function escape(char: string) {
             return `x${char.charCodeAt(0).toString(16).padStart(2,'0')}`;
         }
