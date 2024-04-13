@@ -13,7 +13,7 @@ Symbol['asyncDispose'] ??= Symbol('asyncDispose');
 
 declare var system: {
     args: string[];
-    exit(status: number): never;
+    exit(status?: number): never;
     readTextFileSync(path: string): string;
     writeTextFileSync(path: string, data: string);
     createTextFileReadStream(path: string): Promise<{read(bytes: number): string, [Symbol.dispose]():void}>;

@@ -50,7 +50,7 @@ namespace RegexEngine {
             toNFA(ctx: NFAContext): NFA;
         }
     }
-    export import NFAContext = NFAGen.NFAContext;
+    import NFAContext = NFAGen.NFAContext;
     export import NFA = NFAGen.NFA;
     namespace TreeNodes {
         export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
@@ -195,7 +195,7 @@ namespace RegexEngine {
             }
         }
     }
-    export import RegexNode = TreeNodes.RegexNode;
+    import RegexNode = TreeNodes.RegexNode;
 
     const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
