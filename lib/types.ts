@@ -4,6 +4,11 @@ type char = '\u0000' | '\u0001' | '\u0002' | '\u0003' | '\u0004' | '\u0005' | '\
 declare interface String {
     split(s: ''): char[];
     [Symbol.iterator](): IterableIterator<char>;
+    charAt(pos: number): char;
+}
+
+declare interface StringConstructor {
+    fromCharCode(code: number): char;
 }
 
 declare namespace OpaqueTypes {
