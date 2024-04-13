@@ -208,7 +208,7 @@ namespace LL1 {
                     // Continue parsing
                     Current = parent;
                 } else if(CFG.isNonTerminal(x)) {
-                    let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`))] ?? throws(new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`));
+                    let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new LL1Parser.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'}`))] ?? throws(new LL1Parser.SyntaxError(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`));
                     K.push(MARKER);
                     const R = p[1];
                     
@@ -227,7 +227,7 @@ namespace LL1 {
                     Current = Current.at(-1)! as ParseTree;
                 } else if(CFG.isTerminalOrEOF(x)) {
                     if(x !== ts.peek()?.name as Terminal) {
-                        throw new Error(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`);
+                        throw new LL1Parser.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`);
                     }
                     x = ts.shift()!;
                     Current.push(x instanceof Token ? new ParseTreeTokenLeaf(x.name as Terminal, x.value) : new ParseTreeEOFLeaf());
@@ -237,7 +237,7 @@ namespace LL1 {
             }
         
             if(T.length !== 1) {
-                throw new Error(`Syntax Error`);
+                throw new LL1Parser.SyntaxError();
             }
         
             return T.pop()! as ParseResult<ASTNodeType>;
@@ -289,6 +289,12 @@ namespace LL1 {
         export type ParseTreeLeaf = ParseTreeLambdaLeaf | ParseTreeEOFLeaf | ParseTreeTokenLeaf;
         export type ParseTree = NestedTree<ParseTreeNode, ParseTreeNode | ParseTreeLeaf, false> & {parent?: ParseTree};
         export type ParseResult<ASTNodeType extends Tree = never> = ASTNodeType | StrayTree<ParseTree>;
+
+        export class SyntaxError extends Error {
+            constructor(message?: string, public position?: Position) {
+                super(message);
+            }
+        }
     }
 
     import ParseTree = LL1Parser.ParseTree;
