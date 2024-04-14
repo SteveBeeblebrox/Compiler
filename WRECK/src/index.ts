@@ -18,7 +18,7 @@
 const IO_ERROR = 1, SYNTAX_ERROR = 2, SEMANTIC_ERROR = 3;
 
 if(system.args.slice(1).length < 1) {
-    console.error('Expected at least one argument!')
+    console.error('Error: Expected at least one argument!')
     system.exit();
 }
 
@@ -27,7 +27,7 @@ const lines = (function() {
     try {
         return (system.readTextFileSync(lexFile)?.trim() || throws(new Error('No text!'))).split(/\r?\n/g);
     } catch(e) {
-        console.error(e?.message ?? 'IO Error!')
+        console.error(`IO Error${e.message ? `: ${e.message}` :''}`)
         system.exit(IO_ERROR);
     }
 })();
@@ -45,7 +45,7 @@ const lambdaCharacter: char = (function(alphabet: Set<char>) {
     for(const c of range(String.fromCharCode(1), String.fromCharCode(127))) {
         if(!alphabet.has(c)) return c;
     }
-    console.error('No sutible lambda ascii character found!');
+    console.error('Error: No sutible lambda ascii character found!');
     system.exit(8);
 })(new Set(alphabet));
 
@@ -80,7 +80,7 @@ for(const line of lines) {
 
         system.writeTextFileSync(`${name}.nfa`, nfaFileOutput.join('\n'));
     } catch(e) {
-        console.error(e?.message ?? 'IO Error!');
+        console.error(`IO Error${e.message ? `: ${e.message}` :''}`);
         system.exit(IO_ERROR);
     }
 }
@@ -88,6 +88,6 @@ for(const line of lines) {
 try {
     system.writeTextFileSync(outFile??lexFile.replace(/\.[^.]+$/g,'.u'), uFileOutput.join('\n'));
 } catch(e) {
-    console.error(e?.message ?? 'IO Error!');
+    console.error(`IO Error${e.message ? `: ${e.message}` :''}`);
     system.exit(IO_ERROR);
 }
