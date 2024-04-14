@@ -264,6 +264,7 @@ namespace RegexEngine {
         const iter = text[Symbol.iterator]();
 
         let c: char;
+        let col = 0, line = 1;
         while((c = iter.shift() as char) !== undefined) {
             switch(c) {
                 case '\\': {
@@ -277,13 +278,13 @@ namespace RegexEngine {
                         case '-':
                         case '.':
                         case '|':
-                            yield new Token('char',e);
+                            yield new Token('char',e,{line,col});
                             break;
                         case 's':
-                            yield new Token('char',' ');
+                            yield new Token('char',' ',{line,col});
                             break;
                         case 'n':
-                            yield new Token('char','\n');
+                            yield new Token('char','\n',{line,col});
                             break;
                         case 'u':
                             const hex = iter.take(4).toArray().join('');
@@ -291,7 +292,7 @@ namespace RegexEngine {
                             if(hex.length != 4 || !isHex(hex) || Number.isNaN(n)) {
                                 throw new Error(`Invalid unicode escape sequence '\\u${hex}'`);
                             }
-                            yield new Token('char', String.fromCharCode(n));
+                            yield new Token('char', String.fromCharCode(n),{line,col});
                             break;
                         default:
                             throw new Error(`Unknown escape sequence '\\${e}'`);
@@ -305,12 +306,14 @@ namespace RegexEngine {
                 case '-':
                 case '.':
                 case '|':
-                    yield new Token('%'+c,c);
+                    yield new Token('%'+c,c,{line,col});
                     break;
                 default:
-                    yield new Token('char', c);
+                    yield new Token('char', c,{line,col});
                     break;
             }
+            if(c === '\n') line++;
+            col++;
         }
     }
 
