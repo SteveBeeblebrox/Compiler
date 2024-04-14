@@ -197,7 +197,7 @@ namespace RegexEngine {
     }
     import RegexNode = TreeNodes.RegexNode;
 
-    const GRAMMAR = CFG.fromString(new TextDecoder().decode(new Uint8Array([
+    const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
     ])));
 

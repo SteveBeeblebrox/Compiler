@@ -96,3 +96,5 @@ function installPolyfill<T>(base: { new(...args: any[]): T }, pollyfill: { [key:
 ///#include <compat/iterator.ts>
 ///#include <compat/object.ts>
 ///#include <compat/set.ts>
+
+///#include <compat/basictextdecoder.ts>
