@@ -44,7 +44,7 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
     return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
 };
-var _a, _b, _c, _d, _e, _f, _g, _h;
+var _a, _b, _c, _d, _e, _f;
 //@ts-expect-error
 (_a = Symbol['dispose']) !== null && _a !== void 0 ? _a : (Symbol['dispose'] = Symbol('dispose'));
 //@ts-expect-error
@@ -1746,17 +1746,17 @@ const { decode: alphaDecode, encode: alphaEncode } = AlphabetEncoding;
 ///<reference path="../../core/ll1.ts"/> // Make VS Code happy
 const IO_ERROR = 1, SYNTAX_ERROR = 2, SEMANTIC_ERROR = 3;
 if (system.args.slice(1).length < 1) {
-    console.error('Expected at least one argument!');
+    console.error('Error: Expected at least one argument!');
     system.exit();
 }
 const [lexFile, outFile] = system.args.slice(1);
 const lines = (function () {
-    var _a, _b;
+    var _a;
     try {
         return (((_a = system.readTextFileSync(lexFile)) === null || _a === void 0 ? void 0 : _a.trim()) || throws(new Error('No text!'))).split(/\r?\n/g);
     }
     catch (e) {
-        console.error((_b = e === null || e === void 0 ? void 0 : e.message) !== null && _b !== void 0 ? _b : 'IO Error!');
+        console.error(`IO Error${e.message ? `: ${e.message}` : ''}`);
         system.exit(IO_ERROR);
     }
 })();
@@ -1769,7 +1769,7 @@ const lambdaCharacter = (function (alphabet) {
         if (!alphabet.has(c))
             return c;
     }
-    console.error('No sutible lambda ascii character found!');
+    console.error('Error: No sutible lambda ascii character found!');
     system.exit(8);
 })(new Set(alphabet));
 console.log(`Chose ${alphaEncode(lambdaCharacter)} for lambda`);
@@ -1799,7 +1799,7 @@ for (const line of lines) {
         system.writeTextFileSync(`${name}.nfa`, nfaFileOutput.join('\n'));
     }
     catch (e) {
-        console.error((_g = e === null || e === void 0 ? void 0 : e.message) !== null && _g !== void 0 ? _g : 'IO Error!');
+        console.error(`IO Error${e.message ? `: ${e.message}` : ''}`);
         system.exit(IO_ERROR);
     }
 }
@@ -1807,6 +1807,6 @@ try {
     system.writeTextFileSync(outFile !== null && outFile !== void 0 ? outFile : lexFile.replace(/\.[^.]+$/g, '.u'), uFileOutput.join('\n'));
 }
 catch (e) {
-    console.error((_h = e === null || e === void 0 ? void 0 : e.message) !== null && _h !== void 0 ? _h : 'IO Error!');
+    console.error(`IO Error${e.message ? `: ${e.message}` : ''}`);
     system.exit(IO_ERROR);
 }

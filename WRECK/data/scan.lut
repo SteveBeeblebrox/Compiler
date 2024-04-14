@@ -4,4 +4,3 @@ x0ax20x5C abcde
 (\s|\\|a|b|d)*c     lastc
 d+                  dee         D
 .                   IGNORE
-b-a ERROR
