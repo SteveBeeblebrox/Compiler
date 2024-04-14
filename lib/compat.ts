@@ -1,6 +1,8 @@
 ///#pragma once
 ///#define strc(x) #x
 
+///#include <compat/globalthis.ts>
+
 declare interface SymbolConstructor {
     readonly dispose: unique symbol,
     readonly asyncDispose: unique symbol,
