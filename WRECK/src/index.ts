@@ -38,7 +38,7 @@ console.log(`Alphabet: ${alphabet.map(x => alphaEncode(x)).join(' ')}`);
 
 
 const uFileOutput: string[] = [];
-uFileOutput.push(alphabet.map(x => alphaEncode(x)).join(' '));
+uFileOutput.push(alphabet.map(x => alphaEncode(x)).join(''));
 
 
 const lambdaCharacter: char = (function(alphabet: Set<char>) {
@@ -84,7 +84,7 @@ for(const line of lines) {
         system.exit(IO_ERROR);
     }
 }
-
+uFileOutput.push('\n');
 try {
     system.writeTextFileSync(outFile??lexFile.replace(/\.[^.]+$/g,'.u'), uFileOutput.join('\n'));
 } catch(e) {
