@@ -8,7 +8,6 @@
 ///#include "cfg.ts"
 
 namespace LL1 {
-    export type LL1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
     
     type SyntaxTransformer<ASTNodeType extends Tree> = (node: ParseTreeNode)=>typeof node | ASTNodeType | ASTNodeType[] | null
 
@@ -122,8 +121,8 @@ namespace LL1 {
         return convertLeftRecursion(cfg);
     }
 
-    function createParseTable(cfg: CFG): LL1ParseTable {
-        const parseTable: LL1ParseTable = new Map(cfg.getNonTerminals().map(N=>[N,new Map(cfg.getTerminalsAndEOF().map(a => [a,-1]))]));
+    function createParseTable(cfg: CFG): LL1Parser.LL1ParseTable {
+        const parseTable: LL1Parser.LL1ParseTable = new Map(cfg.getNonTerminals().map(N=>[N,new Map(cfg.getTerminalsAndEOF().map(a => [a,-1]))]));
         let i = 0;
         for(const lhs of cfg.getNonTerminals()) {
             const rules = cfg.getRuleListFor(lhs).map(([_,rhs])=>rhs);
@@ -145,7 +144,7 @@ namespace LL1 {
     }
 
     export class LL1Parser<ASTNodeType extends Tree=never> {
-        private readonly parseTable: LL1ParseTable;
+        private readonly parseTable: LL1Parser.LL1ParseTable;
         private readonly cfg: CFG;
         private readonly sdt: SyntaxTransformerMap<ASTNodeType>; 
         constructor(cfg: CFG, sdt: {[key in NonTerminal | '*']?: SyntaxTransformer<ASTNodeType>} | SyntaxTransformerMap<ASTNodeType> = new Map()) {
@@ -248,6 +247,12 @@ namespace LL1 {
     }
 
     export namespace LL1Parser {
+        export type LL1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
+    }
+
+    export namespace LL1Parser {
+
+
         abstract class AbstractParseTree<NameType extends string = string> extends Tree {
             constructor(public readonly name?: NameType) {super();}
         }
@@ -305,7 +310,7 @@ namespace LL1 {
     import ParseTreeLambdaLeaf = LL1Parser.ParseTreeLambdaLeaf;
     import ParseTreeEOFLeaf = LL1Parser.ParseTreeEOFLeaf;
     import ParseTreeTokenLeaf = LL1Parser.ParseTreeTokenLeaf;
-    export import ParseResult = LL1Parser.ParseResult;
+    import ParseResult = LL1Parser.ParseResult;
 }
 
 import LL1Parser = LL1.LL1Parser;
