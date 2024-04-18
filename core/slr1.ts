@@ -16,12 +16,11 @@ namespace SLR1 {
     export type SLR1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
     type Item = [CFG.CFGRule[0], ...(CFG.CFGRuleBody[number] | typeof MARKER)[]];
     type ItemSet = SignatureSet<Item>;
-    type CFSM = SignatureSet<ItemSet>;
 
     export function itemSets(this: CFG) {
         const G = this;
         function freshStarts(B: NonTerminal): ItemSet {
-            return new SignatureSet(G.getRuleListFor(B).map(([lhs,rhs]) => [lhs,MARKER,...rhs]));
+            return new SignatureSet(G.getRuleListFor(B).map(([lhs,rhs]) => [lhs,MARKER,...rhs,...(B === G.startingSymbol ? [undefined] : [])]));
         }
         function closure(I: ItemSet): ItemSet {
             const C = new SignatureSet(I);
@@ -60,11 +59,26 @@ namespace SLR1 {
             return closure(K);
         }
 
-        console.log(closure(freshStarts(this.startingSymbol)))
+        const states = new SignatureSet([closure(freshStarts(this.startingSymbol))]);
+        const edges = new SignatureSet<[ItemSet, NonTerminal|Terminal|typeof CFG.EOF, ItemSet]>();
 
-        const CFSM = new SignatureSet([])
+        for(const I of  states) {
+            let n = -1;
+            while(n != states.size) {
+                n = states.size;
+                for(const X of [...G.getTerminalsAndEOF(),...G.getNonTerminals()]) {
+                    const R = goto(I,X);
+                    if(R.size !== 0) {
+                        states.add(R);
+                        edges.add([I,X,R]);
+                    }
+                }
+            }
+        }
 
-        return CFSM;
+        
+
+        return {states,edges};
     }
     
 
@@ -82,22 +96,30 @@ namespace SLR1 {
 
 
 
-// console.log(CFG.fromString(`
+const cfsm = CFG.fromString(`
 
-// S -> A B $
-// S -> B C $
+S -> A B $
+S -> B C $
 
-// A -> A x
-// A -> x
+A -> A x
+A -> x
 
-// B -> y A B
-// B -> h
+B -> y A B
+B -> h
 
-// C -> x C y
-// C -> p
+C -> x C y
+C -> p
 
-// `).itemSets())
+`).itemSets();
 
-console.log(new SignatureSet([new SignatureSet([1,2,3,Symbol()])]))
+for(const state of cfsm.states) {
+    for(const item of state.values()) {
+        const [lhs,...rhs]=item;
+        console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??'$').join(' ')}`)
+    }
+    console.log('================================')
+}
+
+console.log(cfsm.states.size)
 
 ///#endif
