@@ -82,14 +82,29 @@ namespace SLR1 {
     }
     
 
-    // export function createParseTable(cfg: CFG): void | SLR1ParseTable {
+    export function createParseTable(cfg: CFG): any {
+        const S = cfg.itemSets();
 
-    //     const MARKER = Symbol();
+        for(const I of S) {
+            for(const X of cfg.getGrammarSymbols()) {
+                if(false) {
 
+                }
+            }
+            for(const P of []) {
+                for(const f of cfg.followSet('A' as any)) {
+                    if(false) {
 
+                    }
+                }
+            }
+            if(false) {
+                
+            }
+        }
 
-    //     console.log(TableGeneration.closure(TableGeneration.freshStarts(cfg.startingSymbol,cfg),cfg))
-    // }
+        
+    }
 }
 
 ///#if __MAIN__
