@@ -227,10 +227,11 @@ namespace RegexEngine {
             }
         },
         Sequence(node) {
-            if(node.length === 1) return node.shift()
+            if(node.length === 1) return node.shift();
             return new TreeNodes.SeqNode([...node].flatMap(node => node instanceof TreeNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]);
         },
         Alternation(node) {
+            if(node.length === 1) return node.shift();
             const l = node.length;
             const children = node.splice(0,node.length).filter(x=>x instanceof RegexNode) as RegexNode[];
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
