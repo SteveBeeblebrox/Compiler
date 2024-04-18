@@ -134,7 +134,6 @@ namespace Signature {
         }
     }
 
-    // Note, does not yet have utility methods like union, etc...
     export class SignatureSet<T extends Signature.SignableValue> implements Set<T>, Signature.SignableObject {
         private readonly base = new Map<ReturnType<typeof Signature.create>,T>();
         constructor(iterable?: Iterable<T> | null | undefined) {
@@ -184,7 +183,9 @@ namespace Signature {
         }
     }
 }
-const {SignatureMap,SignatureSet} = Signature;
+
+import SignatureSet = Signature.SignatureSet;
+import SignatureMap = Signature.SignatureMap;
 
 declare interface Set<T> extends Signature.SignableObject<Set<T>> {}
 Set.prototype[Signature.toSignable] = function(this: Set<any>, options: Signature.SignatureOptions) {
@@ -223,19 +224,20 @@ RegExp.prototype[Signature.toSignable] = function(this: RegExp) {
 
 ///#include <compat.ts>
 namespace Signature {
-    export declare interface SignatureSet<T> {
-        union: typeof SetPolyfill.union<T>;
-        intersection: typeof SetPolyfill.intersection<T>;
-        difference: typeof SetPolyfill.difference<T>;
-        symmetricDifference: typeof SetPolyfill.symmetricDifference<T>;
-        isSubsetOf: typeof SetPolyfill.isSubsetOf<T>;
-        isSupersetOf: typeof SetPolyfill.isSupersetOf<T>;
-        isDisjointFrom: typeof SetPolyfill.isDisjointFrom<T>;
+    type WithReturnAdjustment<T extends SignableValue,F> = F extends (...args: infer Args) => Set<T> ? (...args: Args) => SignatureSet<T> : F
+    export declare interface SignatureSet<T extends Signature.SignableValue> {
+        union: WithReturnAdjustment<T,typeof SetPolyfill.union<T>>;
+        intersection: WithReturnAdjustment<T,typeof SetPolyfill.intersection<T>>;
+        difference: WithReturnAdjustment<T,typeof SetPolyfill.difference<T>>;
+        symmetricDifference: WithReturnAdjustment<T,typeof SetPolyfill.symmetricDifference<T>>;
+        isSubsetOf: WithReturnAdjustment<T,typeof SetPolyfill.isSubsetOf<T>>;
+        isSupersetOf: WithReturnAdjustment<T,typeof SetPolyfill.isSupersetOf<T>>;
+        isDisjointFrom: WithReturnAdjustment<T,typeof SetPolyfill.isDisjointFrom<T>>;
 
-        takeUnion: typeof InPlaceSetPolyfill.takeUnion<T>;
-        takeIntersection: typeof InPlaceSetPolyfill.takeIntersection<T>;
-        takeDifference: typeof InPlaceSetPolyfill.takeDifference<T>;
-        takeSymmetricDifference: typeof InPlaceSetPolyfill.takeSymmetricDifference<T>;
+        takeUnion: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeUnion<T>>;
+        takeIntersection: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeIntersection<T>>;
+        takeDifference: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeDifference<T>>;
+        takeSymmetricDifference: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeSymmetricDifference<T>>;
     }
 }
 // The pollyfill is typed with this: Set<T> but will also work for this: SignatureSet<T>

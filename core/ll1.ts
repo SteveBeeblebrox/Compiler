@@ -15,7 +15,7 @@ namespace LL1 {
     export type SyntaxTransformerMap<ASTNodeType extends Tree> = Map<NonTerminal | '*', SyntaxTransformer<ASTNodeType>>;
 
     function convertLeftRecursion(cfg: CFG): CFG {
-        const newRules = new Map<NonTerminal,CFGRuleBody[]>()
+        const newRules = new Map<NonTerminal,CFG.CFGRuleBody[]>()
     
         function getTailOverrlap<T>(a: T[], b: T[]) {
             let overlap: T[] = [];
@@ -36,9 +36,9 @@ namespace LL1 {
             newRules.set(N,[]);
     
             refactor:
-            for(const [lhs1,rhs1,ref1] of rules.values().map(r=>[...r,r] as [NonTerminal,CFGRuleBody,CFGRule])) {
+            for(const [lhs1,rhs1,ref1] of rules.values().map(r=>[...r,r] as [NonTerminal,CFG.CFGRuleBody,CFG.CFGRule])) {
                 if(rhs1[0] === lhs1) {
-                    for(const [lhs2,rhs2,ref2] of rules.values().map(x=>[...x,x] as [NonTerminal,CFGRuleBody,CFGRule])) {
+                    for(const [lhs2,rhs2,ref2] of rules.values().map(x=>[...x,x] as [NonTerminal,CFG.CFGRuleBody,CFG.CFGRule])) {
                         if(rhs1 === rhs2) {
                             continue;
                         }
@@ -68,13 +68,13 @@ namespace LL1 {
     }
 
     function leftFactor(cfg: CFG): CFG {
-        const newRules = new Map<NonTerminal,CFGRuleBody[]>()
+        const newRules = new Map<NonTerminal,CFG.CFGRuleBody[]>()
     
         for(const N of cfg.getNonTerminals()) {
             const rules = new Set(cfg.getRuleListFor(N));
             newRules.set(N,[]);
     
-            for(const [lhs1,rhs1,ref1] of rules.values().map(r=>[...r,r] as [NonTerminal,CFGRuleBody,CFGRule])) {
+            for(const [lhs1,rhs1,ref1] of rules.values().map(r=>[...r,r] as [NonTerminal,CFG.CFGRuleBody,CFG.CFGRule])) {
                 if(rhs1.length < 1) {
                     newRules.get(N)!.push(rhs1);
                     continue;
@@ -84,7 +84,7 @@ namespace LL1 {
                 const W = CFG.makeUniqueNonTerminal(cfg,N);
                 let anyOverlaps = false;
     
-                for(const [lhs2,rhs2,ref2] of rules.values().map(r=>[...r,r] as [NonTerminal,CFGRuleBody,CFGRule])) { 
+                for(const [lhs2,rhs2,ref2] of rules.values().map(r=>[...r,r] as [NonTerminal,CFG.CFGRuleBody,CFG.CFGRule])) { 
                     const pre2 = rhs2[0];
                     if(rhs1 !== rhs2 && pre1 === pre2) {
                         if(!anyOverlaps) {
