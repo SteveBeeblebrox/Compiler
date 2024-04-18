@@ -115,46 +115,50 @@ class CFG {
         return [F,T];
     }
     
-    public followSet(A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
-        const P = this.rules;
-    
-        if(T.has(A)) {
-            return [new Set(), T];
-        }
-    
-        T.add(A);
+    public followSet(A: NonTerminal, T: Set<NonTerminal> = new Set()): Set<Terminal> {
+        const followSet = (function(A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
+            const P = this.rules;
         
-        const F = new Set<Terminal>();
+            if(T.has(A)) {
+                return [new Set(), T];
+            }
         
-        for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [NonTerminal, CFG.CFGRuleBody]] : []))) {
-            const [lhs,rhs] = p;
-            for(const [i,gamma] of [...rhs.entries()].filter(([_,x])=>x===A)) {
-                const pi = rhs.slice(i+1);
-    
-                if(pi.length) {
-                    const [G,I] = this.firstSet(pi, new Set());
-                    F.takeUnion(G);
-                }
-    
-                if(!pi.length || (
-                    pi.every(x=>CFG.isNonTerminal(x) && this.derivesToLambda(x))
-                )) {
-                    if(this.isStartingRule(lhs)) {
-                        F.add(CFG.EOF);
+            T.add(A);
+            
+            const F = new Set<Terminal>();
+            
+            for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [NonTerminal, CFG.CFGRuleBody]] : []))) {
+                const [lhs,rhs] = p;
+                for(const [i,gamma] of [...rhs.entries()].filter(([_,x])=>x===A)) {
+                    const pi = rhs.slice(i+1);
+        
+                    if(pi.length) {
+                        const [G,I] = this.firstSet(pi, new Set());
+                        F.takeUnion(G);
                     }
-                    const [G,I] = this.followSet(lhs,T);
-                    F.takeUnion(G);
+        
+                    if(!pi.length || (
+                        pi.every(x=>CFG.isNonTerminal(x) && this.derivesToLambda(x))
+                    )) {
+                        if(this.isStartingRule(lhs)) {
+                            F.add(CFG.EOF);
+                        }
+                        const [G,I] = followSet(lhs,T);
+                        F.takeUnion(G);
+                    }
                 }
             }
-        }
-    
-        return [F,T];
+        
+            return [F,T];
+        }).bind(this);
+
+        return followSet(A,T)[0];
     }
     
     public predictSet([lhs,rhs]: CFG.CFGRule): Set<Terminal> {
         const F = this.firstSet(rhs)[0];
         if(rhs.every(x=>this.derivesToLambda(x))) {
-            [...this.followSet(lhs)[0].values()].forEach(x=>F.add(x));
+            [...this.followSet(lhs).values()].forEach(x=>F.add(x));
         }
         return F;
     }
@@ -259,6 +263,7 @@ type Terminal = Opaque<string,'Terminal'>;
 namespace CFG {
     export type CFGRuleBody = (NonTerminal|Terminal)[];
     export type CFGRule = [NonTerminal, CFGRuleBody];
+    export type GrammarSymbol = Terminal | NonTerminal | typeof CFG.EOF;
 }
 
 
