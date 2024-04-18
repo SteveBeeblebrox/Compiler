@@ -68,7 +68,7 @@ namespace LZCompression {
     //decompress from uint8array (UCS-2 big endian format)
     export function decompressFromUint8Array(compressed?: Uint8Array) {
         if (compressed === null || compressed === undefined) {
-            return decompress(compressed);
+            return decompress(compressed as null | undefined);
         } else {
             const buf = new Array(compressed.length / 2); // 2 bytes per character
             for (let i = 0, totalLen = buf.length; i < totalLen; i++) {
