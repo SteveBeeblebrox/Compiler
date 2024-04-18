@@ -66,7 +66,7 @@ namespace SLR1 {
             let n = -1;
             while(n != states.size) {
                 n = states.size;
-                for(const X of [...G.getTerminalsAndEOF(),...G.getNonTerminals()]) {
+                for(const X of G.getGrammarSymbols()) {
                     const R = goto(I,X);
                     if(R.size !== 0) {
                         states.add(R);

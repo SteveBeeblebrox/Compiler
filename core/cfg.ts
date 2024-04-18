@@ -30,6 +30,10 @@ class CFG {
         return [...new Set(this.rules.keys())];
     }
 
+    public getGrammarSymbols(): [typeof CFG.EOF, ...(NonTerminal | Terminal)[]] {
+        return [CFG.EOF, ...this.getTerminals(), ...this.getNonTerminals()];
+    }
+
     public isStartingRule(rule: NonTerminal | CFG.CFGRule) {
         if(typeof rule !== 'string') return this.isStartingRule(rule[0]);
         return rule === this.startingSymbol;
