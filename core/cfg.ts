@@ -190,6 +190,10 @@ class CFG {
         ).toArray().join(', ')}}`;
     }
 
+    public getRuleNumber(rule: CFG.CFGRule): number {
+        return cfg.getRuleList().findIndex(([lhs, rhs]) => rule[0] === lhs && rule[1].every((p,i)=>p===rhs[i]));
+    }
+
     public static fromString(text: string, allowComments = true) {
         const cfgKeywords = Object.assign(Object.create(null), {
             ARROW: '->',

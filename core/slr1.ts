@@ -8,12 +8,13 @@
 ///#include <tree.ts>
 ///#include <peek.ts>
 ///#include <signature.ts>
+///#include <csv.ts>
 
 ///#include "cfg.ts"
 
 namespace SLR1 {
     const MARKER = Symbol('SLR1.marker');
-    type SLR1ParseTableEntry = `sh-${number}` | `${'+'|''}r-${number}`
+    type SLR1ParseTableEntry = `sh-${number}` | `${'R'|'r'}-${number}`
     export type SLR1ParseTable = Map<number,Map<CFG.GrammarSymbol,SLR1ParseTableEntry>>;
 
     export class CFSM {
@@ -134,15 +135,12 @@ namespace SLR1 {
                     }
 
                     const p = cfg.getRuleList().findIndex(([lhs, rhs]) => P.filter(x=>x!==MARKER).every((p,i)=>[lhs,...rhs][i] === p))
-                    T.get(i).set(f, `r-${p}`);
+                    T.get(i).set(f, `r-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`);
                 }
             }
-            if(I[Symbol.iterator]().some(function([lhs,...rhs]) {
-                return rhs.at(-1) === MARKER && rhs.at(-2) === CFG.EOF;
-            })) {
-                // T.get(i).set(null, `+r-${3.14}`)
-                ///#warning slr1 table not yet finished
-                // set T[i][·] operation to REDUCEWITH S → π$ AND ACCEPT
+            let P;
+            if(P = I[Symbol.iterator]().find(([lhs,...rhs]) => rhs.at(-1) === MARKER && rhs.at(-2) === CFG.EOF)) {
+                T.set(i, new Map(cfg.getGrammarSymbols().map(x=>[x,`R-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`])));
             }
         }
 
@@ -175,13 +173,18 @@ const cfsm = new SLR1.CFSM(cfg);
 for(const state of cfsm) {
     for(const item of state.values()) {
         const [lhs,...rhs]=item;
-        console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??'$').join(' ')}`)
+        console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??CFG.EOF_CHARACTER).join(' ')}`)
     }
     console.log('================================')
 }
 
 console.log(cfsm.getItemSets().size)
 
-console.log(SLR1.createParseTable(cfg))
+const table = SLR1.createParseTable(cfg);
+
+const template = Object.fromEntries(cfg.getGrammarSymbols().map(x=>[x??CFG.EOF_CHARACTER,'']));
+console.log(CSV.stringify(table.values().map(function(row,i) {
+    return Object.assign(Object.create(null),{'.':i},template,Object.fromEntries(row.entries().map(([k,v])=>[k??CFG.EOF_CHARACTER,v])));
+}).toArray()));
 
 ///#endif
