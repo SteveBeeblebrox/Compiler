@@ -13,16 +13,35 @@
 
 namespace SLR1 {
     const MARKER = Symbol('SLR1.marker');
-    export type SLR1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
-    type Item = [CFG.CFGRule[0], ...(CFG.CFGRuleBody[number] | typeof MARKER)[]];
-    type ItemSet = SignatureSet<Item>;
+    export type SLR1ParseTable = any;//Map<NonTerminal,Map<Terminal,number>>;
 
-    export function itemSets(this: CFG) {
-        const G = this;
-        function freshStarts(B: NonTerminal): ItemSet {
-            return new SignatureSet(G.getRuleListFor(B).map(([lhs,rhs]) => [lhs,MARKER,...rhs,...(B === G.startingSymbol ? [undefined] : [])]));
+    export class CFSM {
+        private readonly itemSets: SignatureSet<CFSM.ItemSet>;
+        private readonly edges: SignatureSet<[CFSM.ItemSet, NonTerminal|Terminal|typeof CFG.EOF, CFSM.ItemSet]>;
+        constructor(private readonly G: CFG) {
+            this.itemSets = new SignatureSet([this.closure(this.freshStarts(this.G.startingSymbol))]);
+            this.edges = new SignatureSet();
+
+            for(const I of this.itemSets) {
+                let n = -1;
+                while(n != this.itemSets.size) {
+                    n = this.itemSets.size;
+                    for(const X of this.G.getGrammarSymbols()) {
+                        const R = this.goto(I,X);
+                        if(R.size !== 0) {
+                            this.itemSets.add(R);
+                            this.edges.add([I,X,R]);
+                        }
+                    }
+                }
+            }
         }
-        function closure(I: ItemSet): ItemSet {
+
+        freshStarts(B: NonTerminal): CFSM.ItemSet {
+            return new SignatureSet(this.G.getRuleListFor(B).map(([lhs,rhs]) => [lhs,MARKER,...rhs,...(B === this.G.startingSymbol ? [undefined] : [])]));
+        }
+
+        closure(I: CFSM.ItemSet): CFSM.ItemSet {
             const C = new SignatureSet(I);
             let size = -1;
             let k = 0;
@@ -32,16 +51,16 @@ namespace SLR1 {
                 for(const [lhs,...rhs] of [...C]) {
                     const B = rhs[rhs.indexOf(MARKER) + 1];
                     if(CFG.isNonTerminal(B)) {
-                        C.takeUnion(freshStarts(B));
+                        C.takeUnion(this.freshStarts(B));
                     }
                 }
             }
             return C;
         }
-        function goto(I: ItemSet, X: NonTerminal|Terminal|typeof CFG.EOF) {
+        goto(I: CFSM.ItemSet, X: NonTerminal|Terminal|typeof CFG.EOF) {
             const K = new SignatureSet(I[Symbol.iterator]()
                 .filter(([lhs,...rhs]) => rhs[rhs.indexOf(MARKER)+1] === X)
-                .map(function(k: Item): Item {
+                .map(function(k: CFSM.Item): CFSM.Item {
                     const i = k.indexOf(MARKER);
                     if(i > 0 && i < k.length - 1) {
                         return [
@@ -56,34 +75,30 @@ namespace SLR1 {
                 })
             );
 
-            return closure(K);
+            return this.closure(K);
         }
 
-        const states = new SignatureSet([closure(freshStarts(this.startingSymbol))]);
-        const edges = new SignatureSet<[ItemSet, NonTerminal|Terminal|typeof CFG.EOF, ItemSet]>();
-
-        for(const I of  states) {
-            let n = -1;
-            while(n != states.size) {
-                n = states.size;
-                for(const X of G.getGrammarSymbols()) {
-                    const R = goto(I,X);
-                    if(R.size !== 0) {
-                        states.add(R);
-                        edges.add([I,X,R]);
-                    }
-                }
-            }
+        public getItemSets() {
+            return this.itemSets;
         }
 
-        
+        public getEdges() {
+            return this.edges;
+        }
 
-        return {states,edges};
+        public [Symbol.iterator]() {
+            return this.itemSets[Symbol.iterator]();
+        }
+    }
+
+    export namespace CFSM {
+        export type ItemSet = SignatureSet<Item>;
+        export type Item = [CFG.CFGRule[0], ...(CFG.CFGRuleBody[number] | typeof MARKER)[]];
     }
     
 
-    export function createParseTable(cfg: CFG): any {
-        const S = cfg.itemSets();
+    export function createParseTable(cfg: CFG): SLR1ParseTable {
+        const S = new CFSM(cfg);
 
         for(const I of S) {
             for(const X of cfg.getGrammarSymbols()) {
@@ -99,7 +114,7 @@ namespace SLR1 {
                 }
             }
             if(false) {
-                
+
             }
         }
 
@@ -111,7 +126,7 @@ namespace SLR1 {
 
 
 
-const cfsm = CFG.fromString(`
+const cfg = CFG.fromString(`
 
 S -> A B $
 S -> B C $
@@ -125,9 +140,11 @@ B -> h
 C -> x C y
 C -> p
 
-`).itemSets();
+`);
 
-for(const state of cfsm.states) {
+const cfsm = new SLR1.CFSM(cfg);
+
+for(const state of cfsm) {
     for(const item of state.values()) {
         const [lhs,...rhs]=item;
         console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??'$').join(' ')}`)
@@ -135,6 +152,8 @@ for(const state of cfsm.states) {
     console.log('================================')
 }
 
-console.log(cfsm.states.size)
+console.log(cfsm.getItemSets().size)
+
+console.log(SLR1.createParseTable(cfg))
 
 ///#endif

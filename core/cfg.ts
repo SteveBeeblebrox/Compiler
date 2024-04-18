@@ -249,8 +249,8 @@ class CFG {
         return new CFG(startingSymbol, rules, terminals);
     }
 
-    public itemSets() {
-        return SLR1.itemSets.apply(this);
+    public cfsm() {
+        return new SLR1.CFSM(this);
     }
 }
 
