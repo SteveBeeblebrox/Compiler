@@ -150,7 +150,9 @@ namespace Signature {
         delete(value: T): boolean {
             return this.base.delete(Signature.create(value));
         }
-        forEach(callbackfn: (value: T,value2: T,set: Set<T>) => void,thisArg?: any): void {
+        // Different callback than pollyfill
+        // @ts-expect-error
+        forEach(callbackfn: (value: T,value2: T,set: SignatureSet<T>) => void,thisArg?: any): void {
             if (thisArg !== undefined) {
                 callbackfn = callbackfn.bind(thisArg);
             }
