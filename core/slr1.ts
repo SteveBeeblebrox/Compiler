@@ -131,8 +131,7 @@ namespace SLR1 {
                     if(T.get(i).get(f) !== undefined) {
                         throw new Error(`Grammar is not SLL(1) (Caused by item set ${i})`);
                     }
-
-                    const p = cfg.getRuleList().findIndex(([lhs, rhs]) => P.filter(x=>x!==MARKER).every((p,i)=>[lhs,...rhs][i] === p))
+                    
                     T.get(i).set(f, `r-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`);
                 }
             }
@@ -159,7 +158,14 @@ namespace SLR1 {
             return this.parseTable;
         }
         public parse(tokens: Iterable<Token>): any {
+            type StackT = {state: number, tree?: any};
+            const S: Stack<StackT> = [];
+            const D: Queue<Token | any> = [];
             
+            while(D.length) {
+
+            }
+            // syntax errror
         }
     }
     export namespace SLR1Parser {
