@@ -158,9 +158,9 @@ namespace SLR1 {
             return this.parseTable;
         }
         public parse(tokens: Iterable<Token>): any {
-            type StackT = {state: number, tree?: any};
+            type StackT = {state: number, tree?: ParseTree};
             const S: Stack<StackT> = [];
-            const D: Queue<Token | any> = [];
+            const D: Queue<Token | ParseTree> = [];
             
             while(D.length) {
 
@@ -168,7 +168,7 @@ namespace SLR1 {
             // syntax errror
         }
     }
-    
+
     export namespace SLR1Parser {
         type SLR1ParseTableEntry = `sh-${number}` | `${'R'|'r'}-${number}`
         export type SLR1ParseTable = Map<number,Map<CFG.GrammarSymbol,SLR1ParseTableEntry>>;    
