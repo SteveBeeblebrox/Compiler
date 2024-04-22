@@ -10,6 +10,7 @@
 ///#include <signature.ts>
 ///#include <csv.ts>
 
+///#include "parsing.ts"
 ///#include "cfg.ts"
 
 namespace SLR1 {
@@ -158,14 +159,40 @@ namespace SLR1 {
             return this.parseTable;
         }
         public parse(tokens: Iterable<Token>): any {
+            const T = this.parseTable;
+            const D: Queue<Token | ParseTree | undefined> = [];
+            
             type StackT = {state: number, tree?: ParseTree};
             const S: Stack<StackT> = [];
-            const D: Queue<Token | ParseTree> = [];
+            S.push({state:0});
             
-            while(D.length) {
+            const ruleList = cfg.getRuleList();
+            function reduce(n: number): InnerParseTree {
+                const [lhs,rhs] = ruleList[n];
+                const node = new ParseTreeNode(lhs);
 
+
+                return node;
             }
-            // syntax errror
+
+            while(D.length) {
+                let t = D.at(0);
+                const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
+                if(action === undefined) {
+                    throw new Parsing.SyntaxError();
+                }
+                
+                const n = +v;
+                if(action === 'sh') {
+                    const t = D.shift();
+                    S.push({state:n,tree: t instanceof Token ? new ParseTreeTokenLeaf(t.name as Terminal, t.value) : t === undefined ? new ParseTreeEOFLeaf() : t});
+                } else if(action === 'r') {
+                    D.unshift(reduce(n));
+                } else if(action === 'R') {
+                    return reduce(n);
+                }
+            }
+            throw new Parsing.SyntaxError('Unexpected token EOF');
         }
     }
 
@@ -174,9 +201,11 @@ namespace SLR1 {
         export type SLR1ParseTable = Map<number,Map<CFG.GrammarSymbol,SLR1ParseTableEntry>>;    
     }
 
+    import InnerParseTree = Parsing.InnerParseTree;
     import ParseTree = Parsing.ParseTree;
     import ParseTreeNode = Parsing.ParseTreeNode;
     import ParseTreeLambdaLeaf = Parsing.ParseTreeLambdaLeaf;
+    import ParseTreeLeaf = Parsing.ParseTreeLeaf;
     import ParseTreeEOFLeaf = Parsing.ParseTreeEOFLeaf;
     import ParseTreeTokenLeaf = Parsing.ParseTreeTokenLeaf;
     import ParseResult = Parsing.ParseResult;
