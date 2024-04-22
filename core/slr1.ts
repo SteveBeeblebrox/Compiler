@@ -168,10 +168,18 @@ namespace SLR1 {
             // syntax errror
         }
     }
+    
     export namespace SLR1Parser {
         type SLR1ParseTableEntry = `sh-${number}` | `${'R'|'r'}-${number}`
         export type SLR1ParseTable = Map<number,Map<CFG.GrammarSymbol,SLR1ParseTableEntry>>;    
     }
+
+    import ParseTree = Parsing.ParseTree;
+    import ParseTreeNode = Parsing.ParseTreeNode;
+    import ParseTreeLambdaLeaf = Parsing.ParseTreeLambdaLeaf;
+    import ParseTreeEOFLeaf = Parsing.ParseTreeEOFLeaf;
+    import ParseTreeTokenLeaf = Parsing.ParseTreeTokenLeaf;
+    import ParseResult = Parsing.ParseResult;
 }
 
 ///#if __MAIN__
