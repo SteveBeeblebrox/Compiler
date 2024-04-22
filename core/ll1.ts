@@ -158,7 +158,7 @@ namespace LL1 {
         public getParseTable() {
             return this.parseTable;
         }
-        public parse(tokens: Iterable<Token>): LL1Parser.ParseResult<ASTNodeType> {
+        public parse(tokens: Iterable<Token>): ParseResult<ASTNodeType> {
             const LLT = this.parseTable;
             const P = this.cfg.getRuleList();
             const ts = createPeekableIterator(tokens);
@@ -209,7 +209,7 @@ namespace LL1 {
                     // Continue parsing
                     Current = parent;
                 } else if(CFG.isNonTerminal(x)) {
-                    let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new LL1Parser.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'}`, pos))] ?? throws(new LL1Parser.SyntaxError(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`, pos));
+                    let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Parsing.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'}`, pos))] ?? throws(new Parsing.SyntaxError(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`, pos));
                     K.push(MARKER);
                     const R = p[1];
                     
@@ -228,7 +228,7 @@ namespace LL1 {
                     Current = Current.at(-1)! as ParseTree;
                 } else if(CFG.isTerminalOrEOF(x)) {
                     if(x !== ts.peek()?.name as Terminal) {
-                        throw new LL1Parser.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`, pos);
+                        throw new Parsing.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`, pos);
                     }
                     x = ts.shift()!;
                     pos = x?.pos;
@@ -239,7 +239,7 @@ namespace LL1 {
             }
         
             if(T.length !== 1) {
-                throw new LL1Parser.SyntaxError(undefined,pos);
+                throw new Parsing.SyntaxError(undefined,pos);
             }
         
             return T.pop()! as ParseResult<ASTNodeType>;
@@ -250,65 +250,12 @@ namespace LL1 {
         export type LL1ParseTable = Map<NonTerminal,Map<Terminal,number>>;
     }
 
-    export namespace LL1Parser {
-        abstract class AbstractParseTree<NameType extends string = string> extends Tree {
-            constructor(public readonly name?: NameType) {super();}
-        }
-
-        export class ParseTreeNode extends AbstractParseTree<NonTerminal> implements ArrayTreeMethods {
-            constructor(name?: NonTerminal) {super(name);}
-            public override get parent() {
-                return super.parent as ParseTree;
-            }
-
-            public get length() {
-                return super[Tree.treeLength];
-            }
-
-            public at = super[Tree.at];
-            public values = super[Tree.values];
-            public push = super[Tree.push];
-            public unshift = super[Tree.unshift];
-            public pop = super[Tree.pop];
-            public shift = super[Tree.shift];
-            public splice = super[Tree.splice];
-            public [Symbol.iterator] = super[Tree.iterator];
-        
-            @enumerable
-            public get children() {
-                return [...this];
-            }
-        }
-
-        export class ParseTreeLambdaLeaf extends AbstractParseTree<typeof CFG.LAMBDA_CHARACTER> {
-            constructor() {super(CFG.LAMBDA_CHARACTER);}
-        }
-
-        export class ParseTreeEOFLeaf extends AbstractParseTree<typeof CFG.EOF_CHARACTER> {
-            constructor() {super(CFG.EOF_CHARACTER);}
-        }
-
-        export class ParseTreeTokenLeaf extends AbstractParseTree<Terminal> {
-            constructor(name: Terminal, public value?: string) {super(name);}
-        }
-
-        export type ParseTreeLeaf = ParseTreeLambdaLeaf | ParseTreeEOFLeaf | ParseTreeTokenLeaf;
-        export type ParseTree = NestedTree<ParseTreeNode, ParseTreeNode | ParseTreeLeaf, false> & {parent?: ParseTree};
-        export type ParseResult<ASTNodeType extends Tree = never> = ASTNodeType | StrayTree<ParseTree>;
-
-        export class SyntaxError extends Error {
-            constructor(message?: string, public pos?: Position) {
-                super(message);
-            }
-        }
-    }
-
-    import ParseTree = LL1Parser.ParseTree;
-    import ParseTreeNode = LL1Parser.ParseTreeNode;
-    import ParseTreeLambdaLeaf = LL1Parser.ParseTreeLambdaLeaf;
-    import ParseTreeEOFLeaf = LL1Parser.ParseTreeEOFLeaf;
-    import ParseTreeTokenLeaf = LL1Parser.ParseTreeTokenLeaf;
-    import ParseResult = LL1Parser.ParseResult;
+    import ParseTree = Parsing.ParseTree;
+    import ParseTreeNode = Parsing.ParseTreeNode;
+    import ParseTreeLambdaLeaf = Parsing.ParseTreeLambdaLeaf;
+    import ParseTreeEOFLeaf = Parsing.ParseTreeEOFLeaf;
+    import ParseTreeTokenLeaf = Parsing.ParseTreeTokenLeaf;
+    import ParseResult = Parsing.ParseResult;
 }
 
 import LL1Parser = LL1.LL1Parser;
