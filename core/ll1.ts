@@ -251,8 +251,6 @@ namespace LL1 {
     }
 
     export namespace LL1Parser {
-
-
         abstract class AbstractParseTree<NameType extends string = string> extends Tree {
             constructor(public readonly name?: NameType) {super();}
         }
