@@ -158,7 +158,7 @@ namespace SLR1 {
         public getParseTable() {
             return this.parseTable;
         }
-        public parse(tokens: Iterable<Token>): any {
+        public parse(tokens: Iterable<Token>): ParseResult<ASTNodeType> {
             const T = this.parseTable;
             const D: Queue<Token | ParseTree | undefined> = []; // todo
             
@@ -167,13 +167,13 @@ namespace SLR1 {
             S.push({state:0});
             
             const ruleList = cfg.getRuleList();
-            function reduce(n: number): InnerParseTree {
+            function reduce(n: number): StrayTree<InnerParseTree> {
                 const [lhs,rhs] = ruleList[n];
                 const node = new ParseTreeNode(lhs);
 
                 // todo
 
-                return node;
+                return node as StrayTree<InnerParseTree>;
             }
 
             while(D.length) {
