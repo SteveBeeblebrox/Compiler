@@ -5,6 +5,7 @@
 ///#include <tree.ts>
 ///#include <peek.ts>
 
+///#include "parsing.ts"
 ///#include "cfg.ts"
 
 namespace LL1 {
@@ -168,7 +169,7 @@ namespace LL1 {
             type StackT = NonTerminal | Terminal | typeof MARKER | typeof CFG.LAMBDA_CHARACTER;
             const K: Stack<StackT> = [];
         
-            let Current: ParseTree = T;
+            let Current: InnerParseTree = T;
             K.push(this.cfg.startingSymbol);
         
             let pos: Position | undefined = undefined;
@@ -177,7 +178,7 @@ namespace LL1 {
                 let x: StackT | Token = K.pop()!;
                 if(x === MARKER) {
                     // Hold a reference to the current parrent
-                    const parent = Current.parent;
+                    const parent = Current.parent as InnerParseTree;
 
                     // Disjoin completed node
                     const node = parent.pop() as ParseTreeNode;
@@ -203,11 +204,11 @@ namespace LL1 {
                     if(Array.isArray(rvalue)) {
                         parent.push(...rvalue);
                     } else if(rvalue != null) {
-                        parent.push(rvalue);
+                        parent.push(rvalue as InnerParseTree);
                     }
 
                     // Continue parsing
-                    Current = parent;
+                    Current = parent as InnerParseTree;
                 } else if(CFG.isNonTerminal(x)) {
                     let p = P[LLT.get(x)?.get(ts.peek()?.name as Terminal) ?? throws(new Parsing.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'}`, pos))] ?? throws(new Parsing.SyntaxError(`Syntax Error: Unexpected token ${ts.peek()?.name ?? 'EOF'}`, pos));
                     K.push(MARKER);
@@ -225,7 +226,7 @@ namespace LL1 {
         
                     const n: ParseTree = new ParseTreeNode(x);
                     Current.push(n);
-                    Current = Current.at(-1)! as ParseTree;
+                    Current = Current.at(-1)! as InnerParseTree;
                 } else if(CFG.isTerminalOrEOF(x)) {
                     if(x !== ts.peek()?.name as Terminal) {
                         throw new Parsing.SyntaxError(`Unexpected token ${ts.peek()?.name ?? 'EOF'} expected ${x}`, pos);
@@ -251,6 +252,7 @@ namespace LL1 {
     }
 
     import ParseTree = Parsing.ParseTree;
+    import InnerParseTree = Parsing.InnerParseTree;
     import ParseTreeNode = Parsing.ParseTreeNode;
     import ParseTreeLambdaLeaf = Parsing.ParseTreeLambdaLeaf;
     import ParseTreeEOFLeaf = Parsing.ParseTreeEOFLeaf;
