@@ -14,8 +14,6 @@
 
 namespace SLR1 {
     const MARKER = Symbol('SLR1.marker');
-    type SLR1ParseTableEntry = `sh-${number}` | `${'R'|'r'}-${number}`
-    export type SLR1ParseTable = Map<number,Map<CFG.GrammarSymbol,SLR1ParseTableEntry>>;
 
     export class CFSM {
         private readonly itemSets: SignatureSet<CFSM.ItemSet>;
@@ -113,10 +111,10 @@ namespace SLR1 {
         export type Item = [CFG.CFGRule[0], ...(CFG.CFGRuleBody[number] | typeof MARKER)[]];
     }
     
-    export function createParseTable(cfg: CFG): SLR1ParseTable {
+    export function createParseTable(cfg: CFG): SLR1Parser.SLR1ParseTable {
         const cfsm = new CFSM(cfg);
 
-        const T: SLR1ParseTable = new Map();
+        const T: SLR1Parser.SLR1ParseTable = new Map();
 
         for(const I of cfsm) {
             const i = cfsm.getSetNumber(I);
@@ -145,6 +143,28 @@ namespace SLR1 {
         }
 
         return T;
+    }
+
+    export class SLR1Parser<ASTNodeType extends Tree=never> {
+        private readonly parseTable: SLR1Parser.SLR1ParseTable;
+        private readonly cfg: CFG;
+        constructor(cfg: CFG) {
+            this.cfg = cfg;
+            this.parseTable = createParseTable(cfg);
+        }
+        public getCFG() {
+            return this.cfg;
+        }
+        public getParseTable() {
+            return this.parseTable;
+        }
+        public parse(tokens: Iterable<Token>): any {
+            
+        }
+    }
+    export namespace SLR1Parser {
+        type SLR1ParseTableEntry = `sh-${number}` | `${'R'|'r'}-${number}`
+        export type SLR1ParseTable = Map<number,Map<CFG.GrammarSymbol,SLR1ParseTableEntry>>;    
     }
 }
 
