@@ -160,7 +160,7 @@ namespace SLR1 {
         }
         public parse(tokens: Iterable<Token>): any {
             const T = this.parseTable;
-            const D: Queue<Token | ParseTree | undefined> = [];
+            const D: Queue<Token | ParseTree | undefined> = []; // todo
             
             type StackT = {state: number, tree?: ParseTree};
             const S: Stack<StackT> = [];
@@ -171,6 +171,7 @@ namespace SLR1 {
                 const [lhs,rhs] = ruleList[n];
                 const node = new ParseTreeNode(lhs);
 
+                // todo
 
                 return node;
             }
