@@ -24,6 +24,14 @@ type Stack<T> = {
     [Symbol.iterator]: Array<T>[typeof Symbol.iterator]
 }
 
+type Queue<T> = {
+    at(n: 0): T;
+    unshift: Array<T>['unshift'],
+    shift: Array<T>['shift'],
+    length: Array<T>['length'],
+    [Symbol.iterator]: Array<T>[typeof Symbol.iterator]
+}
+
 type JSONPrimitive = number | boolean | string | null;
 type JSONObject = {[key: string]: JSONValue};
 type JSONArrray = JSONValue[];
