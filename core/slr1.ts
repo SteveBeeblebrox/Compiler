@@ -118,6 +118,18 @@ namespace SLR1 {
 
         const T: SLR1Parser.SLR1ParseTable = new Map();
 
+        // const [[_,...header],...rows] = system.readTextFileSync('data/zlang.lr').trim().split('\n').map(x=>x.split(','));
+        
+        // for(const row of rows) {
+        //     const r = new Map();
+        //     T.set(+row.shift(), r);
+        //     for(let i = 0; i <row.length; i++) {
+        //         r.set(header[i],row[i])
+        //     }
+        // }
+
+        // return T
+
         for(const I of cfsm) {
             const i = cfsm.getSetNumber(I);
             T.set(i, new Map());
@@ -161,6 +173,7 @@ namespace SLR1 {
         }
         public parse(tokens: Iterable<Token>): ParseResult<ASTNodeType> {
             const T = this.parseTable;
+            const cfg = this.cfg;
             const ts = createPeekableIterator(tokens);
             const D: Queue<Token | ParseTree | undefined> = [];
             
@@ -170,6 +183,8 @@ namespace SLR1 {
             
             const ruleList = cfg.getRuleList();
             function reduce(n: number): StrayTree<InnerParseTree> {
+                const x = {ts,D,T,cfg}
+                
                 const [lhs,rhs] = ruleList[n];
                 const node = new ParseTreeNode(lhs);
 
@@ -193,9 +208,10 @@ namespace SLR1 {
                 return node as StrayTree<InnerParseTree>;
             }
 
-            while(true) {
+            while(true) { //todo not in 0
                 let t = D.at(0) ?? ts.peek();
                 const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
+                debugger;
                 if(action === undefined) {
                     throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name??t??'EOF'}'`);
                 }
@@ -205,6 +221,7 @@ namespace SLR1 {
                     const t = D.shift() ?? ts.shift();
                     S.push({state:n,tree:t});
                 } else if(action === 'r') {
+                    if(n==94) debugger
                     D.unshift(reduce(n));
                 } else if(action === 'R') {
                     return reduce(n);

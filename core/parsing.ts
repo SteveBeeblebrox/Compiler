@@ -57,9 +57,9 @@ namespace Parsing {
         }
     }
 
-    export type ParseTreeLeaf = Tree & Omit<ParseTreeLambdaNode | ParseTreeEOFNode | ParseTreeTokenNode, typeof Graphviz.label>;
+    type ParseTreeLeaf = Tree & Omit<ParseTreeLambdaNode | ParseTreeEOFNode | ParseTreeTokenNode, typeof Graphviz.label>;
     export type InnerParseTree = NestedTree<ParseTreeNode, ParseTreeNode | ParseTreeLeaf, false> & {parent?: ParseTree};
-    export type ParseTree = (InnerParseTree | ParseTreeLeaf); 
+    export type ParseTree = InnerParseTree | ParseTreeLeaf; 
 
     export type ParseResult<ASTNodeType extends Tree = never> = ASTNodeType | StrayTree<ParseTree>;
 
