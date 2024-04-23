@@ -233,9 +233,9 @@ namespace LL1 {
                     }
                     x = ts.shift()!;
                     pos = x?.pos;
-                    Current.push(x instanceof Token ? new ParseTreeTokenLeaf(x.name as Terminal, x.value) : new ParseTreeEOFLeaf());
+                    Current.push(x instanceof Token ? new ParseTreeTokenNode(x.name as Terminal, x.value) : new ParseTreeEOFNode());
                 } else if(CFG.isLambda(x)) {
-                    Current.push(new ParseTreeLambdaLeaf());
+                    Current.push(new ParseTreeLambdaNode());
                 }
             }
         
@@ -254,9 +254,9 @@ namespace LL1 {
     import ParseTree = Parsing.ParseTree;
     import InnerParseTree = Parsing.InnerParseTree;
     import ParseTreeNode = Parsing.ParseTreeNode;
-    import ParseTreeLambdaLeaf = Parsing.ParseTreeLambdaLeaf;
-    import ParseTreeEOFLeaf = Parsing.ParseTreeEOFLeaf;
-    import ParseTreeTokenLeaf = Parsing.ParseTreeTokenLeaf;
+    import ParseTreeLambdaNode = Parsing.ParseTreeLambdaNode;
+    import ParseTreeEOFNode = Parsing.ParseTreeEOFNode;
+    import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     import ParseResult = Parsing.ParseResult;
 }
 

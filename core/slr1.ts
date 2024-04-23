@@ -11,6 +11,7 @@
 ///#include <csv.ts>
 
 ///#include "parsing.ts"
+///#include "graphviz.ts"
 ///#include "cfg.ts"
 
 namespace SLR1 {
@@ -160,9 +161,10 @@ namespace SLR1 {
         }
         public parse(tokens: Iterable<Token>): ParseResult<ASTNodeType> {
             const T = this.parseTable;
-            const D: Queue<Token | ParseTree | undefined> = []; // todo
+            const ts = createPeekableIterator(tokens);
+            const D: Queue<Token | ParseTree | undefined> = [];
             
-            type StackT = {state: number, tree?: ParseTree};
+            type StackT = {state: number, tree?: ParseTree | Token | undefined};
             const S: Stack<StackT> = [];
             S.push({state:0});
             
@@ -171,29 +173,43 @@ namespace SLR1 {
                 const [lhs,rhs] = ruleList[n];
                 const node = new ParseTreeNode(lhs);
 
-                // todo
+                if(rhs.length === 0) {
+                    node.push(new ParseTreeLambdaNode());
+                } else {
+                    for(const expected of [...rhs, ...(cfg.isStartingRule(lhs) ? [undefined] : [])].reverse()) {
+                        const {state,tree:t} = S.pop();
+                        if(CFG.isEOF(expected) && t === undefined) {
+                            node.unshift(new ParseTreeEOFNode());
+                        } else if(CFG.isTerminal(expected) && t instanceof Token) {
+                            node.unshift(new ParseTreeTokenNode(t.name as Terminal, t.value));
+                        } else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
+                            node.unshift(t);
+                        } else {
+                            throw new Parsing.SyntaxError(`Expected '${expected??'EOF'}' got '${t??'EOF'}'`)
+                        }
+                    }
+                }
 
                 return node as StrayTree<InnerParseTree>;
             }
 
-            while(D.length) {
-                let t = D.at(0);
+            while(true) {
+                let t = D.at(0) ?? ts.peek();
                 const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
                 if(action === undefined) {
-                    throw new Parsing.SyntaxError();
+                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name ?? t}'`);
                 }
                 
                 const n = +v;
                 if(action === 'sh') {
-                    const t = D.shift();
-                    S.push({state:n,tree: t instanceof Token ? new ParseTreeTokenLeaf(t.name as Terminal, t.value) : t === undefined ? new ParseTreeEOFLeaf() : t});
+                    const t = D.shift() ?? ts.shift();
+                    S.push({state:n,tree:t});
                 } else if(action === 'r') {
                     D.unshift(reduce(n));
                 } else if(action === 'R') {
                     return reduce(n);
                 }
             }
-            throw new Parsing.SyntaxError('Unexpected token EOF');
         }
     }
 
@@ -205,10 +221,10 @@ namespace SLR1 {
     import InnerParseTree = Parsing.InnerParseTree;
     import ParseTree = Parsing.ParseTree;
     import ParseTreeNode = Parsing.ParseTreeNode;
-    import ParseTreeLambdaLeaf = Parsing.ParseTreeLambdaLeaf;
+    import ParseTreeLambdaNode = Parsing.ParseTreeLambdaNode;
     import ParseTreeLeaf = Parsing.ParseTreeLeaf;
-    import ParseTreeEOFLeaf = Parsing.ParseTreeEOFLeaf;
-    import ParseTreeTokenLeaf = Parsing.ParseTreeTokenLeaf;
+    import ParseTreeEOFNode = Parsing.ParseTreeEOFNode;
+    import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     import ParseResult = Parsing.ParseResult;
 }
 
@@ -232,23 +248,39 @@ C -> p
 
 `);
 
-const cfsm = new SLR1.CFSM(cfg);
+// const cfsm = new SLR1.CFSM(cfg);
 
-for(const state of cfsm) {
-    for(const item of state.values()) {
-        const [lhs,...rhs]=item;
-        console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??CFG.EOF_CHARACTER).join(' ')}`)
-    }
-    console.log('================================')
+// for(const state of cfsm) {
+//     for(const item of state.values()) {
+//         const [lhs,...rhs]=item;
+//         console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??CFG.EOF_CHARACTER).join(' ')}`)
+//     }
+//     console.log('================================')
+// }
+
+// console.log(cfsm.getItemSets().size)
+
+// const table = SLR1.createParseTable(cfg);
+
+// const template = Object.fromEntries(cfg.getGrammarSymbols().map(x=>[x??CFG.EOF_CHARACTER,'']));
+// console.log(CSV.stringify(table.values().map(function(row,i) {
+//     return Object.assign(Object.create(null),{'.':i},template,Object.fromEntries(row.entries().map(([k,v])=>[k??CFG.EOF_CHARACTER,v])));
+// }).toArray()));
+
+
+async function dump(name: string, node: Tree) {
+    //@ts-ignore
+    const dot = new system.Command('dot', {
+        args: ['-Tpng', `-odata/${name}.png`],
+        stdin: 'piped'
+    }).spawn();
+    
+    const writer = dot.stdin.getWriter()
+    await writer.write(new TextEncoder().encode(Graphviz.serialize(node)));
+    await writer.ready;
+    await writer.close();
 }
 
-console.log(cfsm.getItemSets().size)
-
-const table = SLR1.createParseTable(cfg);
-
-const template = Object.fromEntries(cfg.getGrammarSymbols().map(x=>[x??CFG.EOF_CHARACTER,'']));
-console.log(CSV.stringify(table.values().map(function(row,i) {
-    return Object.assign(Object.create(null),{'.':i},template,Object.fromEntries(row.entries().map(([k,v])=>[k??CFG.EOF_CHARACTER,v])));
-}).toArray()));
-
+const tokens = 'yxxhxpy'.split('').map((c,i)=>new Token(c,c,{col:i,line:1}));
+dump('slr1', new SLR1.SLR1Parser(cfg).parse(tokens))
 ///#endif

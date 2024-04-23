@@ -202,9 +202,9 @@ namespace RegexEngine {
     ])));
 
     const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Map(Object.entries({
-        '*'(node: LL1Parser.ParseTreeNode) {
+        '*'(node: Parsing.ParseTreeNode) {
             if(node.length === 1) {
-                if(node.at(0) instanceof LL1Parser.ParseTreeLambdaLeaf) {
+                if(node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
                     // Remove empty lambdas
                     return null;
                 } else {
@@ -217,7 +217,7 @@ namespace RegexEngine {
             }
         },
         Primitive(node) {
-            const [first,,second] = [...node] as LL1Parser.ParseTreeTokenLeaf[];
+            const [first,,second] = [...node] as Parsing.ParseTreeTokenNode[];
             if(first.name === 'char' && second?.name === 'char') {
                 return new TreeNodes.RangeNode(first.value as char, second.value as char);
             } else if(first.name === 'char') {
@@ -241,7 +241,7 @@ namespace RegexEngine {
         },
         Quantifier(node) {
             const mod = node.at(1);
-            if(mod instanceof LL1Parser.ParseTreeTokenLeaf) {
+            if(mod instanceof Parsing.ParseTreeTokenNode) {
                 switch(mod.name) {
                     case '%+': return new TreeNodes.SeqNode([node.at(0) as RegexNode, new TreeNodes.KleenNode((node.shift() as RegexNode).clone())]);
                     case '%*': return new TreeNodes.KleenNode(node.shift() as RegexNode);
