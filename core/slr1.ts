@@ -61,7 +61,6 @@ namespace SLR1 {
         closure(I: CFSM.ItemSet): CFSM.ItemSet {
             const C = new SignatureSet(I);
             let size = -1;
-            let k = 0;
             while(C.size != size) {
                 size = C.size;
 
@@ -118,18 +117,6 @@ namespace SLR1 {
 
         const T: SLR1Parser.SLR1ParseTable = new Map();
 
-        // const [[_,...header],...rows] = system.readTextFileSync('data/zlang.lr').trim().split('\n').map(x=>x.split(','));
-        
-        // for(const row of rows) {
-        //     const r = new Map();
-        //     T.set(+row.shift(), r);
-        //     for(let i = 0; i <row.length; i++) {
-        //         r.set(header[i],row[i])
-        //     }
-        // }
-
-        // return T
-
         for(const I of cfsm) {
             const i = cfsm.getSetNumber(I);
             T.set(i, new Map());
@@ -149,8 +136,9 @@ namespace SLR1 {
                     T.get(i).set(f, `r-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`);
                 }
             }
+            
             let P;
-            if(P = I[Symbol.iterator]().find(([lhs,...rhs]) => rhs.at(-1) === MARKER && rhs.at(-2) === CFG.EOF)) {
+            if(P = I[Symbol.iterator]().find(([lhs,...rhs]) => rhs.at(-1) === MARKER && rhs.at(-2) === CFG.EOF && cfg.isStartingRule(lhs))) {
                 T.set(i, new Map(cfg.getGrammarSymbols().map(x=>[x,`R-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`])));
             }
         }
@@ -263,6 +251,19 @@ C -> x C y
 C -> p
 
 `);
+
+
+// const [[_,...header],...rows] = system.readTextFileSync('data/zlang.lr').trim().split('\n').map(x=>x.split(','));
+
+// for(const row of rows) {
+//     const r = new Map();
+//     T.set(+row.shift(), r);
+//     for(let i = 0; i <row.length; i++) {
+//         r.set(header[i],row[i])
+//     }
+// }
+
+// return T
 
 // const cfsm = new SLR1.CFSM(cfg);
 
