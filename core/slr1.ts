@@ -131,7 +131,7 @@ namespace SLR1 {
                 const [A] = P;
                 for(const f of cfg.followSet(A)) {
                     if(T.get(i).get(f) !== undefined) {
-                        throw new Error(`Grammar is not SLL(1) (Caused by item set ${i})`);
+                        throw new Error(`Grammar is not SLR(1) (Caused by item set ${i})`);
                     }
                     
                     T.get(i).set(f, `r-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`);
@@ -185,7 +185,7 @@ namespace SLR1 {
                         } else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
                             node.unshift(t);
                         } else {
-                            throw new Parsing.SyntaxError(`Expected '${expected??'EOF'}' got '${t??'EOF'}'`)
+                            throw new Parsing.SyntaxError(`Expected '${expected??'EOF'}' got '${t?.name??t??'EOF'}'`)
                         }
                     }
                 }
@@ -197,7 +197,7 @@ namespace SLR1 {
                 let t = D.at(0) ?? ts.peek();
                 const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
                 if(action === undefined) {
-                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name ?? t}'`);
+                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name??t??'EOF'}'`);
                 }
                 
                 const n = +v;
