@@ -222,7 +222,6 @@ namespace SLR1 {
     import ParseTree = Parsing.ParseTree;
     import ParseTreeNode = Parsing.ParseTreeNode;
     import ParseTreeLambdaNode = Parsing.ParseTreeLambdaNode;
-    import ParseTreeLeaf = Parsing.ParseTreeLeaf;
     import ParseTreeEOFNode = Parsing.ParseTreeEOFNode;
     import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     import ParseResult = Parsing.ParseResult;
