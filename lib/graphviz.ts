@@ -1,6 +1,8 @@
 #!/usr/bin/bash
 //`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
 
+///#pragma once
+
 ///#include <compat.ts>
 
 namespace Graphviz {
@@ -68,8 +70,9 @@ namespace Graphviz {
             }
 
             const keys: string[] | object = obj[Graphviz.children] ?? Object.keys(obj);
-            for(const [key, child] of Object.entries(Array.isArray(keys) ? obj : keys)) {
-                if(!Array.isArray(keys) || keys.includes(key)) {
+
+            for(const [key, child] of Array.isArray(keys) && Array.isArray(keys[0]) ? keys : Object.entries(Array.isArray(keys) ? obj : keys)) {
+                if(!Array.isArray(keys) || keys.includes(key) || Array.isArray(keys[0])) {
                     if(Array.isArray(child)) {
                         for(const [i,arrayChild] of Array.entries(child)) {
                             recurse(name,`${key}[${i}]`,arrayChild);
