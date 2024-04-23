@@ -8,4 +8,7 @@ class Token {
         public readonly value?: string,
         public readonly pos?: Position
     ) {}
+    public get [Symbol.toStringTag]() {
+        return this.constructor.name;
+    }
 }
