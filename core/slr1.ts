@@ -136,7 +136,7 @@ namespace SLR1 {
                     T.get(i).set(f, `r-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`);
                 }
             }
-            
+
             let P;
             if(P = I[Symbol.iterator]().find(([lhs,...rhs]) => rhs.at(-1) === MARKER && rhs.at(-2) === CFG.EOF && cfg.isStartingRule(lhs))) {
                 T.set(i, new Map(cfg.getGrammarSymbols().map(x=>[x,`R-${cfg.getRuleNumber([P[0],P.slice(1).filter(x=>x!==MARKER) as CFG.CFGRuleBody])}`])));
@@ -199,7 +199,6 @@ namespace SLR1 {
             while(true) { //todo not in 0
                 let t = D.at(0) ?? ts.peek();
                 const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
-                debugger;
                 if(action === undefined) {
                     throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name??t??'EOF'}'`);
                 }
@@ -209,7 +208,6 @@ namespace SLR1 {
                     const t = D.shift() ?? ts.shift();
                     S.push({state:n,tree:t});
                 } else if(action === 'r') {
-                    if(n==94) debugger
                     D.unshift(reduce(n));
                 } else if(action === 'R') {
                     return reduce(n);
