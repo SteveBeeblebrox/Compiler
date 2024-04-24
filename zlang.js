@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-//`which sjs` --debug <(mtsc -po- -tes2018 -Ilib "$0" | tee zlang.js) "$@"; exit $?
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee zlang.js) "$@"; exit $?
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
     for (var i = 0; i < initializers.length; i++) {
@@ -2241,7 +2241,7 @@ system.writeTextFileSync('temp.csv', out.join('\n'));
 async function dump(name, node) {
     //@ts-ignore
     const dot = new system.Command('dot', {
-        args: ['-Tpng', `-odata/${name}.png`],
+        args: ['-Tpdf', `-odata/${name}.pdf`],
         stdin: 'piped'
     }).spawn();
     const writer = dot.stdin.getWriter();

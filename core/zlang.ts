@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-//`which sjs` --debug <(mtsc -po- -tes2018 -Ilib "$0" | tee zlang.js) "$@"; exit $?
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee zlang.js) "$@"; exit $?
 
 ///#pragma once
 
@@ -33,7 +33,7 @@ system.writeTextFileSync('temp.csv',out.join('\n'))
 async function dump(name: string, node: Tree) {
     //@ts-ignore
     const dot = new system.Command('dot', {
-        args: ['-Tpng', `-odata/${name}.png`],
+        args: ['-Tpdf', `-odata/${name}.pdf`],
         stdin: 'piped'
     }).spawn();
     
