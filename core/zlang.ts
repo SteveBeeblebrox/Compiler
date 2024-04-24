@@ -19,7 +19,7 @@ console.log('Building parser...')
 
 const tokens = new BasicTextDecoder().decode(new Uint8Array([
     ///#embed "../data/zlang.tok"
-])).split('\n').map(x=>x.split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
+])).trim().split('\n').map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
 
 const PARSER = new SLR1.SLR1Parser(GRAMMAR);
 
