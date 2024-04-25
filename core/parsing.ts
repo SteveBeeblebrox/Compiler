@@ -68,4 +68,69 @@ namespace Parsing {
             super(message);
         }
     }
+
+    /*
+        void - nothing happened, run * transform if given
+        ParseTreeNode | ASTNodeType | ASTNodeType[] - replace with return value and break
+        null - delete node
+    */
+
+    export class SyntaxTransformer<ASTNodeType extends Tree=Tree> {
+
+        private readonly rules: Map<NonTerminal | '*', (node: StrayTree<ParseTreeNode>)=>void | ParseTree | ParseTree[] | StrayTree<ASTNodeType> | StrayTree<ASTNodeType>[]>;
+
+        constructor(rules: SyntaxTransformer<ASTNodeType>['rules'] | {[key: string]: MapValue<SyntaxTransformer<ASTNodeType>['rules']>}) {
+            this.rules = rules instanceof Map ? rules : new Map(Object.entries(rules)) as SyntaxTransformer<ASTNodeType>['rules'];
+        }
+        transform(node: StrayTree<ParseTreeNode>) {
+            for(const rule of [node.name,'*'] as [...NonTerminal[], '*']) {
+                if(this.rules.has(rule)) {
+                    const rvalue = this.rules.get(rule)(node);
+                    if(rvalue !== undefined) {
+                        return rvalue;
+                    }
+                }
+            }
+            return node;
+            /*
+            // Hold a reference to the current parrent
+                    const parent = Current.parent as InnerParseTree;
+
+                    // Disjoin completed node
+                    const node = parent.pop() as ParseTreeNode;
+                    let rvalue: any = node;
+                    
+                    // Apply NonTerminal specific transforms
+                    if(rvalue === node && this.sdt.has(node.name as NonTerminal)) {
+                        rvalue = this.sdt.get(node.name as NonTerminal)(node);
+                        if(rvalue === undefined) {
+                            rvalue = node;
+                        }
+                    }
+
+                    // Apply wildcard transforms
+                    if(rvalue === node && this.sdt.has('*')) {
+                        rvalue = this.sdt.get('*')(node);
+                        if(rvalue === undefined) {
+                            rvalue = node;
+                        }
+                    }
+                    
+                    // Restore connections
+                    if(Array.isArray(rvalue)) {
+                        parent.push(...rvalue);
+                    } else if(rvalue != null) {
+                        parent.push(rvalue as InnerParseTree);
+                    }
+
+                    // Continue parsing
+                    Current = parent as InnerParseTree;
+            
+            
+            
+            
+            
+            */
+        }
+    }
 }
