@@ -201,7 +201,7 @@ namespace RegexEngine {
         ///#embed "regex.cfg"
     ])));
 
-    const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Map(Object.entries({
+    const PARSER = new LL1Parser<RegexNode>(GRAMMAR, new Parsing.SyntaxTransformer<RegexNode>({
         '*'(node: Parsing.ParseTreeNode) {
             if(node.length === 1) {
                 if(node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
@@ -219,16 +219,16 @@ namespace RegexEngine {
         Primitive(node) {
             const [first,,second] = [...node] as Parsing.ParseTreeTokenNode[];
             if(first.name === 'char' && second?.name === 'char') {
-                return new TreeNodes.RangeNode(first.value as char, second.value as char);
+                return new TreeNodes.RangeNode(first.value as char, second.value as char) as StrayTree<TreeNodes.RangeNode>;
             } else if(first.name === 'char') {
-                return new TreeNodes.CharNode(first.value as char);
+                return new TreeNodes.CharNode(first.value as char) as StrayTree<TreeNodes.CharNode>;
             } else if(first.name === '%.') {
-                return new TreeNodes.WildcharNode();
+                return new TreeNodes.WildcharNode() as StrayTree<TreeNodes.WildcharNode>;
             }
         },
         Sequence(node) {
-            if(node.length === 1) return node.shift()
-            return new TreeNodes.SeqNode([...node].flatMap(node => node instanceof TreeNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]);
+            if(node.length === 1) return node.shift();
+            return new TreeNodes.SeqNode([...node].flatMap(node => node instanceof TreeNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]) as StrayTree<TreeNodes.SeqNode>;
         },
         Alternation(node) {
             const l = node.length;
@@ -237,14 +237,14 @@ namespace RegexEngine {
             if(2*children.length-1 !== l) {
                 children.push(new TreeNodes.LambdaNode());
             }
-            return new TreeNodes.AltNode(children); // Todo, flatten this?
+            return new TreeNodes.AltNode(children) as StrayTree<TreeNodes.AltNode>; // Todo, flatten this?
         },
         Quantifier(node) {
             const mod = node.at(1);
             if(mod instanceof Parsing.ParseTreeTokenNode) {
                 switch(mod.name) {
-                    case '%+': return new TreeNodes.SeqNode([node.at(0) as RegexNode, new TreeNodes.KleenNode((node.shift() as RegexNode).clone())]);
-                    case '%*': return new TreeNodes.KleenNode(node.shift() as RegexNode);
+                    case '%+': return new TreeNodes.SeqNode([node.at(0) as RegexNode, new TreeNodes.KleenNode((node.shift() as RegexNode).clone())]) as StrayTree<TreeNodes.SeqNode>;
+                    case '%*': return new TreeNodes.KleenNode(node.shift() as RegexNode) as StrayTree<TreeNodes.KleenNode>;
                 }
             }
         },
@@ -254,7 +254,7 @@ namespace RegexEngine {
         S(node) {
             return node.shift();
         }
-    })) as LL1.SyntaxTransformerMap<RegexNode>);
+    }));
 
     function isHex(text: string) {
         return text.split('').every(c => '0123456789abcdef'.includes(c.toLowerCase()));
@@ -350,7 +350,7 @@ function nfaToGraphviz(nfa: RegexEngine.NFA) {
     }
 
     data.push('}');
-    return data.join('\n')
+    return data.join('\n');
 }
 
 if(system.args.length === 2 || system.args.length === 3) {
