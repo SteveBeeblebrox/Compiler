@@ -9,11 +9,6 @@
 ///#include "cfg.ts"
 
 namespace LL1 {
-    
-    type SyntaxTransformer<ASTNodeType extends Tree> = (node: ParseTreeNode)=>typeof node | ASTNodeType | ASTNodeType[] | null
-
-    export type SyntaxTransformerMap<ASTNodeType extends Tree> = Map<NonTerminal | '*', SyntaxTransformer<ASTNodeType>>;
-
     function convertLeftRecursion(cfg: CFG): CFG {
         const newRules = new Map<NonTerminal,CFG.CFGRuleBody[]>()
     
@@ -147,11 +142,11 @@ namespace LL1 {
     export class LL1Parser<ASTNodeType extends Tree=never> {
         private readonly parseTable: LL1Parser.LL1ParseTable;
         private readonly cfg: CFG;
-        private readonly sdt: SyntaxTransformerMap<ASTNodeType>; 
-        constructor(cfg: CFG, sdt: {[key in NonTerminal | '*']?: SyntaxTransformer<ASTNodeType>} | SyntaxTransformerMap<ASTNodeType> = new Map()) {
+        private readonly sdt: Parsing.SyntaxTransformer<ASTNodeType>; 
+        constructor(cfg: CFG, sdt?: Parsing.SyntaxTransformer<ASTNodeType>) {
             this.cfg = transform(cfg);
             this.parseTable = createParseTable(this.cfg);
-            this.sdt = sdt instanceof Map ? sdt : new Map(Object.entries(sdt)) as SyntaxTransformerMap<ASTNodeType>;
+            this.sdt = sdt;
         }
         public getCFG() {
             return this.cfg;
@@ -171,7 +166,7 @@ namespace LL1 {
         
             let Current: InnerParseTree = T;
             K.push(this.cfg.startingSymbol);
-        
+            
             let pos: Position | undefined = undefined;
 
             while(K.length) {
@@ -181,30 +176,13 @@ namespace LL1 {
                     const parent = Current.parent as InnerParseTree;
 
                     // Disjoin completed node
-                    const node = parent.pop() as ParseTreeNode;
-                    let rvalue: any = node;
-                    
-                    // Apply NonTerminal specific transforms
-                    if(rvalue === node && this.sdt.has(node.name as NonTerminal)) {
-                        rvalue = this.sdt.get(node.name as NonTerminal)(node);
-                        if(rvalue === undefined) {
-                            rvalue = node;
-                        }
-                    }
+                    const node = this.sdt.transform(parent.pop() as StrayTree<ParseTreeNode>);                    
 
-                    // Apply wildcard transforms
-                    if(rvalue === node && this.sdt.has('*')) {
-                        rvalue = this.sdt.get('*')(node);
-                        if(rvalue === undefined) {
-                            rvalue = node;
-                        }
-                    }
-                    
                     // Restore connections
-                    if(Array.isArray(rvalue)) {
-                        parent.push(...rvalue);
-                    } else if(rvalue != null) {
-                        parent.push(rvalue as InnerParseTree);
+                    if(Array.isArray(node)) {
+                        parent.push(...node);
+                    } else if(node != null) {
+                        parent.push(node as InnerParseTree);
                     }
 
                     // Continue parsing
