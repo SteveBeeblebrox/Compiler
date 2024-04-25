@@ -35,6 +35,11 @@ const sdt = new Parsing.SyntaxTransformer({
             // Simplify generated nodes
             return node.splice(0,node.length);
         }
+    },
+    FUNSIG(node: Parsing.ParseTreeNode) {
+        node.splice(2,1);
+        node.pop();
+        return node;
     }
 });
 

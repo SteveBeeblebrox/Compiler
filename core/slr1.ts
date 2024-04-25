@@ -160,6 +160,7 @@ namespace SLR1 {
         public parse(tokens: Iterable<Token>): ParseResult<ASTNodeType> {
             const T = this.parseTable;
             const cfg = this.cfg;
+            const sdt = this.sdt;
             const ts = createPeekableIterator(tokens);
             const D: Queue<Token | ParseTree | undefined> = [];
             
@@ -182,7 +183,16 @@ namespace SLR1 {
                         } else if(CFG.isTerminal(expected) && t instanceof Token) {
                             node.unshift(new ParseTreeTokenNode(t.name as Terminal, t.value));
                         } else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
-                            node.unshift(t);
+                            ///#warning test slr1 sdt
+                            const child = sdt.transform(t as StrayTree<ParseTreeNode>);                    
+
+                            if(Array.isArray(child)) {
+                                node.unshift(...child);
+                            } else if(child != null) {
+                                node.unshift(child as InnerParseTree);
+                            }
+
+                            // node.unshift(t);
                         } else {
                             throw new Parsing.SyntaxError(`Expected '${expected??'EOF'}' got '${t?.name??t??'EOF'}'`)
                         }
