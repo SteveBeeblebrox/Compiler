@@ -39,3 +39,6 @@ type JSONArrray = JSONValue[];
 type JSONValue = JSONPrimitive | JSONArrray | JSONObject
 
 type Constructor<ParameterTypes extends any[],ThisType>=new(...args: ParameterTypes)=>ThisType;
+
+type MapKey<T> = T extends Map<infer K, any> ? K : never;
+type MapValue<T> = T extends Map<any, infer V> ? V : never;
