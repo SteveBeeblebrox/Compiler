@@ -148,9 +148,7 @@ namespace SLR1 {
 
     export class SLR1Parser<ASTNodeType extends Tree=never> {
         private readonly parseTable: SLR1Parser.SLR1ParseTable;
-        private readonly cfg: CFG;
-        constructor(cfg: CFG) {
-            this.cfg = cfg;
+        constructor(private readonly cfg: CFG, private readonly sdt?: Parsing.SyntaxTransformer<ASTNodeType>) {
             this.parseTable = createParseTable(cfg);
         }
         public getCFG() {
@@ -170,9 +168,7 @@ namespace SLR1 {
             S.push({state:0});
             
             const ruleList = cfg.getRuleList();
-            function reduce(n: number): StrayTree<InnerParseTree> {
-                const x = {ts,D,T,cfg}
-                
+            function reduce(n: number): StrayTree<InnerParseTree> {                
                 const [lhs,rhs] = ruleList[n];
                 const node = new ParseTreeNode(lhs);
 
