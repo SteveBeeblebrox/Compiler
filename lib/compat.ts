@@ -1,4 +1,5 @@
 ///#pragma once
+declare function strc(x: any): string;
 ///#define strc(x) #x
 
 ///#include <compat/globalthis.ts>
