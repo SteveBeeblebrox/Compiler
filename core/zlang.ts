@@ -21,7 +21,24 @@ const tokens = new BasicTextDecoder().decode(new Uint8Array([
     ///#embed "../data/zlang.tok"
 ])).trim().split('\n').map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
 
-const PARSER = new SLR1.SLR1Parser(GRAMMAR);
+const sdt = new Parsing.SyntaxTransformer({
+    '*'(node: Parsing.ParseTreeNode) {
+        if(node.length === 1) {
+            if(node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
+                // Remove empty lambdas
+                return null;
+            } else {
+                // Squish tree
+                return node.pop();
+            }
+        } else if(node.name.endsWith('\'')) {
+            // Simplify generated nodes
+            return node.splice(0,node.length);
+        }
+    }
+});
+
+const PARSER = new SLR1.SLR1Parser(GRAMMAR, sdt);
 
 const out = [];
 const table = PARSER.getParseTable();
