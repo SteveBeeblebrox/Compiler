@@ -2207,6 +2207,7 @@ var SLR1;
             var _a, _b, _c, _d, _e, _f;
             const T = this.parseTable;
             const cfg = this.cfg;
+            const sdt = this.sdt;
             const ts = createPeekableIterator(tokens);
             const D = [];
             const S = [];
@@ -2229,7 +2230,14 @@ var SLR1;
                             node.unshift(new ParseTreeTokenNode(t.name, t.value));
                         }
                         else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
-                            node.unshift(t);
+                            const child = sdt.transform(t);
+                            if (Array.isArray(child)) {
+                                node.unshift(...child);
+                            }
+                            else if (child != null) {
+                                node.unshift(child);
+                            }
+                            // node.unshift(t);
                         }
                         else {
                             throw new Parsing.SyntaxError(`Expected '${expected !== null && expected !== void 0 ? expected : 'EOF'}' got '${(_b = (_a = t === null || t === void 0 ? void 0 : t.name) !== null && _a !== void 0 ? _a : t) !== null && _b !== void 0 ? _b : 'EOF'}'`);
@@ -2308,6 +2316,11 @@ const sdt = new Parsing.SyntaxTransformer({
             // Simplify generated nodes
             return node.splice(0, node.length);
         }
+    },
+    FUNSIG(node) {
+        node.splice(2, 1);
+        node.pop();
+        return node;
     }
 });
 const PARSER = new SLR1.SLR1Parser(GRAMMAR, sdt);
