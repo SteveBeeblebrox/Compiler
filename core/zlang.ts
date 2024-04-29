@@ -22,8 +22,82 @@ namespace ZLang {
     namespace TreeNodes {
         export abstract class ZNode extends Tree {
             public readonly name = this.constructor.name;
+            get [Graphviz.label]() {
+                return this.name;
+            }
+        }
+        export class BinaryOp extends ZNode {
+            constructor(public override readonly name: string,public readonly lhs:Tree,public readonly rhs:Tree) {
+                super();
+            }
+        }
+        export class UnaryOp extends ZNode {
+            constructor(public override readonly name: string,public readonly val:Tree) {
+                super();
+            }
+        }
+        export class CastNode extends ZNode {
+            constructor(public type: Tree, public readonly val: Tree) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return this.type[Graphviz.label];
+            }
+            get [Graphviz.children]() {
+                return [['',this.val]];
+            }
+        }
+
+        export class ParameterNode extends ZNode {
+            constructor(public type: Tree, public override readonly name: string) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return `${this.type[Graphviz.label]} ${this.name}`;
+            }
+            
+            get [Graphviz.children]() {
+                return [];
+            }
+        }
+
+        export class FunctionHeaderNode extends ZNode {
+            constructor(public override readonly name: string, public readonly rtype: Tree, public readonly parameters: ParameterNode[]) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return `fn ${this.name}(...)`;
+            }
+        }
+
+        export class AssignmentNode extends ZNode {
+            constructor(public override readonly name: string, public readonly value: Tree) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return '=';
+            }
+            get [Graphviz.children]() {
+                return [['',Graphviz.text(this.name)],['',this.value]]
+            }
+        }
+
+        export class Statement {
+
+        }
+
+        export class FunctionCallNode extends ZNode {
+            constructor(public override readonly name: string, public readonly args: Tree[]) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return `${this.name}(...)`;
+            }
         }
     }
+
+    import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
+
     export const sdt = new Parsing.SyntaxTransformer<TreeNodes.ZNode>({
         '*'(node: Parsing.ParseTreeNode) {
             if(node.length === 1) {
@@ -42,10 +116,42 @@ namespace ZLang {
         MODULE(node) {
             node.pop();
             return node;
+        },
+        'SUM|PRODUCT|BEXPR'(node) {
+            if(node.length === 1) return;
+            return new TreeNodes.BinaryOp((node.at(1) as ParseTreeTokenNode).value,node.shift(),node.pop()) as StrayTree<TreeNodes.BinaryOp>;
+        },
+        UNARY(node) {
+            if(node.length === 1) return;
+            return new TreeNodes.UnaryOp((node.at(0) as ParseTreeTokenNode).value,node.pop()) as StrayTree<TreeNodes.UnaryOp>;
+        },
+        CAST(node) {
+            return new TreeNodes.CastNode(node.at(0), node.at(2)) as StrayTree<TreeNodes.CastNode>;
+        },
+        FUNSIG(node) {
+            return new TreeNodes.FunctionHeaderNode((node.at(1) as ParseTreeTokenNode).value, node.at(0), node.children.splice(3,node.length-4) as TreeNodes.ParameterNode[]) as StrayTree<TreeNodes.FunctionHeaderNode>
+        },
+        PARAMLIST(node) {
+            if(node.length === 1) return;
+            if(node.length === 2) {
+                return new TreeNodes.ParameterNode(node.at(0), (node.at(1) as ParseTreeTokenNode).value) as StrayTree<TreeNodes.ParameterNode>;
+            } else {
+                return [new TreeNodes.ParameterNode(node.at(0), (node.at(1) as ParseTreeTokenNode).value), ...node.splice(3,node.length)] as StrayTree<TreeNodes.ParameterNode>[];
+            }
+        },
+        ASSIGN(node) {
+            // return new TreeNodes.AssignmentNode((node.at(0) as ParseTreeTokenNode).value, node.at(2)) as StrayTree<TreeNodes.AssignmentNode>;
+        },
+        FUNCALL(node) {
+            return new TreeNodes.FunctionCallNode((node.at(0) as ParseTreeTokenNode).value, node.splice(2,node.length-3)) as StrayTree<TreeNodes.FunctionCallNode>;
+        },
+        ARGLIST(node) {
+            if(node.length === 1) return;
+            node.splice(-2,1);
+            return node.splice(0,node.length);
         }
     });
 }
-
 
 const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, 'zlang.json');
 

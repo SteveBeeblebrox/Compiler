@@ -1833,6 +1833,14 @@ var Parsing;
     class SyntaxTransformer {
         constructor(rules) {
             this.rules = rules instanceof Map ? rules : new Map(Object.entries(rules));
+            for (const [key, value] of this.rules.entries()) {
+                if (key.includes('|')) {
+                    for (const branch of key.split('|').map(x => x.trim())) {
+                        this.rules.set(branch, value);
+                    }
+                    this.rules.delete(key);
+                }
+            }
         }
         transform(node) {
             for (const rule of [node.name, '*']) {
@@ -2379,8 +2387,96 @@ var ZLang;
                 super(...arguments);
                 this.name = this.constructor.name;
             }
+            get [Graphviz.label]() {
+                return this.name;
+            }
         }
         TreeNodes.ZNode = ZNode;
+        class BinaryOp extends ZNode {
+            constructor(name, lhs, rhs) {
+                super();
+                this.name = name;
+                this.lhs = lhs;
+                this.rhs = rhs;
+            }
+        }
+        TreeNodes.BinaryOp = BinaryOp;
+        class UnaryOp extends ZNode {
+            constructor(name, val) {
+                super();
+                this.name = name;
+                this.val = val;
+            }
+        }
+        TreeNodes.UnaryOp = UnaryOp;
+        class CastNode extends ZNode {
+            constructor(type, val) {
+                super();
+                this.type = type;
+                this.val = val;
+            }
+            get [Graphviz.label]() {
+                return this.type[Graphviz.label];
+            }
+            get [Graphviz.children]() {
+                return [['', this.val]];
+            }
+        }
+        TreeNodes.CastNode = CastNode;
+        class ParameterNode extends ZNode {
+            constructor(type, name) {
+                super();
+                this.type = type;
+                this.name = name;
+            }
+            get [Graphviz.label]() {
+                return `${this.type[Graphviz.label]} ${this.name}`;
+            }
+            get [Graphviz.children]() {
+                return [];
+            }
+        }
+        TreeNodes.ParameterNode = ParameterNode;
+        class FunctionHeaderNode extends ZNode {
+            constructor(name, rtype, parameters) {
+                super();
+                this.name = name;
+                this.rtype = rtype;
+                this.parameters = parameters;
+            }
+            get [Graphviz.label]() {
+                return `fn ${this.name}(...)`;
+            }
+        }
+        TreeNodes.FunctionHeaderNode = FunctionHeaderNode;
+        class AssignmentNode extends ZNode {
+            constructor(name, value) {
+                super();
+                this.name = name;
+                this.value = value;
+            }
+            get [Graphviz.label]() {
+                return '=';
+            }
+            get [Graphviz.children]() {
+                return [['', Graphviz.text(this.name)], ['', this.value]];
+            }
+        }
+        TreeNodes.AssignmentNode = AssignmentNode;
+        class Statement {
+        }
+        TreeNodes.Statement = Statement;
+        class FunctionCallNode extends ZNode {
+            constructor(name, args) {
+                super();
+                this.name = name;
+                this.args = args;
+            }
+            get [Graphviz.label]() {
+                return `${this.name}(...)`;
+            }
+        }
+        TreeNodes.FunctionCallNode = FunctionCallNode;
     })(TreeNodes || (TreeNodes = {}));
     ZLang.sdt = new Parsing.SyntaxTransformer({
         '*'(node) {
@@ -2402,6 +2498,44 @@ var ZLang;
         MODULE(node) {
             node.pop();
             return node;
+        },
+        'SUM|PRODUCT|BEXPR'(node) {
+            if (node.length === 1)
+                return;
+            return new TreeNodes.BinaryOp(node.at(1).value, node.shift(), node.pop());
+        },
+        UNARY(node) {
+            if (node.length === 1)
+                return;
+            return new TreeNodes.UnaryOp(node.at(0).value, node.pop());
+        },
+        CAST(node) {
+            return new TreeNodes.CastNode(node.at(0), node.at(2));
+        },
+        FUNSIG(node) {
+            return new TreeNodes.FunctionHeaderNode(node.at(1).value, node.at(0), node.children.splice(3, node.length - 4));
+        },
+        PARAMLIST(node) {
+            if (node.length === 1)
+                return;
+            if (node.length === 2) {
+                return new TreeNodes.ParameterNode(node.at(0), node.at(1).value);
+            }
+            else {
+                return [new TreeNodes.ParameterNode(node.at(0), node.at(1).value), ...node.splice(3, node.length)];
+            }
+        },
+        ASSIGN(node) {
+            // return new TreeNodes.AssignmentNode((node.at(0) as ParseTreeTokenNode).value, node.at(2)) as StrayTree<TreeNodes.AssignmentNode>;
+        },
+        FUNCALL(node) {
+            return new TreeNodes.FunctionCallNode(node.at(0).value, node.splice(2, node.length - 3));
+        },
+        ARGLIST(node) {
+            if (node.length === 1)
+                return;
+            node.splice(-2, 1);
+            return node.splice(0, node.length);
         }
     });
 })(ZLang || (ZLang = {}));
