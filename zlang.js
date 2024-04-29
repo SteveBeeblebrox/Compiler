@@ -1845,7 +1845,7 @@ var Parsing;
         transform(node) {
             for (const rule of [node.name, '*']) {
                 if (this.rules.has(rule)) {
-                    const rvalue = this.rules.get(rule)(node);
+                    const rvalue = this.rules.get(rule).bind(node)(node);
                     if (rvalue !== undefined) {
                         return rvalue;
                     }
@@ -2488,6 +2488,19 @@ var ZLang;
             }
         }
         TreeNodes.FunctionCallNode = FunctionCallNode;
+        class DomainNode extends ZNode {
+            constructor(value) {
+                super();
+                this.value = value;
+            }
+            get [Graphviz.label]() {
+                return `Domain`;
+            }
+            get [Graphviz.children]() {
+                return [['', this.value]];
+            }
+        }
+        TreeNodes.DomainNode = DomainNode;
     })(TreeNodes || (TreeNodes = {}));
     var ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     ZLang.sdt = new Parsing.SyntaxTransformer({
@@ -2554,6 +2567,14 @@ var ZLang;
         },
         'OTHERTYPE|FUNTYPE'(node) {
             return new TreeNodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' });
+        },
+        VALUE(node) {
+            if (node.length === 3) {
+                return node.splice(1, 1);
+            }
+            else if (node.length === 4) {
+                return new TreeNodes.DomainNode(node.splice(2, 1)[0]);
+            }
         }
     });
 })(ZLang || (ZLang = {}));

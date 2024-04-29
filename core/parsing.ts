@@ -94,7 +94,7 @@ namespace Parsing {
         transform(node: StrayTree<ParseTreeNode>) {
             for(const rule of [node.name,'*'] as [...NonTerminal[], '*']) {
                 if(this.rules.has(rule)) {
-                    const rvalue = this.rules.get(rule)(node);
+                    const rvalue = this.rules.get(rule).bind(node)(node);
                     if(rvalue !== undefined) {
                         return rvalue;
                     }

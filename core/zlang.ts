@@ -103,6 +103,18 @@ namespace ZLang {
                 return `${this.name}(...)`;
             }
         }
+
+        export class DomainNode extends ZNode {
+            constructor(public readonly value: Tree) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return `Domain`;
+            }
+            get [Graphviz.children]() {
+                return [['',this.value]];
+            }
+        }
     }
 
     import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
@@ -164,6 +176,13 @@ namespace ZLang {
         },
         'OTHERTYPE|FUNTYPE'(node) {
             return new TreeNodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const'}) as StrayTree<TreeNodes.TypeNode>;
+        },
+        VALUE(node) {
+            if(node.length === 3) {
+                return node.splice(1,1);
+            } else if(node.length === 4) {
+                return new TreeNodes.DomainNode(node.splice(2,1)[0]) as StrayTree<TreeNodes.DomainNode>;
+            }
         }
     });
 }
