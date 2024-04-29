@@ -82,8 +82,17 @@ namespace ZLang {
             }
         }
 
-        export class Statement {
-
+        type TypeMeta = {const:boolean};
+        export class TypeNode extends ZNode {
+            constructor(public readonly type: string, public readonly meta: TypeMeta) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return `${this.meta.const ? 'const ' : ''}${this.type}`;
+            }
+            get [Graphviz.children]() {
+                return [];
+            }
         }
 
         export class FunctionCallNode extends ZNode {
@@ -149,6 +158,12 @@ namespace ZLang {
             if(node.length === 1) return;
             node.splice(-2,1);
             return node.splice(0,node.length);
+        },
+        'MODPARTS'(node) {
+            return node.splice(0,node.length).filter(n=>n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true)
+        },
+        'OTHERTYPE|FUNTYPE'(node) {
+            return new TreeNodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const'}) as StrayTree<TreeNodes.TypeNode>;
         }
     });
 }

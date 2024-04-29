@@ -2463,9 +2463,20 @@ var ZLang;
             }
         }
         TreeNodes.AssignmentNode = AssignmentNode;
-        class Statement {
+        class TypeNode extends ZNode {
+            constructor(type, meta) {
+                super();
+                this.type = type;
+                this.meta = meta;
+            }
+            get [Graphviz.label]() {
+                return `${this.meta.const ? 'const ' : ''}${this.type}`;
+            }
+            get [Graphviz.children]() {
+                return [];
+            }
         }
-        TreeNodes.Statement = Statement;
+        TreeNodes.TypeNode = TypeNode;
         class FunctionCallNode extends ZNode {
             constructor(name, args) {
                 super();
@@ -2478,6 +2489,7 @@ var ZLang;
         }
         TreeNodes.FunctionCallNode = FunctionCallNode;
     })(TreeNodes || (TreeNodes = {}));
+    var ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     ZLang.sdt = new Parsing.SyntaxTransformer({
         '*'(node) {
             if (node.length === 1) {
@@ -2536,6 +2548,12 @@ var ZLang;
                 return;
             node.splice(-2, 1);
             return node.splice(0, node.length);
+        },
+        'MODPARTS'(node) {
+            return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
+        },
+        'OTHERTYPE|FUNTYPE'(node) {
+            return new TreeNodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' });
         }
     });
 })(ZLang || (ZLang = {}));
