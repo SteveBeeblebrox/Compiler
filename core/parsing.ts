@@ -81,6 +81,15 @@ namespace Parsing {
 
         constructor(rules: SyntaxTransformer<ASTNodeType>['rules'] | {[key: string]: MapValue<SyntaxTransformer<ASTNodeType>['rules']>}) {
             this.rules = rules instanceof Map ? rules : new Map(Object.entries(rules)) as SyntaxTransformer<ASTNodeType>['rules'];
+        
+            for(const [key,value] of this.rules.entries()) {
+                if(key.includes('|')) {
+                    for(const branch of key.split('|').map(x=>x.trim())) {
+                        this.rules.set(branch as NonTerminal | '*',value);
+                    }
+                    this.rules.delete(key);
+                }
+            }
         }
         transform(node: StrayTree<ParseTreeNode>) {
             for(const rule of [node.name,'*'] as [...NonTerminal[], '*']) {
