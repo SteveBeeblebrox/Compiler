@@ -1814,7 +1814,7 @@ var Parsing;
             this.value = value;
         }
         get [Graphviz.label]() {
-            return this.name;
+            return this.name === this.value ? this.name : `${this.name}:${this.value}`;
         }
     }
     Parsing.ParseTreeTokenNode = ParseTreeTokenNode;
@@ -2392,7 +2392,10 @@ var ZLang;
             }
         }
         TreeNodes.ZNode = ZNode;
-        class BinaryOp extends ZNode {
+        class ExpressionNode extends ZNode {
+        }
+        TreeNodes.ExpressionNode = ExpressionNode;
+        class BinaryOp extends ExpressionNode {
             constructor(name, lhs, rhs) {
                 super();
                 this.name = name;
@@ -2401,7 +2404,7 @@ var ZLang;
             }
         }
         TreeNodes.BinaryOp = BinaryOp;
-        class UnaryOp extends ZNode {
+        class UnaryOp extends ExpressionNode {
             constructor(name, val) {
                 super();
                 this.name = name;
@@ -2409,7 +2412,7 @@ var ZLang;
             }
         }
         TreeNodes.UnaryOp = UnaryOp;
-        class CastNode extends ZNode {
+        class CastNode extends ExpressionNode {
             constructor(type, val) {
                 super();
                 this.type = type;
@@ -2477,7 +2480,7 @@ var ZLang;
             }
         }
         TreeNodes.TypeNode = TypeNode;
-        class FunctionCallNode extends ZNode {
+        class FunctionCallNode extends ExpressionNode {
             constructor(name, args) {
                 super();
                 this.name = name;
@@ -2488,7 +2491,7 @@ var ZLang;
             }
         }
         TreeNodes.FunctionCallNode = FunctionCallNode;
-        class DomainNode extends ZNode {
+        class DomainNode extends ExpressionNode {
             constructor(value) {
                 super();
                 this.value = value;
@@ -2501,6 +2504,39 @@ var ZLang;
             }
         }
         TreeNodes.DomainNode = DomainNode;
+        class StatementNode extends ZNode {
+            constructor() {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'Statement';
+            }
+        }
+        TreeNodes.StatementNode = StatementNode;
+        class DeclareStatement extends StatementNode {
+        }
+        class AssignmentStatement extends StatementNode {
+        }
+        class IfStatement extends StatementNode {
+        }
+        class DoWhileStatement extends StatementNode {
+        }
+        class WhileStatement extends StatementNode {
+        }
+        class EmitStatement extends StatementNode {
+        }
+        class RandStatement extends StatementNode {
+        }
+        class StatementGroup extends StatementNode {
+            constructor(statements) {
+                super();
+                this.statements = statements;
+            }
+            get [Graphviz.label]() {
+                return 'Statements';
+            }
+        }
+        TreeNodes.StatementGroup = StatementGroup;
     })(TreeNodes || (TreeNodes = {}));
     var ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     ZLang.sdt = new Parsing.SyntaxTransformer({
@@ -2562,7 +2598,7 @@ var ZLang;
             node.splice(-2, 1);
             return node.splice(0, node.length);
         },
-        'MODPARTS'(node) {
+        MODPARTS(node) {
             return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
         },
         'OTHERTYPE|FUNTYPE'(node) {
@@ -2575,6 +2611,20 @@ var ZLang;
             else if (node.length === 4) {
                 return new TreeNodes.DomainNode(node.splice(2, 1)[0]);
             }
+        },
+        BSTMT(node) {
+            return node.splice(0, 1); //new TreeNodes.StatementNode(node.at(0)) as StrayTree<TreeNodes.StatementNode>;
+        },
+        BSTMTS(node) {
+            if (node.length === 1)
+                return;
+            return node.splice(0, node.length);
+        },
+        BRACESTMTS(node) {
+            return new TreeNodes.StatementGroup(node.splice(1, node.length - 2));
+        },
+        SOLOSTMT(node) {
+            return new TreeNodes.StatementGroup(node.splice(0, 1));
         }
     });
 })(ZLang || (ZLang = {}));
@@ -2591,5 +2641,5 @@ async function dump(name, node, { format = 'png' } = {}) {
     await writer.close();
 }
 console.log('Parsing...');
-const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').map(x => x.trim().split(' ')).map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
+const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x => x.trim()).map(x => x.trim().split(' ')).map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
 dump('zlang', PARSER.parse(tokens));

@@ -26,18 +26,21 @@ namespace ZLang {
                 return this.name;
             }
         }
-        export class BinaryOp extends ZNode {
-            constructor(public override readonly name: string,public readonly lhs:Tree,public readonly rhs:Tree) {
+        export abstract class ExpressionNode extends ZNode {
+            
+        }
+        export class BinaryOp extends ExpressionNode {
+            constructor(public override readonly name: string,public readonly lhs:ExpressionNode, public readonly rhs:ExpressionNode) {
                 super();
             }
         }
-        export class UnaryOp extends ZNode {
-            constructor(public override readonly name: string,public readonly val:Tree) {
+        export class UnaryOp extends ExpressionNode {
+            constructor(public override readonly name: string,public readonly val:ExpressionNode) {
                 super();
             }
         }
-        export class CastNode extends ZNode {
-            constructor(public type: Tree, public readonly val: Tree) {
+        export class CastNode extends ExpressionNode {
+            constructor(public type: Tree, public readonly val: ExpressionNode) {
                 super();
             }
             get [Graphviz.label]() {
@@ -78,7 +81,7 @@ namespace ZLang {
                 return '=';
             }
             get [Graphviz.children]() {
-                return [['',Graphviz.text(this.name)],['',this.value]]
+                return [['',Graphviz.text(this.name)],['',this.value]];
             }
         }
 
@@ -95,8 +98,8 @@ namespace ZLang {
             }
         }
 
-        export class FunctionCallNode extends ZNode {
-            constructor(public override readonly name: string, public readonly args: Tree[]) {
+        export class FunctionCallNode extends ExpressionNode {
+            constructor(public override readonly name: string, public readonly args: ExpressionNode[]) {
                 super();
             }
             get [Graphviz.label]() {
@@ -104,8 +107,8 @@ namespace ZLang {
             }
         }
 
-        export class DomainNode extends ZNode {
-            constructor(public readonly value: Tree) {
+        export class DomainNode extends ExpressionNode {
+            constructor(public readonly value: ExpressionNode) {
                 super();
             }
             get [Graphviz.label]() {
@@ -115,9 +118,57 @@ namespace ZLang {
                 return [['',this.value]];
             }
         }
+
+        ///#warning impl if, assign, etc... statements
+        export abstract class StatementNode extends ZNode {
+            constructor() {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'Statement';
+            }
+        }
+
+        class DeclareStatement extends StatementNode {
+
+        }
+
+        class AssignmentStatement extends StatementNode {
+
+        }
+
+        class IfStatement extends StatementNode {
+            // else?
+        }
+
+        class DoWhileStatement extends StatementNode {
+
+        }
+
+        class WhileStatement extends StatementNode {
+
+        }
+
+        class EmitStatement extends StatementNode {
+
+        }
+
+        class RandStatement extends StatementNode {
+
+        }
+
+        export class StatementGroup extends StatementNode {
+            constructor(public readonly statements: StatementNode[]) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'Statements';
+            }
+        }
     }
 
     import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
+    import ExpressionNode = TreeNodes.ExpressionNode;
 
     export const sdt = new Parsing.SyntaxTransformer<TreeNodes.ZNode>({
         '*'(node: Parsing.ParseTreeNode) {
@@ -140,14 +191,14 @@ namespace ZLang {
         },
         'SUM|PRODUCT|BEXPR'(node) {
             if(node.length === 1) return;
-            return new TreeNodes.BinaryOp((node.at(1) as ParseTreeTokenNode).value,node.shift(),node.pop()) as StrayTree<TreeNodes.BinaryOp>;
+            return new TreeNodes.BinaryOp((node.at(1) as ParseTreeTokenNode).value,node.shift() as ExpressionNode,node.pop() as ExpressionNode) as StrayTree<TreeNodes.BinaryOp>;
         },
         UNARY(node) {
             if(node.length === 1) return;
-            return new TreeNodes.UnaryOp((node.at(0) as ParseTreeTokenNode).value,node.pop()) as StrayTree<TreeNodes.UnaryOp>;
+            return new TreeNodes.UnaryOp((node.at(0) as ParseTreeTokenNode).value,node.pop() as ExpressionNode) as StrayTree<TreeNodes.UnaryOp>;
         },
         CAST(node) {
-            return new TreeNodes.CastNode(node.at(0), node.at(2)) as StrayTree<TreeNodes.CastNode>;
+            return new TreeNodes.CastNode(node.at(0), node.at(2) as ExpressionNode) as StrayTree<TreeNodes.CastNode>;
         },
         FUNSIG(node) {
             return new TreeNodes.FunctionHeaderNode((node.at(1) as ParseTreeTokenNode).value, node.at(0), node.children.splice(3,node.length-4) as TreeNodes.ParameterNode[]) as StrayTree<TreeNodes.FunctionHeaderNode>
@@ -164,14 +215,14 @@ namespace ZLang {
             // return new TreeNodes.AssignmentNode((node.at(0) as ParseTreeTokenNode).value, node.at(2)) as StrayTree<TreeNodes.AssignmentNode>;
         },
         FUNCALL(node) {
-            return new TreeNodes.FunctionCallNode((node.at(0) as ParseTreeTokenNode).value, node.splice(2,node.length-3)) as StrayTree<TreeNodes.FunctionCallNode>;
+            return new TreeNodes.FunctionCallNode((node.at(0) as ParseTreeTokenNode).value, node.splice(2,node.length-3) as ExpressionNode[]) as StrayTree<TreeNodes.FunctionCallNode>;
         },
         ARGLIST(node) {
             if(node.length === 1) return;
             node.splice(-2,1);
             return node.splice(0,node.length);
         },
-        'MODPARTS'(node) {
+        MODPARTS(node) {
             return node.splice(0,node.length).filter(n=>n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true)
         },
         'OTHERTYPE|FUNTYPE'(node) {
@@ -181,8 +232,21 @@ namespace ZLang {
             if(node.length === 3) {
                 return node.splice(1,1);
             } else if(node.length === 4) {
-                return new TreeNodes.DomainNode(node.splice(2,1)[0]) as StrayTree<TreeNodes.DomainNode>;
+                return new TreeNodes.DomainNode(node.splice(2,1)[0] as ExpressionNode) as StrayTree<TreeNodes.DomainNode>;
             }
+        },
+        BSTMT(node) {
+            return node.splice(0,1); //new TreeNodes.StatementNode(node.at(0)) as StrayTree<TreeNodes.StatementNode>;
+        },
+        BSTMTS(node) {
+            if(node.length === 1) return;
+            return node.splice(0,node.length);
+        },
+        BRACESTMTS(node) {
+            return new TreeNodes.StatementGroup(node.splice(1,node.length-2) as TreeNodes.StatementNode[]) as StrayTree<TreeNodes.StatementGroup>;
+        },
+        SOLOSTMT(node) {
+            return new TreeNodes.StatementGroup(node.splice(0,1) as TreeNodes.StatementNode[]) as StrayTree<TreeNodes.StatementGroup>;
         }
     });
 }
@@ -202,5 +266,5 @@ async function dump(name: string, node: Tree, {format = 'png'} = {}) {
     await writer.close();
 }
 console.log('Parsing...');
-const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
+const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x=>x.trim()).map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
 dump('zlang', PARSER.parse(tokens));
