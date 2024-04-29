@@ -9,53 +9,50 @@
 ///#include "slr1.ts"
 ///#include "cfg.ts"
 
+///#include <signature.ts>
+///#include <encoding.ts>
+
 const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
     ///#embed "zlang.cfg"
 ])));
 
-console.log('Building parser...')
+console.log('Building parser...');
 
-///#include <encoding.ts>
-
-const tokens = new BasicTextDecoder().decode(new Uint8Array([
-    ///#embed "../data/zlang.tok"
-])).trim().split('\n').map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
-
-const sdt = new Parsing.SyntaxTransformer({
-    '*'(node: Parsing.ParseTreeNode) {
-        if(node.length === 1) {
-            if(node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
-                // Remove empty lambdas
-                return null;
-            } else {
-                // Squish tree
-                return node.pop();
-            }
-        } else if(node.name.endsWith('\'')) {
-            // Simplify generated nodes
-            return node.splice(0,node.length);
+namespace ZLang {
+    namespace TreeNodes {
+        export abstract class ZNode extends Tree {
+            public readonly name = this.constructor.name;
         }
-    },
-    FUNSIG(node: Parsing.ParseTreeNode) {
-        node.splice(2,1);
-        node.pop();
-        return node;
     }
-});
+    export const sdt = new Parsing.SyntaxTransformer<TreeNodes.ZNode>({
+        '*'(node: Parsing.ParseTreeNode) {
+            if(node.length === 1) {
+                if(node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
+                    // Remove empty lambdas
+                    return null;
+                } else {
+                    // Squish tree
+                    return node.pop();
+                }
+            } else if(node.name.endsWith('\'')) {
+                // Simplify generated nodes
+                return node.splice(0,node.length);
+            }
+        },
+        MODULE(node) {
+            node.pop();
+            return node;
+        }
+    });
+}
 
-const PARSER = new SLR1.SLR1Parser(GRAMMAR, sdt);
 
-const out = [];
-const table = PARSER.getParseTable();
-out.push('.,'+GRAMMAR.getGrammarSymbols().map(x=>x??CFG.EOF_CHARACTER).join(','));
-out.push(...table.entries().map(([k,v])=>k+','+
-    GRAMMAR.getGrammarSymbols().map(s=>v.get(s)??'').join(',')));
-system.writeTextFileSync('temp.csv',out.join('\n'))
+const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, 'zlang.json');
 
-async function dump(name: string, node: Tree) {
+async function dump(name: string, node: Tree, {format = 'png'} = {}) {
     //@ts-ignore
     const dot = new system.Command('dot', {
-        args: ['-Tpdf', `-odata/${name}.pdf`],
+        args: [`-T${format}`, `-odata/${name}.${format}`],
         stdin: 'piped'
     }).spawn();
     
@@ -64,5 +61,6 @@ async function dump(name: string, node: Tree) {
     await writer.ready;
     await writer.close();
 }
-console.log('Parsing...')
+console.log('Parsing...');
+const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
 dump('zlang', PARSER.parse(tokens));

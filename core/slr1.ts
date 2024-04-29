@@ -9,6 +9,7 @@
 ///#include <peek.ts>
 ///#include <signature.ts>
 ///#include <csv.ts>
+///#include <range.ts>
 
 ///#include "parsing.ts"
 ///#include "graphviz.ts"
@@ -148,8 +149,52 @@ namespace SLR1 {
 
     export class SLR1Parser<ASTNodeType extends Tree=never> {
         private readonly parseTable: SLR1Parser.SLR1ParseTable;
-        constructor(private readonly cfg: CFG, private readonly sdt?: Parsing.SyntaxTransformer<ASTNodeType>) {
-            this.parseTable = createParseTable(cfg);
+        constructor(private readonly cfg: CFG, private readonly sdt: Parsing.SyntaxTransformer<ASTNodeType> = new Parsing.SyntaxTransformer({}), cache?: string) {
+            // Try to load from cache
+            try {
+                if(cache !== undefined) {
+                    const {signature, table} = JSON.parse(system.readTextFileSync(cache));
+                    if(Signature.create(GRAMMAR as any) === signature) {
+                        this.parseTable = this.deserializeTableFromCSV(table);
+                    }
+                }
+            } catch(e) {}
+
+            
+            if(this.parseTable === undefined) {
+                this.parseTable = createParseTable(cfg);
+                // Save to cache
+                try {
+                    if(cache !== undefined) {
+                        system.writeTextFileSync(cache,JSON.stringify({signature: Signature.create(cfg as any), table: this.serializeTableToCSV()}));
+                    }
+                } catch(e) {}
+            }
+        }
+        private deserializeTableFromCSV(csv: string): SLR1Parser.SLR1ParseTable {
+            const T = new Map();
+            const [[_,...header],...rows] = csv.trim().split('\n').map(x=>x.split(','));
+            for(const row of rows) {
+                const R = new Map();
+                T.set(+row.shift(), R);
+                for(const i of range(row.length)) {
+                    R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i],row[i]);
+                }
+            }
+            return T;
+        }
+        private serializeTableToCSV(): string {
+            const T = this.getParseTable();
+            const data: string[] = [['.',...GRAMMAR.getGrammarSymbols().map(s=>s??CFG.EOF_CHARACTER)].join(',')];
+            for(const [i,R] of T.entries()) {
+                const row = new Map(GRAMMAR.getGrammarSymbols().map(s=>[s,undefined]));
+                for(const [k,v] of R.entries()) {
+                    row.set(k,v);
+                }
+    
+                data.push([i,...row.values().map(x=>x??'')].join(','));
+            }
+            return data.join('\n');
         }
         public getCFG() {
             return this.cfg;
@@ -216,7 +261,7 @@ namespace SLR1 {
                 } else if(action === 'r') {
                     D.unshift(reduce(n));
                 } else if(action === 'R') {
-                    return reduce(n);
+                    return this.sdt.transform(reduce(n) as StrayTree<ParseTreeNode>) as ParseResult<ASTNodeType>;
                 }
             }
         }
@@ -237,9 +282,6 @@ namespace SLR1 {
 }
 
 ///#if __MAIN__
-
-
-
 const cfg = CFG.fromString(`
 
 S -> A B $
@@ -256,52 +298,13 @@ C -> p
 
 `);
 
+const cfsm = new SLR1.CFSM(cfg);
 
-// const [[_,...header],...rows] = system.readTextFileSync('data/zlang.lr').trim().split('\n').map(x=>x.split(','));
-
-// for(const row of rows) {
-//     const r = new Map();
-//     T.set(+row.shift(), r);
-//     for(let i = 0; i <row.length; i++) {
-//         r.set(header[i],row[i])
-//     }
-// }
-
-// return T
-
-// const cfsm = new SLR1.CFSM(cfg);
-
-// for(const state of cfsm) {
-//     for(const item of state.values()) {
-//         const [lhs,...rhs]=item;
-//         console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??CFG.EOF_CHARACTER).join(' ')}`)
-//     }
-//     console.log('================================')
-// }
-
-// console.log(cfsm.getItemSets().size)
-
-// const table = SLR1.createParseTable(cfg);
-
-// const template = Object.fromEntries(cfg.getGrammarSymbols().map(x=>[x??CFG.EOF_CHARACTER,'']));
-// console.log(CSV.stringify(table.values().map(function(row,i) {
-//     return Object.assign(Object.create(null),{'.':i},template,Object.fromEntries(row.entries().map(([k,v])=>[k??CFG.EOF_CHARACTER,v])));
-// }).toArray()));
-
-
-async function dump(name: string, node: Tree) {
-    //@ts-ignore
-    const dot = new system.Command('dot', {
-        args: ['-Tpng', `-odata/${name}.png`],
-        stdin: 'piped'
-    }).spawn();
-    
-    const writer = dot.stdin.getWriter()
-    await writer.write(new TextEncoder().encode(Graphviz.serialize(node)));
-    await writer.ready;
-    await writer.close();
+for(const state of cfsm) {
+    for(const item of state.values()) {
+        const [lhs,...rhs]=item;
+        console.log(`${lhs} -> ${rhs.map(x => typeof x === 'symbol' ? '\u2022' : x??CFG.EOF_CHARACTER).join(' ')}`)
+    }
+    console.log('================================')
 }
-
-const tokens = 'yxxhxpy'.split('').map((c,i)=>new Token(c,c,{col:i,line:1}));
-dump('slr1', new SLR1.SLR1Parser(cfg).parse(tokens))
 ///#endif
