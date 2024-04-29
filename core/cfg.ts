@@ -191,6 +191,9 @@ class CFG {
     }
 
     public getRuleNumber(rule: CFG.CFGRule): number {
+        if(this.isStartingRule(rule[0])) {
+            rule = [rule[0],rule[1].filter(x=>x !== CFG.EOF)];
+        }
         return this.getRuleList().findIndex(([lhs, rhs]) => rule[0] === lhs && rule[1].length === rhs.length && rule[1].every((p,i)=>p===rhs[i]));
     }
 
