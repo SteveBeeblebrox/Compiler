@@ -2452,9 +2452,6 @@ var ZLang;
             }
         }
         TreeNodes.FunctionHeaderNode = FunctionHeaderNode;
-        class AssignmentNode extends ZNode {
-        }
-        TreeNodes.AssignmentNode = AssignmentNode;
         class TypeNode extends ZNode {
             constructor(type, meta) {
                 super();
@@ -2503,9 +2500,40 @@ var ZLang;
         }
         TreeNodes.StatementNode = StatementNode;
         class DeclareStatement extends StatementNode {
+            constructor(type, entries) {
+                super();
+                this.type = type;
+                this.entries = entries;
+            }
+            get [Graphviz.label]() {
+                return 'Declare';
+            }
+            get [Graphviz.children]() {
+                return [...Object.entries({ type: this.type }), this.entries.map(function (entry) {
+                        return entry.length === 1 ? new ParseTreeTokenNode('id', entry[0]) : {
+                            get [Graphviz.label]() {
+                                return '=';
+                            },
+                            get [Graphviz.children]() {
+                                return [['', new ParseTreeTokenNode('id', entry[0])], ['', entry[1]]];
+                            }
+                        };
+                    })];
+            }
         }
         TreeNodes.DeclareStatement = DeclareStatement;
         class AssignmentStatement extends StatementNode {
+            constructor(id, value) {
+                super();
+                this.id = id;
+                this.value = value;
+            }
+            get [Graphviz.label]() {
+                return '=';
+            }
+            get [Graphviz.children]() {
+                return [['id', new ParseTreeTokenNode('id', this.id)], ...Object.entries({ value: this.value })];
+            }
         }
         TreeNodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
@@ -2557,7 +2585,7 @@ var ZLang;
                 return 'Rand';
             }
             get [Graphviz.children]() {
-                return [...[['id', new ParseTreeTokenNode('id', this.id)]], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
+                return [['id', new ParseTreeTokenNode('id', this.id)], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
             }
         }
         TreeNodes.RandStatement = RandStatement;
@@ -2594,6 +2622,7 @@ var ZLang;
             node.pop();
             return node;
         },
+        // Expressions
         'SUM|PRODUCT|BEXPR'(node) {
             if (node.length === 1)
                 return;
@@ -2607,6 +2636,7 @@ var ZLang;
         CAST(node) {
             return new TreeNodes.CastNode(node.at(0), node.at(2));
         },
+        // Functions
         FUNSIG(node) {
             return new TreeNodes.FunctionHeaderNode(node.at(1).value, node.at(0), node.children.splice(3, node.length - 4));
         },
@@ -2620,9 +2650,6 @@ var ZLang;
                 return [new TreeNodes.ParameterNode(node.at(0), node.at(1).value), ...node.splice(3, node.length)];
             }
         },
-        ASSIGN(node) {
-            // return new TreeNodes.AssignmentNode((node.at(0) as ParseTreeTokenNode).value, node.at(2)) as StrayTree<TreeNodes.AssignmentNode>;
-        },
         FUNCALL(node) {
             return new TreeNodes.FunctionCallNode(node.at(0).value, node.splice(2, node.length - 3));
         },
@@ -2632,12 +2659,15 @@ var ZLang;
             node.splice(-2, 1);
             return node.splice(0, node.length);
         },
+        // TODO convert to statements?
         MODPARTS(node) {
             return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
         },
+        // Types
         'OTHERTYPE|FUNTYPE'(node) {
             return new TreeNodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' });
         },
+        // General simplification
         VALUE(node) {
             if (node.length === 3) {
                 return node.splice(1, 1);
@@ -2647,7 +2677,7 @@ var ZLang;
             }
         },
         BSTMT(node) {
-            return node.splice(0, 1); //new TreeNodes.StatementNode(node.at(0)) as StrayTree<TreeNodes.StatementNode>;
+            return node.splice(0, 1);
         },
         BSTMTS(node) {
             if (node.length === 1)
@@ -2659,6 +2689,16 @@ var ZLang;
         },
         SOLOSTMT(node) {
             return new TreeNodes.StatementGroup(node.splice(0, 1));
+        },
+        // Assignment and declaration
+        ASSIGN(node) {
+            return new TreeNodes.AssignmentStatement(node.at(0).value, node.splice(-1, 1)[0]);
+        },
+        'GFTDECLLIST|GOTDECLLIST'(node) {
+            return new TreeNodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(x => x instanceof TreeNodes.AssignmentStatement ? [x.id, x.value] : [x.value]));
+        },
+        DECLIDS(node) {
+            return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'comma' : true);
         },
         // Control Statements
         WHILE(node) {

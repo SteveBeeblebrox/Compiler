@@ -73,18 +73,6 @@ namespace ZLang {
             }
         }
 
-        export class AssignmentNode extends ZNode {
-            // constructor(public override readonly name: string, public readonly value: Tree) {
-            //     super();
-            // }
-            // get [Graphviz.label]() {
-            //     return '=';
-            // }
-            // get [Graphviz.children]() {
-            //     return [['',Graphviz.text(this.name)],['',this.value]];
-            // }
-        }
-
         type TypeMeta = {const:boolean};
         export class TypeNode extends ZNode {
             constructor(public readonly type: string, public readonly meta: TypeMeta) {
@@ -130,11 +118,36 @@ namespace ZLang {
         }
 
         export class DeclareStatement extends StatementNode {
-            
+            constructor(public readonly type: TypeNode, public readonly entries: [string, ExpressionNode?][]) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'Declare';
+            }
+            get [Graphviz.children]() {
+                return [...Object.entries({type:this.type}), this.entries.map(function(entry) {
+                    return entry.length === 1 ? new ParseTreeTokenNode('id' as Terminal, entry[0]) : {
+                        get [Graphviz.label]() {
+                            return '=';
+                        },
+                        get [Graphviz.children]() {
+                            return [['',new ParseTreeTokenNode('id' as Terminal, entry[0])], ['',entry[1]]];
+                        }
+                    }
+                })];
+            }
         }
 
         export  class AssignmentStatement extends StatementNode {
-
+            constructor(public readonly id: string, public readonly value: ExpressionNode) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return '=';
+            }
+            get [Graphviz.children]() {
+                return [['id',new ParseTreeTokenNode('id' as Terminal, this.id)],...Object.entries({value:this.value})]
+            }
         }
 
         export  class IfStatement extends StatementNode {
@@ -191,7 +204,7 @@ namespace ZLang {
                 return 'Rand';
             }
             get [Graphviz.children]() {
-                return [...[['id',new ParseTreeTokenNode('id' as Terminal,this.id)]],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
+                return [['id',new ParseTreeTokenNode('id' as Terminal,this.id)],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
             }
         }
 
@@ -228,6 +241,8 @@ namespace ZLang {
             node.pop();
             return node;
         },
+
+        // Expressions
         'SUM|PRODUCT|BEXPR'(node) {
             if(node.length === 1) return;
             return new TreeNodes.BinaryOp((node.at(1) as ParseTreeTokenNode).value,node.shift() as ExpressionNode,node.pop() as ExpressionNode) as StrayTree<TreeNodes.BinaryOp>;
@@ -239,6 +254,8 @@ namespace ZLang {
         CAST(node) {
             return new TreeNodes.CastNode(node.at(0), node.at(2) as ExpressionNode) as StrayTree<TreeNodes.CastNode>;
         },
+
+        // Functions
         FUNSIG(node) {
             return new TreeNodes.FunctionHeaderNode((node.at(1) as ParseTreeTokenNode).value, node.at(0), node.children.splice(3,node.length-4) as TreeNodes.ParameterNode[]) as StrayTree<TreeNodes.FunctionHeaderNode>
         },
@@ -250,9 +267,6 @@ namespace ZLang {
                 return [new TreeNodes.ParameterNode(node.at(0), (node.at(1) as ParseTreeTokenNode).value), ...node.splice(3,node.length)] as StrayTree<TreeNodes.ParameterNode>[];
             }
         },
-        ASSIGN(node) {
-            // return new TreeNodes.AssignmentNode((node.at(0) as ParseTreeTokenNode).value, node.at(2)) as StrayTree<TreeNodes.AssignmentNode>;
-        },
         FUNCALL(node) {
             return new TreeNodes.FunctionCallNode((node.at(0) as ParseTreeTokenNode).value, node.splice(2,node.length-3) as ExpressionNode[]) as StrayTree<TreeNodes.FunctionCallNode>;
         },
@@ -261,12 +275,17 @@ namespace ZLang {
             node.splice(-2,1);
             return node.splice(0,node.length);
         },
+        
+        // TODO convert to statements?
         MODPARTS(node) {
-            return node.splice(0,node.length).filter(n=>n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true)
+            return node.splice(0,node.length).filter(n=>n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
         },
+        // Types
         'OTHERTYPE|FUNTYPE'(node) {
             return new TreeNodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const'}) as StrayTree<TreeNodes.TypeNode>;
         },
+
+        // General simplification
         VALUE(node) {
             if(node.length === 3) {
                 return node.splice(1,1);
@@ -275,7 +294,7 @@ namespace ZLang {
             }
         },
         BSTMT(node) {
-            return node.splice(0,1); //new TreeNodes.StatementNode(node.at(0)) as StrayTree<TreeNodes.StatementNode>;
+            return node.splice(0,1);
         },
         BSTMTS(node) {
             if(node.length === 1) return;
@@ -286,6 +305,20 @@ namespace ZLang {
         },
         SOLOSTMT(node) {
             return new TreeNodes.StatementGroup(node.splice(0,1) as TreeNodes.StatementNode[]) as StrayTree<TreeNodes.StatementGroup>;
+        },
+
+        // Assignment and declaration
+        ASSIGN(node) {
+            return new TreeNodes.AssignmentStatement((node.at(0) as ParseTreeTokenNode).value, node.splice(-1,1)[0] as ExpressionNode) as StrayTree<TreeNodes.AssignmentStatement>;
+        },
+        'GFTDECLLIST|GOTDECLLIST'(node) {
+            return new TreeNodes.DeclareStatement(
+                node.splice(0,1)[0] as TreeNodes.TypeNode,
+                node.splice(0,node.length).map(x => x instanceof TreeNodes.AssignmentStatement ? [x.id, x.value] : [(x as ParseTreeTokenNode).value])
+            ) as StrayTree<TreeNodes.DeclareStatement>;
+        },
+        DECLIDS(node) {
+            return node.splice(0,node.length).filter(n=>n instanceof ParseTreeTokenNode ? n.name !== 'comma' : true);
         },
 
         // Control Statements
