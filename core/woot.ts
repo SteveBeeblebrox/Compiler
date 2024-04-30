@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee woot.js) "$@"; exit $?
+//`which sjs` <(mtsc -po- -tes2018 -Ilib -M "$0" | tee woot.js) "$@"; exit $?
 
 ///#pragma once
 
