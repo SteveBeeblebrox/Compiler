@@ -95,6 +95,24 @@ namespace ZLang {
             }
         }
 
+        export class FunctionNode extends ZNode {
+            constructor(public readonly header: FunctionHeaderNode, ) {
+                super();
+            }
+        }
+
+        export class Program extends ZNode {
+            constructor(public readonly children: (StatementNode|FunctionNode)[]) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'Program.z';
+            }
+            get [Graphviz.children]() {
+                return this.children.map((n,i) => [`statements[${i}]`,n]);
+            }
+        }
+
         export class DomainNode extends ExpressionNode {
             constructor(public readonly value: ExpressionNode) {
                 super();
@@ -107,7 +125,7 @@ namespace ZLang {
             }
         }
 
-        ///#warning impl if, function and module
+        ///#warning impl if, function
         export abstract class StatementNode extends ZNode {
             constructor() {
                 super();
@@ -237,10 +255,6 @@ namespace ZLang {
                 return node.splice(0,node.length);
             }
         },
-        MODULE(node) {
-            node.pop();
-            return node;
-        },
 
         // Expressions
         'SUM|PRODUCT|BEXPR'(node) {
@@ -275,17 +289,22 @@ namespace ZLang {
             node.splice(-2,1);
             return node.splice(0,node.length);
         },
-        
-        // TODO convert to statements?
-        MODPARTS(node) {
-            return node.splice(0,node.length).filter(n=>n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
+        FUNCTION(node) {
+
         },
+        
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
             return new TreeNodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const'}) as StrayTree<TreeNodes.TypeNode>;
         },
-
+        
         // General simplification
+        MODULE(node) {
+            return new TreeNodes.Program(node.splice(0,node.length - 1) as (TreeNodes.StatementNode | TreeNodes.FunctionNode)[]) as StrayTree<TreeNodes.Program>;
+        },
+        MODPARTS(node) {
+            return node.splice(0,node.length).filter(n=>n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
+        },
         VALUE(node) {
             if(node.length === 3) {
                 return node.splice(1,1);

@@ -2477,6 +2477,26 @@ var ZLang;
             }
         }
         TreeNodes.FunctionCallNode = FunctionCallNode;
+        class FunctionNode extends ZNode {
+            constructor(header) {
+                super();
+                this.header = header;
+            }
+        }
+        TreeNodes.FunctionNode = FunctionNode;
+        class Program extends ZNode {
+            constructor(children) {
+                super();
+                this.children = children;
+            }
+            get [Graphviz.label]() {
+                return 'Program.z';
+            }
+            get [Graphviz.children]() {
+                return this.children.map((n, i) => [`statements[${i}]`, n]);
+            }
+        }
+        TreeNodes.Program = Program;
         class DomainNode extends ExpressionNode {
             constructor(value) {
                 super();
@@ -2618,10 +2638,6 @@ var ZLang;
                 return node.splice(0, node.length);
             }
         },
-        MODULE(node) {
-            node.pop();
-            return node;
-        },
         // Expressions
         'SUM|PRODUCT|BEXPR'(node) {
             if (node.length === 1)
@@ -2659,15 +2675,17 @@ var ZLang;
             node.splice(-2, 1);
             return node.splice(0, node.length);
         },
-        // TODO convert to statements?
-        MODPARTS(node) {
-            return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
-        },
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
             return new TreeNodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' });
         },
         // General simplification
+        MODULE(node) {
+            return new TreeNodes.Program(node.splice(0, node.length - 1));
+        },
+        MODPARTS(node) {
+            return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
+        },
         VALUE(node) {
             if (node.length === 3) {
                 return node.splice(1, 1);
