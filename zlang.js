@@ -2509,15 +2509,15 @@ var ZLang;
                 return 'Declare';
             }
             get [Graphviz.children]() {
-                return [...Object.entries({ type: this.type }), this.entries.map(function (entry) {
-                        return entry.length === 1 ? new ParseTreeTokenNode('id', entry[0]) : {
-                            get [Graphviz.label]() {
-                                return '=';
-                            },
-                            get [Graphviz.children]() {
-                                return [['', new ParseTreeTokenNode('id', entry[0])], ['', entry[1]]];
-                            }
-                        };
+                return [...Object.entries({ type: this.type }), ...this.entries.map(function (entry, i) {
+                        return entry.length === 1 ? ['', new ParseTreeTokenNode('id', entry[0])] : ['', {
+                                get [Graphviz.label]() {
+                                    return '=';
+                                },
+                                get [Graphviz.children]() {
+                                    return [['', new ParseTreeTokenNode('id', entry[0])], ['', entry[1]]];
+                                }
+                            }];
                     })];
             }
         }
@@ -2745,8 +2745,10 @@ async function dump(name, node, { format = 'png' } = {}) {
         args: [`-T${format}`, `-odata/${name}.${format}`],
         stdin: 'piped'
     }).spawn();
+    const text = Graphviz.serialize(node);
+    system.writeTextFileSync(`data/${name}.dot`, text);
     const writer = dot.stdin.getWriter();
-    await writer.write(new TextEncoder().encode(Graphviz.serialize(node)));
+    await writer.write(new TextEncoder().encode(text));
     await writer.ready;
     await writer.close();
 }
