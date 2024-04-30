@@ -153,7 +153,7 @@ namespace ZLang {
         }
 
         export class DomainNode extends ExpressionNode {
-            constructor(public readonly value: ExpressionNode) {
+            constructor(public readonly value: ExpressionNode,public readonly pos: Position) {
                 super();
             }
             get children() {
@@ -390,8 +390,8 @@ namespace ZLang {
             if(node.length === 3) {
                 return node.splice(1,1);
             } else if(node.length === 4) {
-                // const pos = (node.at(0) as ParseTreeTokenNode)
-                return new Nodes.DomainNode(node.splice(2,1)[0] as ExpressionNode) as StrayTree<Nodes.DomainNode>;
+                const pos = {...(node.at(0) as ParseTreeTokenNode).pos};
+                return new Nodes.DomainNode(node.splice(2,1)[0] as ExpressionNode,pos) as StrayTree<Nodes.DomainNode>;
             }
         },
         BSTMT(node) {
@@ -555,7 +555,7 @@ function output(...args: (string|number)[]) {
 
 ZLang.visit(ast, function(node) {
     if(node instanceof ZLang.Nodes.DomainNode) {
-        output('DOMAIN',0,0,node.domain);
+        output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
 },'post')
 
