@@ -16,7 +16,7 @@ class Scanner {
                         new Set(alphabet),
                         lambdaChar,
                         new Map(
-                            patterns.map(([k,{dfa,value}])=>[k,{dfa: new Map(dfa.map(([k,v])=>[k,new Map(v)])),value}])
+                            patterns.map(([k,{dfa,value}])=>[k,{dfa: new Map(dfa.map(([k,{entries,props}])=>[k,Object.assign(new Map(entries),props)])),value}])
                         )
                     );
                 }
@@ -45,7 +45,7 @@ class Scanner {
             const dfa = FiniteAutomata.optimizeDFA(FiniteAutomata.toDFA(nfa,ctx),ctx);
 
             patterns.set(name, {
-                dfa, value: value ?? name
+                dfa, value: value ?? undefined
             });
         }
 
@@ -57,7 +57,7 @@ class Scanner {
                 system.writeFileSync(cache,LZCompression.compressToUint8Array(JSON.stringify({
                     signature: Signature.create(text),
                     alphabet: [...scanner.alphabet],
-                    patterns: scanner.patterns.entries().map(([k,{dfa,value}]) => [k,{dfa:dfa.entries().map(([k,v])=>[k,v.entries().toArray()]).toArray(),value}]).toArray(),
+                    patterns: scanner.patterns.entries().map(([k,{dfa,value}]) => [k,{dfa:dfa.entries().map(([k,v])=>[k,{entries:v.entries().toArray(),props:{...v}}]).toArray(),value}]).toArray(),
                     lambdaCharacter
                 })));
             }
@@ -104,6 +104,10 @@ class Scanner {
         let bytes: char[] = [];
 
         while((byte = tape.next()) || bytes.length) {
+            if(byte !== undefined && !this.alphabet.has(byte)) {
+                throw new Parsing.LexError(`Unexpected character '${JSON.stringify(byte).slice(1,-1).replace(/'/g,'\\\'').replace(/\\"/g,'"')}'`,currentPos);
+            }
+
             if(byte) {
                 bytes.push(byte);
                 matchers.forEach(matcher => matcher.accept(byte!));
@@ -113,10 +117,12 @@ class Scanner {
             
             if(matchers.every(matcher => matcher.isFailed()) || !byte) {
                 if(!bestMatch) {
-                    throw new Error('Language matched nothing!');
+                    throw new Parsing.LexError('Language matched nothing!',currentPos);
                 }
                 
-                yield new Token(bestMatch[0].name, bestMatch[0].value ?? bytes.slice(0,bestMatch[1]).join(''), {...startPos});
+                if(bestMatch[0].name.toUpperCase() !== bestMatch[0].name) {
+                    yield new Token(bestMatch[0].name, bestMatch[0].value ?? bytes.slice(0,bestMatch[1]).join(''), {...startPos});
+                }
 
                 matchers.forEach(matcher => matcher.reset());
                 tape.rewind(bytes.length - bestMatch[1]);

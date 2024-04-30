@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-//`which sjs` <(mtsc -po- -tes2018 -Ilib -M "$0" | tee woot.js) "$@"; exit $?
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee woot.js) "$@"; exit $?
 
 ///#pragma once
 
@@ -30,10 +30,12 @@ namespace ZLang {
     }
 }
 
-// start and accepting are not saved when reading dfa to/from file!
-// console.log(JSON.parse(LZCompression.decompressFromUint8Array(system.readFileSync('zlex.json.lz'))))
+///#warning value field on token is not set
 
 console.log('Tokens:')
 console.log(ZLang.tokenize(`
-1+1
-`).toArray().join('\n'))
+int x=1+1;
+`).map(x=>JSON.stringify(x)).toArray().join('\n'))
+
+
+// console.log(JSON.parse(LZCompression.decompressFromUint8Array(system.readFileSync('zlex.json.lz'))).patterns)

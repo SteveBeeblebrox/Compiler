@@ -68,6 +68,11 @@ namespace Parsing {
             super(message);
         }
     }
+    export class LexError extends Error {
+        constructor(message?: string, public pos?: Position) {
+            super(message);
+        }
+    }
 
     /*
         void - nothing happened, run * transform if given
