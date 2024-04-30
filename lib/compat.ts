@@ -19,6 +19,8 @@ declare var system: {
     exit(status?: number): never;
     readTextFileSync(path: string): string;
     writeTextFileSync(path: string, data: string);
+    readFileSync(path: string): Uint8Array;
+    writeFileSync(path: string, data: Uint8Array);
     createTextFileReadStream(path: string): Promise<{read(bytes: number): string, [Symbol.dispose]():void}>;
     createTextFileWriteStream(path: string): Promise<{write(text: string): void, [Symbol.dispose]():void}>;
 };
@@ -35,6 +37,14 @@ globalThis['system'] ??= {
     writeTextFileSync(path: string, data: string) {
         //@ts-expect-error
         require('fs').writeFileSync(path, data, {encoding:'utf8'});
+    },
+    readFileSync(path: string): Uint8Array {
+        //@ts-expect-error
+        return require('fs').readFileSync(path);
+    },
+    writeFileSync(path: string, data: Uint8Array) {
+        //@ts-expect-error
+        require('fs').writeFileSync(path, data);
     },
     async createTextFileReadStream(path: string) {
         //@ts-expect-error

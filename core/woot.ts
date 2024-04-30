@@ -18,7 +18,7 @@ class Scanner {
         // Try to load from cache
         try {
             if(cache !== undefined) {
-                const {signature,alphabet,patterns,lambdaChar} = JSON.parse(system.readTextFileSync(cache));
+                const {signature,alphabet,patterns,lambdaChar} = JSON.parse(LZCompression.decompressFromUint8Array(system.readFileSync(cache)));
                 if(Signature.create(text) === signature) {
                     return new Scanner(
                         new Set(alphabet),
@@ -63,12 +63,12 @@ class Scanner {
         // Save to cache
         try {
             if(cache !== undefined) {
-                system.writeTextFileSync(cache,JSON.stringify({
+                system.writeFileSync(cache,LZCompression.compressToUint8Array(JSON.stringify({
                     signature: Signature.create(text),
                     alphabet: [...scanner.alphabet],
                     patterns: scanner.patterns.entries().map(([k,{dfa,value}]) => [k,{dfa:dfa.entries().map(([k,v])=>[k,v.entries().toArray()]).toArray(),value}]).toArray(),
                     lambdaCharacter
-                }));
+                })));
             }
         } catch(e) {}
 
@@ -79,5 +79,5 @@ class Scanner {
 console.log('Building Scanner...');
 const SCANNER = Scanner.fromString(new BasicTextDecoder().decode(new Uint8Array([
     ///#embed "zlang.lut"
-])), 'zlex.json');
+])), 'zlex.json.lz');
 console.log('Done!');
