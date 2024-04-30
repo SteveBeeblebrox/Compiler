@@ -11,49 +11,14 @@
 ///#include "lex.ts"
 ///#include "cfg.ts"
 ///#include "ll1.ts"
+///#include "nfa.ts"
+
 
 namespace RegexEngine {
-    namespace NFAGen {
-        type NFAState = Opaque<number,'NFAState'>
-        export type LambdaEdge = [start: NFAState, end: NFAState];
-        export type StructuralEdge = [...LambdaEdge, char];
-        export type NFA = {
-            start: NFAState,
-            end: NFAState,
-            edges: (StructuralEdge | LambdaEdge)[],
-        }
-        export class NFAContext {
-            constructor(public readonly alphabet: ReadonlySet<char>) {}
-        
-            private readonly iter = (function*(i = 0) {
-                while(true) yield i++ as NFAState;
-            })();
-        
-            public createState(): NFAState {
-                return this.iter.shift();
-            }
-
-            public createStates(n: number = 1): NFAState[] {
-                return [...this.iter.shift(n)];
-            }
-
-            public lambdaWrap(nfa: NFA): NFA {
-                const [start, end] = this.createStates(2);
-                return {
-                    start,
-                    end,
-                    edges: [[start,nfa.start], ...nfa.edges, [nfa.end,end]]
-                }
-            }
-        }
-        export interface NFAConvertible {
-            toNFA(ctx: NFAContext): NFA;
-        }
-    }
-    import NFAContext = NFAGen.NFAContext;
-    export import NFA = NFAGen.NFA;
+    import NFAContext = FiniteAutomata.NFAContext;
+    export import NFA = FiniteAutomata.NFA;
     namespace TreeNodes {
-        export abstract class RegexNode extends Tree implements NFAGen.NFAConvertible {
+        export abstract class RegexNode extends Tree implements FiniteAutomata.NFAConvertible {
             public readonly name = this.constructor.name;
             public abstract clone(): typeof this;
             public abstract toNFA(ctx: NFAContext): NFA;
@@ -120,7 +85,7 @@ namespace RegexEngine {
                 return ctx.lambdaWrap({
                     start,
                     end,
-                    edges: range(this.min, this.max).filter(char => ctx.alphabet.has(char)).map(char => [start,end,char] as NFAGen.StructuralEdge).toArray()
+                    edges: range(this.min, this.max).filter(char => ctx.alphabet.has(char)).map(char => [start,end,char] as FiniteAutomata.StructuralEdge).toArray()
                 });
             }
         }
@@ -175,7 +140,7 @@ namespace RegexEngine {
                 return ctx.lambdaWrap({
                     start,
                     end,
-                    edges: ctx.alphabet.values().map(char => [start, end, char] as NFAGen.StructuralEdge).toArray()
+                    edges: ctx.alphabet.values().map(char => [start, end, char] as FiniteAutomata.StructuralEdge).toArray()
                 });
             }
         }

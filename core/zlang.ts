@@ -418,7 +418,7 @@ namespace ZLang {
     }
 }
 
-
+///#if __MAIN__
 async function dump(name: string, node: Tree, {format = 'png'} = {}) {
     //@ts-ignore
     const dot = new system.Command('dot', {
@@ -437,3 +437,4 @@ async function dump(name: string, node: Tree, {format = 'png'} = {}) {
 console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x=>x.trim()).map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
 dump('zlang', ZLang.parse(tokens));
+///#endif
