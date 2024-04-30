@@ -17,7 +17,7 @@ declare namespace OpaqueTypes {
 }
 type Opaque<T,Ident> = OpaqueTypes.Opaque<T,Ident>;
 
-type Stack<T> = {
+type Stack<T=any> = {
     at(n: -1): T;
     push: Array<T>['push'],
     pop: Array<T>['pop'],

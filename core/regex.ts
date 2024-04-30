@@ -286,8 +286,8 @@ namespace RegexEngine {
         return PARSER.parse(tokenize(text)) as RegexNode;
     }
 
-    export function compile(text: string, alphabet: char[]): NFA {
-        const ctx = new NFAContext(new Set(alphabet));
+    export function compile(text: string, alphabet: ReadonlySet<char>): NFA {
+        const ctx = new NFAContext(alphabet);
         const [start,end] = ctx.createStates(2);
         const ast = RegexEngine.parse(text);
         const nfa = ast.toNFA(ctx);
@@ -326,7 +326,7 @@ if(system.args.length === 2 || system.args.length === 3) {
     } else if('graphviz'.startsWith(format) || 'dot'.startsWith(format)) {
         console.log(Graphviz.serialize(ast));
     } else if('nfa'.startsWith(format)) {
-        console.log(nfaToGraphviz(RegexEngine.compile(system.args[1], [...range('a','d')])));
+        console.log(nfaToGraphviz(RegexEngine.compile(system.args[1], new Set([...range('a','d')]))));
     } else {
         throw new Error(`Unknown format '${format}'!`)
     }
