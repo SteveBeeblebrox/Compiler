@@ -81,3 +81,9 @@ const SCANNER = Scanner.fromString(new BasicTextDecoder().decode(new Uint8Array(
     ///#embed "zlang.lut"
 ])), 'zlex.json');
 console.log('Done!');
+
+
+const alphabet = new Set(range('a','c'));
+const ctx = new FiniteAutomata.NFAContext(alphabet)
+const dfa = (FiniteAutomata.toDFA(RegexEngine.compile('a*',alphabet),ctx));
+console.log(dfa)
