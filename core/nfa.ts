@@ -4,7 +4,7 @@
 
 namespace FiniteAutomata {
     type NFAState = Opaque<number,'NFAState'>;
-    type DFAState = Opaque<number,'DFAState'>;
+    export type DFAState = Opaque<number,'DFAState'>;
     export type LambdaEdge = [start: NFAState, end: NFAState];
     export type StructuralEdge = [...LambdaEdge, char];
     export type NFA = {

@@ -5,7 +5,7 @@
 ///#include "regex.ts"
 
 class Scanner {
-    private constructor(public readonly alphabet: ReadonlySet<char>, public readonly lambdaChar: char, private readonly patterns: Map<string,{dfa:FiniteAutomata.DFA,value:string}>) {}
+    private constructor(public readonly alphabet: ReadonlySet<char>, private readonly lambdaChar: char, private readonly patterns: Map<string,{dfa:FiniteAutomata.DFA,value:string}>) {}
     public static fromString(text: string, cache?: string): Scanner {
         // Try to load from cache
         try {
@@ -64,5 +64,75 @@ class Scanner {
         } catch(e) {}
 
         return scanner;
+    }
+
+    *tokenize(iter: Iterator<char>) {
+        type TokenType = {name: string, value?:string};
+        class TokenMatcher {
+            private static readonly NO_MATCH = -1;
+            private state: FiniteAutomata.DFAState | typeof TokenMatcher.NO_MATCH = 0 as FiniteAutomata.DFAState;
+            constructor(
+                private readonly type: TokenType,
+                private readonly dfa: FiniteAutomata.DFA
+            ) {}
+            public reset() {
+                this.state = 0 as FiniteAutomata.DFAState;
+            }
+            public accept(byte: char) {
+                if(this.state !== TokenMatcher.NO_MATCH) {
+                    this.state = this.dfa.get(this.state).get(byte) ?? TokenMatcher.NO_MATCH;
+                }
+            }
+            public isComplete(): boolean {
+                return this.state !== TokenMatcher.NO_MATCH && this.dfa.get(this.state)?.accepting;
+            }
+            public getType(): TokenType {
+                return this.type;
+            }
+            public isFailed(): boolean {
+                return this.state === TokenMatcher.NO_MATCH;
+            }
+        }
+
+        const tape: Tape<char> = new Tape(iter);
+        let byte: char | undefined;
+
+        let matchers: TokenMatcher[] = this.patterns.entries().map(([name,{value,dfa}]) => new TokenMatcher({name,value},dfa)).toArray();
+        let bestMatch: [TokenType,number,end:Position] | null = null;
+        let currentPos = {line: 1, col: 1}
+        let startPos: Position = {...currentPos};
+        let bytes: char[] = [];
+
+        while((byte = tape.next()) || bytes.length) {
+            if(byte) {
+                bytes.push(byte);
+                matchers.forEach(matcher => matcher.accept(byte!));
+            }
+            
+            const matcher = matchers.find(matcher => matcher.isComplete()) ?? null;
+            
+            if(matchers.every(matcher => matcher.isFailed()) || !byte) {
+                if(!bestMatch) {
+                    throw new Error('Language matched nothing!');
+                }
+                
+                yield new Token(bestMatch[0].name, bestMatch[0].value ?? bytes.slice(0,bestMatch[1]).join(''), {...startPos});
+
+                matchers.forEach(matcher => matcher.reset());
+                tape.rewind(bytes.length - bestMatch[1]);
+                tape.erase();
+                bytes = [];
+                startPos = bestMatch[2];
+                currentPos = {...startPos};
+                bestMatch = null;
+            } else {
+                currentPos.col++;
+                if(byte === '\n') {
+                    currentPos.line++;
+                    currentPos.col=1;
+                }
+                bestMatch = matcher ? [matcher.getType(), bytes.length, {...currentPos}] : bestMatch;
+            }
+        }
     }
 }
