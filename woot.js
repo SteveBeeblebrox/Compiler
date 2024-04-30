@@ -3076,7 +3076,7 @@ var FiniteAutomata;
             };
         })();
         for (const [state, value] of T.entries()) {
-            dfa.set(n(state), new Map(value.entries().map(([c, state]) => [c, n(state)])));
+            dfa.set(n(state), Object.assign(new Map(value.entries().flatMap(([c, state]) => state.size ? [[c, n(state)]] : [])), Object.fromEntries(Object.entries(value))));
         }
         return dfa;
     }
@@ -3545,5 +3545,5 @@ const SCANNER = Scanner.fromString(new BasicTextDecoder().decode(new Uint8Array(
 console.log('Done!');
 const alphabet = new Set(range('a', 'c'));
 const ctx = new FiniteAutomata.NFAContext(alphabet);
-const dfa = (FiniteAutomata.toDFA(RegexEngine.compile('a*', alphabet), ctx));
+const dfa = FiniteAutomata.optimizeDFA(FiniteAutomata.toDFA(RegexEngine.compile('a+|b', alphabet), ctx), ctx);
 console.log(dfa);
