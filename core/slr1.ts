@@ -226,7 +226,7 @@ namespace SLR1 {
                         if(CFG.isEOF(expected) && t === undefined) {
                             node.unshift(new ParseTreeEOFNode());
                         } else if(CFG.isTerminal(expected) && t instanceof Token) {
-                            node.unshift(new ParseTreeTokenNode(t.name as Terminal, t.value));
+                            node.unshift(new ParseTreeTokenNode(t.name as Terminal, t.value, t.pos));
                         } else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
                             ///#warning test slr1 sdt
                             const child = sdt.transform(t as StrayTree<ParseTreeNode>);                    

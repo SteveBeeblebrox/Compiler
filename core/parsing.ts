@@ -51,7 +51,7 @@ namespace Parsing {
     }
 
     export class ParseTreeTokenNode extends AbstractParseTree<Terminal> {
-        constructor(name: Terminal, public value?: string) {super(name);}
+        constructor(name: Terminal, public value?: string, public pos?: Position) {super(name);}
         get [Graphviz.label] () {
             return this.name === this.value ? this.name : `${this.name}:${this.value}`;
         }

@@ -211,7 +211,7 @@ namespace LL1 {
                     }
                     x = ts.shift()!;
                     pos = x?.pos;
-                    Current.push(x instanceof Token ? new ParseTreeTokenNode(x.name as Terminal, x.value) : new ParseTreeEOFNode());
+                    Current.push(x instanceof Token ? new ParseTreeTokenNode(x.name as Terminal, x.value, x.pos) : new ParseTreeEOFNode());
                 } else if(CFG.isLambda(x)) {
                     Current.push(new ParseTreeLambdaNode());
                 }
