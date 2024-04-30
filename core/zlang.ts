@@ -410,7 +410,7 @@ namespace ZLang {
     });
     
     console.debug('Building Parser...');
-    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, 'zlang.json');
+    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, 'zlang.json.lz');
     console.debug('Done!');
 
     export function parse(tokens: Iterable<Token>): Program {

@@ -153,7 +153,7 @@ namespace SLR1 {
             // Try to load from cache
             try {
                 if(cache !== undefined) {
-                    const {signature, table} = JSON.parse(system.readTextFileSync(cache));
+                    const {signature, table} = JSON.parse(LZCompression.decompressFromUint8Array(system.readFileSync(cache)));
                     if(Signature.create(cfg as any) === signature) {
                         this.parseTable = this.deserializeTableFromCSV(table);
                     }
@@ -166,7 +166,7 @@ namespace SLR1 {
                 // Save to cache
                 try {
                     if(cache !== undefined) {
-                        system.writeTextFileSync(cache,JSON.stringify({signature: Signature.create(cfg as any), table: this.serializeTableToCSV()}));
+                        system.writeFileSync(cache,LZCompression.compressToUint8Array(JSON.stringify({signature: Signature.create(cfg as any), table: this.serializeTableToCSV()})));
                     }
                 } catch(e) {}
             }
@@ -185,9 +185,9 @@ namespace SLR1 {
         }
         private serializeTableToCSV(): string {
             const T = this.getParseTable();
-            const data: string[] = [['.',...GRAMMAR.getGrammarSymbols().map(s=>s??CFG.EOF_CHARACTER)].join(',')];
+            const data: string[] = [['.',...this.cfg.getGrammarSymbols().map(s=>s??CFG.EOF_CHARACTER)].join(',')];
             for(const [i,R] of T.entries()) {
-                const row = new Map(GRAMMAR.getGrammarSymbols().map(s=>[s,undefined]));
+                const row = new Map(this.cfg.getGrammarSymbols().map(s=>[s,undefined]));
                 for(const [k,v] of R.entries()) {
                     row.set(k,v);
                 }
