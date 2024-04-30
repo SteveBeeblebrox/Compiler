@@ -39,7 +39,7 @@ class Scanner {
         for(const line of lines) {
             const [regex,name,value] = line.split(/\s+/g);
 
-            console.debug(`Compiling regex ${name}...`)
+            // console.debug(`Compiling regex ${name}...`)
 
             const nfa = RegexEngine.compile(regex,alphabet);
             const dfa = FiniteAutomata.optimizeDFA(FiniteAutomata.toDFA(nfa,ctx),ctx);
