@@ -107,7 +107,7 @@ namespace ZLang {
             }
         }
 
-        ///#warning impl if, assign, etc... statements
+        ///#warning impl if, function and module
         export abstract class StatementNode extends ZNode {
             constructor() {
                 super();
@@ -311,7 +311,7 @@ namespace ZLang {
         ASSIGN(node) {
             return new TreeNodes.AssignmentStatement((node.at(0) as ParseTreeTokenNode).value, node.splice(-1,1)[0] as ExpressionNode) as StrayTree<TreeNodes.AssignmentStatement>;
         },
-        'GFTDECLLIST|GOTDECLLIST'(node) {
+        'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
             return new TreeNodes.DeclareStatement(
                 node.splice(0,1)[0] as TreeNodes.TypeNode,
                 node.splice(0,node.length).map(x => x instanceof TreeNodes.AssignmentStatement ? [x.id, x.value] : [(x as ParseTreeTokenNode).value])

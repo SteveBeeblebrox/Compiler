@@ -2694,7 +2694,7 @@ var ZLang;
         ASSIGN(node) {
             return new TreeNodes.AssignmentStatement(node.at(0).value, node.splice(-1, 1)[0]);
         },
-        'GFTDECLLIST|GOTDECLLIST'(node) {
+        'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
             return new TreeNodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(x => x instanceof TreeNodes.AssignmentStatement ? [x.id, x.value] : [x.value]));
         },
         DECLIDS(node) {
