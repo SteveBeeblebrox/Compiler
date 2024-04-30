@@ -106,45 +106,6 @@ namespace Parsing {
                 }
             }
             return node;
-            /*
-            // Hold a reference to the current parrent
-                    const parent = Current.parent as InnerParseTree;
-
-                    // Disjoin completed node
-                    const node = parent.pop() as ParseTreeNode;
-                    let rvalue: any = node;
-                    
-                    // Apply NonTerminal specific transforms
-                    if(rvalue === node && this.sdt.has(node.name as NonTerminal)) {
-                        rvalue = this.sdt.get(node.name as NonTerminal)(node);
-                        if(rvalue === undefined) {
-                            rvalue = node;
-                        }
-                    }
-
-                    // Apply wildcard transforms
-                    if(rvalue === node && this.sdt.has('*')) {
-                        rvalue = this.sdt.get('*')(node);
-                        if(rvalue === undefined) {
-                            rvalue = node;
-                        }
-                    }
-                    
-                    // Restore connections
-                    if(Array.isArray(rvalue)) {
-                        parent.push(...rvalue);
-                    } else if(rvalue != null) {
-                        parent.push(rvalue as InnerParseTree);
-                    }
-
-                    // Continue parsing
-                    Current = parent as InnerParseTree;
-            
-            
-            
-            
-            
-            */
         }
     }
 }
