@@ -4,21 +4,18 @@
 ///#pragma once
 
 ///#include <compat.ts>
-
+///#include <signature.ts>
+///#include <encoding.ts>
 
 ///#include "slr1.ts"
 ///#include "cfg.ts"
 
-///#include <signature.ts>
-///#include <encoding.ts>
-
-const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
-    ///#embed "zlang.cfg"
-])));
-
-console.log('Building parser...');
 
 namespace ZLang {
+    const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
+        ///#embed "zlang.cfg"
+    ])));
+    
     namespace TreeNodes {
         export abstract class ZNode extends Tree {
             public readonly name = this.constructor.name;
@@ -249,6 +246,7 @@ namespace ZLang {
     import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     import ExpressionNode = TreeNodes.ExpressionNode;
     import StatementGroup = TreeNodes.StatementGroup;
+    import Program = TreeNodes.Program;
 
     export const sdt = new Parsing.SyntaxTransformer<TreeNodes.ZNode>({
         '*'(node: Parsing.ParseTreeNode) {
@@ -410,9 +408,16 @@ namespace ZLang {
             }
         }
     });
+    
+    console.debug('Building Parser...');
+    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, 'zlang.json');
+    console.debug('Done.');
+
+    export function parse(tokens: Iterable<Token>): Program {
+        return PARSER.parse(tokens) as Program;
+    }
 }
 
-const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, 'zlang.json');
 
 async function dump(name: string, node: Tree, {format = 'png'} = {}) {
     //@ts-ignore
@@ -429,6 +434,6 @@ async function dump(name: string, node: Tree, {format = 'png'} = {}) {
     await writer.ready;
     await writer.close();
 }
-console.log('Parsing...');
+console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x=>x.trim()).map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
-dump('zlang', PARSER.parse(tokens));
+dump('zlang', ZLang.parse(tokens));

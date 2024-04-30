@@ -154,7 +154,7 @@ namespace SLR1 {
             try {
                 if(cache !== undefined) {
                     const {signature, table} = JSON.parse(system.readTextFileSync(cache));
-                    if(Signature.create(GRAMMAR as any) === signature) {
+                    if(Signature.create(cfg as any) === signature) {
                         this.parseTable = this.deserializeTableFromCSV(table);
                     }
                 }
