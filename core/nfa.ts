@@ -114,7 +114,7 @@ namespace FiniteAutomata {
             const M = new SignatureMap<Set<NFAState>,DFAState>();
             let n = 0;
             
-            return function(state: Set<NFAState>) {
+            return function(state: Set<NFAState>): DFAState {
                 if(!M.has(state)) {
                     M.set(state,n++ as DFAState);
                 }
@@ -123,7 +123,10 @@ namespace FiniteAutomata {
         })();
 
         for(const [state,value] of T.entries()) {
-            dfa.set(n(state), new Map(value.entries().map(([c,state]) => [c,n(state)] as [char,DFAState])));
+            dfa.set(n(state), Object.assign(
+                new Map(value.entries().flatMap(([c,state]) => state.size ? [[c,n(state)]] as [char,DFAState][] : [])),
+                Object.fromEntries(Object.entries(value))
+            ));
         }
 
         return dfa;
