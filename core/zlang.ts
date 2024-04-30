@@ -131,7 +131,7 @@ namespace ZLang {
             }
         }
 
-        ///#warning impl if, function
+        ///#warning impl if
         export abstract class StatementNode extends ZNode {
             constructor() {
                 super();
