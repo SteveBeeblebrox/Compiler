@@ -2453,17 +2453,6 @@ var ZLang;
         }
         TreeNodes.FunctionHeaderNode = FunctionHeaderNode;
         class AssignmentNode extends ZNode {
-            constructor(name, value) {
-                super();
-                this.name = name;
-                this.value = value;
-            }
-            get [Graphviz.label]() {
-                return '=';
-            }
-            get [Graphviz.children]() {
-                return [['', Graphviz.text(this.name)], ['', this.value]];
-            }
         }
         TreeNodes.AssignmentNode = AssignmentNode;
         class TypeNode extends ZNode {
@@ -2515,18 +2504,63 @@ var ZLang;
         TreeNodes.StatementNode = StatementNode;
         class DeclareStatement extends StatementNode {
         }
+        TreeNodes.DeclareStatement = DeclareStatement;
         class AssignmentStatement extends StatementNode {
         }
+        TreeNodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
         }
+        TreeNodes.IfStatement = IfStatement;
         class DoWhileStatement extends StatementNode {
+            constructor(body, predicate) {
+                super();
+                this.body = body;
+                this.predicate = predicate;
+            }
+            get [Graphviz.label]() {
+                return 'Do While';
+            }
         }
+        TreeNodes.DoWhileStatement = DoWhileStatement;
         class WhileStatement extends StatementNode {
+            constructor(predicate, body) {
+                super();
+                this.predicate = predicate;
+                this.body = body;
+            }
+            get [Graphviz.label]() {
+                return 'While';
+            }
         }
+        TreeNodes.WhileStatement = WhileStatement;
         class EmitStatement extends StatementNode {
+            constructor(data) {
+                super();
+                this.data = data;
+            }
+            get [Graphviz.label]() {
+                return 'Emit';
+            }
+            get [Graphviz.children]() {
+                return [...(this.data.type === 'string' ? [['id', new ParseTreeTokenNode('id', this.data.id)]] : []), ...Object.entries(this.data)];
+            }
         }
+        TreeNodes.EmitStatement = EmitStatement;
         class RandStatement extends StatementNode {
+            constructor(id, min, max) {
+                super();
+                this.id = id;
+                this.min = min;
+                this.max = max;
+            }
+            get [Graphviz.label]() {
+                return 'Rand';
+            }
+            get [Graphviz.children]() {
+                return [...[['id', new ParseTreeTokenNode('id', this.id)]], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
+            }
         }
+        TreeNodes.RandStatement = RandStatement;
         class StatementGroup extends StatementNode {
             constructor(statements) {
                 super();
@@ -2625,6 +2659,42 @@ var ZLang;
         },
         SOLOSTMT(node) {
             return new TreeNodes.StatementGroup(node.splice(0, 1));
+        },
+        // Control Statements
+        WHILE(node) {
+            return new TreeNodes.WhileStatement(node.splice(2, 1)[0], node.splice(-1, 1)[0]);
+        },
+        DOWHILE(node) {
+            return new TreeNodes.DoWhileStatement(node.splice(1, 1)[0], node.splice(-3, 1)[0]);
+        },
+        // Special Statements
+        EMIT(node) {
+            switch (node.length) {
+                case 2:
+                    return new TreeNodes.EmitStatement({
+                        type: node.at(-1).value
+                    });
+                case 4:
+                    return new TreeNodes.EmitStatement({
+                        type: 'value',
+                        value: node.splice(2, 1)[0]
+                    });
+                case 6:
+                    return new TreeNodes.EmitStatement({
+                        type: 'string',
+                        id: node.at(1).value,
+                        index: node.splice(3, 1)[0],
+                        length: node.splice(-1, 1)[0]
+                    });
+            }
+        },
+        RAND(node) {
+            switch (node.length) {
+                case 2:
+                    return new TreeNodes.RandStatement(node.at(1).value);
+                case 6:
+                    return new TreeNodes.RandStatement(node.at(1).value, node.splice(3, 1)[0], node.splice(-1, 1)[0]);
+            }
         }
     });
 })(ZLang || (ZLang = {}));

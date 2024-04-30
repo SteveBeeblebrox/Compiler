@@ -74,15 +74,15 @@ namespace ZLang {
         }
 
         export class AssignmentNode extends ZNode {
-            constructor(public override readonly name: string, public readonly value: Tree) {
-                super();
-            }
-            get [Graphviz.label]() {
-                return '=';
-            }
-            get [Graphviz.children]() {
-                return [['',Graphviz.text(this.name)],['',this.value]];
-            }
+            // constructor(public override readonly name: string, public readonly value: Tree) {
+            //     super();
+            // }
+            // get [Graphviz.label]() {
+            //     return '=';
+            // }
+            // get [Graphviz.children]() {
+            //     return [['',Graphviz.text(this.name)],['',this.value]];
+            // }
         }
 
         type TypeMeta = {const:boolean};
@@ -129,32 +129,70 @@ namespace ZLang {
             }
         }
 
-        class DeclareStatement extends StatementNode {
+        export class DeclareStatement extends StatementNode {
+            
+        }
+
+        export  class AssignmentStatement extends StatementNode {
 
         }
 
-        class AssignmentStatement extends StatementNode {
-
-        }
-
-        class IfStatement extends StatementNode {
+        export  class IfStatement extends StatementNode {
             // else?
         }
 
-        class DoWhileStatement extends StatementNode {
-
+        export class DoWhileStatement extends StatementNode {
+            constructor(public readonly body: StatementGroup, public readonly predicate: ExpressionNode) {
+                super();
+            }
+            
+            get [Graphviz.label]() {
+                return 'Do While';
+            }
         }
 
-        class WhileStatement extends StatementNode {
-
+        export  class WhileStatement extends StatementNode {
+            constructor(public readonly predicate: ExpressionNode, public readonly body: StatementGroup) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'While';
+            }
         }
 
-        class EmitStatement extends StatementNode {
-
+        type EmitMeta = {
+            readonly type: 'symbtable'
+        } | {
+            readonly type: 'value',
+            readonly value: ExpressionNode
+        } | {
+            readonly type: 'string',
+            readonly id: string,
+            readonly index: ExpressionNode,
+            readonly length: ExpressionNode
+        }
+        export class EmitStatement extends StatementNode {
+            constructor(public readonly data: EmitMeta) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'Emit'
+            }
+            get [Graphviz.children]() {
+                return [...(this.data.type==='string' ? [['id',new ParseTreeTokenNode('id' as Terminal,this.data.id)]] : []),...Object.entries(this.data)];
+            }
         }
 
-        class RandStatement extends StatementNode {
-
+        export class RandStatement extends StatementNode {
+            constructor(public readonly id: string, public readonly min?: ExpressionNode, public readonly max?: ExpressionNode) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return 'Rand';
+            }
+            get [Graphviz.children]() {
+                return [...[['id',new ParseTreeTokenNode('id' as Terminal,this.id)]],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
+            }
         }
 
         export class StatementGroup extends StatementNode {
@@ -169,6 +207,7 @@ namespace ZLang {
 
     import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     import ExpressionNode = TreeNodes.ExpressionNode;
+    import StatementGroup = TreeNodes.StatementGroup;
 
     export const sdt = new Parsing.SyntaxTransformer<TreeNodes.ZNode>({
         '*'(node: Parsing.ParseTreeNode) {
@@ -247,6 +286,48 @@ namespace ZLang {
         },
         SOLOSTMT(node) {
             return new TreeNodes.StatementGroup(node.splice(0,1) as TreeNodes.StatementNode[]) as StrayTree<TreeNodes.StatementGroup>;
+        },
+
+        // Control Statements
+        WHILE(node) {
+            return new TreeNodes.WhileStatement(node.splice(2,1)[0] as ExpressionNode,node.splice(-1,1)[0] as StatementGroup) as StrayTree<TreeNodes.WhileStatement>;
+        },
+        DOWHILE(node) {
+            return new TreeNodes.DoWhileStatement(node.splice(1,1)[0] as StatementGroup, node.splice(-3,1)[0] as ExpressionNode) as StrayTree<TreeNodes.WhileStatement>;
+        },
+
+        // Special Statements
+        EMIT(node) {
+            switch(node.length) {
+                case 2:
+                    return new TreeNodes.EmitStatement({
+                        type: (node.at(-1) as ParseTreeTokenNode).value as 'symbtable'
+                    }) as StrayTree<TreeNodes.EmitStatement>;
+                case 4:
+                    return new TreeNodes.EmitStatement({
+                        type: 'value',
+                        value: node.splice(2,1)[0] as ExpressionNode
+                    }) as StrayTree<TreeNodes.EmitStatement>;
+                case 6:
+                    return new TreeNodes.EmitStatement({
+                        type: 'string',
+                        id: (node.at(1) as ParseTreeTokenNode).value,
+                        index: node.splice(3,1)[0] as ExpressionNode,
+                        length: node.splice(-1,1)[0] as ExpressionNode
+                    }) as StrayTree<TreeNodes.EmitStatement>;
+            }
+        },
+        RAND(node) {
+            switch(node.length) {
+                case 2:
+                    return new TreeNodes.RandStatement((node.at(1) as ParseTreeTokenNode).value) as StrayTree<TreeNodes.RandStatement>;
+                case 6:
+                    return new TreeNodes.RandStatement(
+                        (node.at(1) as ParseTreeTokenNode).value,
+                        node.splice(3,1)[0] as ExpressionNode,
+                        node.splice(-1,1)[0] as ExpressionNode
+                    ) as StrayTree<TreeNodes.RandStatement>;
+            }
         }
     });
 }
