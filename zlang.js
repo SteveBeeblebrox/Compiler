@@ -2478,9 +2478,18 @@ var ZLang;
         }
         TreeNodes.FunctionCallNode = FunctionCallNode;
         class FunctionNode extends ZNode {
-            constructor(header) {
+            constructor(header, rvar, rvalue, body) {
                 super();
                 this.header = header;
+                this.rvar = rvar;
+                this.rvalue = rvalue;
+                this.body = body;
+            }
+            get [Graphviz.label]() {
+                return `${this.header[Graphviz.label]} {...}`;
+            }
+            get [Graphviz.children]() {
+                return [['header', this.header], ['var', new ParseTreeTokenNode('id', this.rvar)], ['rvalue', this.rvalue], ['body', this.body]];
             }
         }
         TreeNodes.FunctionNode = FunctionNode;
@@ -2674,6 +2683,9 @@ var ZLang;
                 return;
             node.splice(-2, 1);
             return node.splice(0, node.length);
+        },
+        FUNCTION(node) {
+            return new TreeNodes.FunctionNode(node.splice(0, 1)[0], node.at(1).value, node.splice(-2, 1)[0], node.splice(-1, 1)[0]);
         },
         // Types
         'OTHERTYPE|FUNTYPE'(node) {

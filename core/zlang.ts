@@ -96,8 +96,14 @@ namespace ZLang {
         }
 
         export class FunctionNode extends ZNode {
-            constructor(public readonly header: FunctionHeaderNode, ) {
+            constructor(public readonly header: FunctionHeaderNode, public readonly rvar: string, public readonly rvalue: ExpressionNode, public readonly body: StatementGroup) {
                 super();
+            }
+            get [Graphviz.label]() {
+                return `${this.header[Graphviz.label]} {...}`;
+            }
+            get [Graphviz.children]() {
+                return [['header',this.header],['var',new ParseTreeTokenNode('id' as Terminal, this.rvar)],['rvalue',this.rvalue], ['body',this.body]];
             }
         }
 
@@ -290,7 +296,12 @@ namespace ZLang {
             return node.splice(0,node.length);
         },
         FUNCTION(node) {
-
+            return new TreeNodes.FunctionNode(
+                node.splice(0,1)[0] as TreeNodes.FunctionHeaderNode,
+                (node.at(1) as ParseTreeTokenNode).value,
+                node.splice(-2,1)[0] as ExpressionNode,
+                node.splice(-1,1)[0] as StatementGroup
+            ) as StrayTree<TreeNodes.FunctionNode>;
         },
         
         // Types
