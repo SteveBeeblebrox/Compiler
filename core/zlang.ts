@@ -131,7 +131,6 @@ namespace ZLang {
             }
         }
 
-        ///#warning impl if
         export abstract class StatementNode extends ZNode {
             constructor() {
                 super();
@@ -175,7 +174,12 @@ namespace ZLang {
         }
 
         export  class IfStatement extends StatementNode {
-            // else?
+            constructor(public readonly predicate: ExpressionNode, public readonly btrue: StatementGroup, public readonly bfalse?: StatementGroup) {
+                super();
+            }
+            get [Graphviz.label]() {
+                return this.bfalse !== undefined ? 'If-Else' : 'If'
+            }
         }
 
         export class DoWhileStatement extends StatementNode {
@@ -357,6 +361,19 @@ namespace ZLang {
         },
         DOWHILE(node) {
             return new TreeNodes.DoWhileStatement(node.splice(1,1)[0] as StatementGroup, node.splice(-3,1)[0] as ExpressionNode) as StrayTree<TreeNodes.WhileStatement>;
+        },
+        IF(node) {
+            return new TreeNodes.IfStatement(
+                node.splice(2,1)[0] as ExpressionNode,
+                node.splice(-1,1)[0] as StatementGroup
+            ) as StrayTree<TreeNodes.IfStatement>;
+        },
+        IFELSE(node) {
+            return new TreeNodes.IfStatement(
+                node.splice(2,1)[0] as ExpressionNode,
+                node.splice(-3,1)[0] as StatementGroup,
+                node.splice(-1,1)[0] as StatementGroup
+            ) as StrayTree<TreeNodes.IfStatement>;
         },
 
         // Special Statements

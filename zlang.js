@@ -2566,6 +2566,15 @@ var ZLang;
         }
         TreeNodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
+            constructor(predicate, btrue, bfalse) {
+                super();
+                this.predicate = predicate;
+                this.btrue = btrue;
+                this.bfalse = bfalse;
+            }
+            get [Graphviz.label]() {
+                return this.bfalse !== undefined ? 'If-Else' : 'If';
+            }
         }
         TreeNodes.IfStatement = IfStatement;
         class DoWhileStatement extends StatementNode {
@@ -2736,6 +2745,12 @@ var ZLang;
         },
         DOWHILE(node) {
             return new TreeNodes.DoWhileStatement(node.splice(1, 1)[0], node.splice(-3, 1)[0]);
+        },
+        IF(node) {
+            return new TreeNodes.IfStatement(node.splice(2, 1)[0], node.splice(-1, 1)[0]);
+        },
+        IFELSE(node) {
+            return new TreeNodes.IfStatement(node.splice(2, 1)[0], node.splice(-3, 1)[0], node.splice(-1, 1)[0]);
         },
         // Special Statements
         EMIT(node) {
