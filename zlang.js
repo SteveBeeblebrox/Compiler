@@ -1838,9 +1838,10 @@ var Parsing;
     _b = Graphviz.label;
     Parsing.ParseTreeEOFNode = ParseTreeEOFNode;
     class ParseTreeTokenNode extends AbstractParseTree {
-        constructor(name, value) {
+        constructor(name, value, pos) {
             super(name);
             this.value = value;
+            this.pos = pos;
         }
         get [Graphviz.label]() {
             return this.name === this.value ? this.name : `${this.name}:${this.value}`;
@@ -2305,7 +2306,7 @@ var SLR1;
                             node.unshift(new ParseTreeEOFNode());
                         }
                         else if (CFG.isTerminal(expected) && t instanceof Token) {
-                            node.unshift(new ParseTreeTokenNode(t.name, t.value));
+                            node.unshift(new ParseTreeTokenNode(t.name, t.value, t.pos));
                         }
                         else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
                             const child = sdt.transform(t);
@@ -2518,9 +2519,10 @@ var ZLang;
         }
         Nodes.Program = Program;
         class DomainNode extends ExpressionNode {
-            constructor(value) {
+            constructor(value, pos) {
                 super();
                 this.value = value;
+                this.pos = pos;
             }
             get children() {
                 return [this.value];
@@ -2757,8 +2759,8 @@ var ZLang;
                 return node.splice(1, 1);
             }
             else if (node.length === 4) {
-                // const pos = (node.at(0) as ParseTreeTokenNode)
-                return new Nodes.DomainNode(node.splice(2, 1)[0]);
+                const pos = { ...node.at(0).pos };
+                return new Nodes.DomainNode(node.splice(2, 1)[0], pos);
             }
         },
         BSTMT(node) {
@@ -2894,7 +2896,7 @@ function output(...args) {
 }
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
-        output('DOMAIN', 0, 0, node.domain);
+        output('DOMAIN', node.pos.line, node.pos.col, node.domain);
     }
 }, 'post');
 dump('zlang', ast);
