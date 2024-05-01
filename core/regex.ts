@@ -17,7 +17,7 @@
 namespace RegexEngine {
     import NFAContext = FiniteAutomata.NFAContext;
     export import NFA = FiniteAutomata.NFA;
-    namespace TreeNodes {
+    namespace Nodes {
         export abstract class RegexNode extends Tree implements FiniteAutomata.NFAConvertible {
             public readonly name = this.constructor.name;
             public abstract clone(): typeof this;
@@ -160,7 +160,7 @@ namespace RegexEngine {
             }
         }
     }
-    import RegexNode = TreeNodes.RegexNode;
+    import RegexNode = Nodes.RegexNode;
 
     const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
         ///#embed "regex.cfg"
@@ -184,32 +184,32 @@ namespace RegexEngine {
         Primitive(node) {
             const [first,,second] = [...node] as Parsing.ParseTreeTokenNode[];
             if(first.name === 'char' && second?.name === 'char') {
-                return new TreeNodes.RangeNode(first.value as char, second.value as char) as StrayTree<TreeNodes.RangeNode>;
+                return new Nodes.RangeNode(first.value as char, second.value as char) as StrayTree<Nodes.RangeNode>;
             } else if(first.name === 'char') {
-                return new TreeNodes.CharNode(first.value as char) as StrayTree<TreeNodes.CharNode>;
+                return new Nodes.CharNode(first.value as char) as StrayTree<Nodes.CharNode>;
             } else if(first.name === '%.') {
-                return new TreeNodes.WildcharNode() as StrayTree<TreeNodes.WildcharNode>;
+                return new Nodes.WildcharNode() as StrayTree<Nodes.WildcharNode>;
             }
         },
         Sequence(node) {
             if(node.length === 1) return node.shift();
-            return new TreeNodes.SeqNode([...node].flatMap(node => node instanceof TreeNodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]) as StrayTree<TreeNodes.SeqNode>;
+            return new Nodes.SeqNode([...node].flatMap(node => node instanceof Nodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]) as StrayTree<Nodes.SeqNode>;
         },
         Alternation(node) {
             const l = node.length;
             const children = node.splice(0,node.length).filter(x=>x instanceof RegexNode) as RegexNode[];
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
             if(2*children.length-1 !== l) {
-                children.push(new TreeNodes.LambdaNode());
+                children.push(new Nodes.LambdaNode());
             }
-            return new TreeNodes.AltNode(children) as StrayTree<TreeNodes.AltNode>; // Todo, flatten this?
+            return new Nodes.AltNode(children) as StrayTree<Nodes.AltNode>; // Todo, flatten this?
         },
         Quantifier(node) {
             const mod = node.at(1);
             if(mod instanceof Parsing.ParseTreeTokenNode) {
                 switch(mod.name) {
-                    case '%+': return new TreeNodes.SeqNode([node.at(0) as RegexNode, new TreeNodes.KleenNode((node.shift() as RegexNode).clone())]) as StrayTree<TreeNodes.SeqNode>;
-                    case '%*': return new TreeNodes.KleenNode(node.shift() as RegexNode) as StrayTree<TreeNodes.KleenNode>;
+                    case '%+': return new Nodes.SeqNode([node.at(0) as RegexNode, new Nodes.KleenNode((node.shift() as RegexNode).clone())]) as StrayTree<Nodes.SeqNode>;
+                    case '%*': return new Nodes.KleenNode(node.shift() as RegexNode) as StrayTree<Nodes.KleenNode>;
                 }
             }
         },

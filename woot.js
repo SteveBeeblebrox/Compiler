@@ -3132,10 +3132,11 @@ var LL1;
         return parseTable;
     }
     class LL1Parser {
-        constructor(cfg, sdt) {
+        constructor(cfg, sdt = new Parsing.SyntaxTransformer({}), tt = new Parsing.TokenTransformer({})) {
             this.cfg = transform(cfg);
             this.parseTable = createParseTable(this.cfg);
             this.sdt = sdt;
+            this.tt = tt;
         }
         getCFG() {
             return this.cfg;
@@ -3194,7 +3195,7 @@ var LL1;
                     }
                     x = ts.shift();
                     pos = x === null || x === void 0 ? void 0 : x.pos;
-                    Current.push(x instanceof Token ? new ParseTreeTokenNode(x.name, x.value, x.pos) : new ParseTreeEOFNode());
+                    Current.push(x instanceof Token ? this.tt.transform(new ParseTreeTokenNode(x.name, x.value, x.pos)) : new ParseTreeEOFNode());
                 }
                 else if (CFG.isLambda(x)) {
                     Current.push(new ParseTreeLambdaNode());
@@ -3412,8 +3413,8 @@ var FiniteAutomata;
 var RegexEngine;
 (function (RegexEngine) {
     var NFAContext = FiniteAutomata.NFAContext;
-    let TreeNodes;
-    (function (TreeNodes) {
+    let Nodes;
+    (function (Nodes) {
         var _a, _b;
         class RegexNode extends Tree {
             constructor() {
@@ -3421,7 +3422,7 @@ var RegexEngine;
                 this.name = this.constructor.name;
             }
         }
-        TreeNodes.RegexNode = RegexNode;
+        Nodes.RegexNode = RegexNode;
         class AltNode extends RegexNode {
             constructor(nodes) {
                 super();
@@ -3444,7 +3445,7 @@ var RegexEngine;
                 return ctx.lambdaWrap(nfa);
             }
         }
-        TreeNodes.AltNode = AltNode;
+        Nodes.AltNode = AltNode;
         class SeqNode extends RegexNode {
             constructor(nodes) {
                 super();
@@ -3469,7 +3470,7 @@ var RegexEngine;
                 return ctx.lambdaWrap(nfa);
             }
         }
-        TreeNodes.SeqNode = SeqNode;
+        Nodes.SeqNode = SeqNode;
         class RangeNode extends RegexNode {
             constructor(min, max) {
                 super();
@@ -3494,7 +3495,7 @@ var RegexEngine;
                 });
             }
         }
-        TreeNodes.RangeNode = RangeNode;
+        Nodes.RangeNode = RangeNode;
         class KleenNode extends RegexNode {
             constructor(node) {
                 super();
@@ -3515,7 +3516,7 @@ var RegexEngine;
             }
         }
         _a = Graphviz.label;
-        TreeNodes.KleenNode = KleenNode;
+        Nodes.KleenNode = KleenNode;
         class CharNode extends RegexNode {
             constructor(char) {
                 super();
@@ -3536,7 +3537,7 @@ var RegexEngine;
                 });
             }
         }
-        TreeNodes.CharNode = CharNode;
+        Nodes.CharNode = CharNode;
         class WildcharNode extends RegexNode {
             // TODO, it might be better to support wildchars and charsets in the matcher to reduce nfa size?
             clone() {
@@ -3551,7 +3552,7 @@ var RegexEngine;
                 });
             }
         }
-        TreeNodes.WildcharNode = WildcharNode;
+        Nodes.WildcharNode = WildcharNode;
         class LambdaNode extends RegexNode {
             constructor() {
                 super(...arguments);
@@ -3570,9 +3571,9 @@ var RegexEngine;
             }
         }
         _b = Graphviz.label;
-        TreeNodes.LambdaNode = LambdaNode;
-    })(TreeNodes || (TreeNodes = {}));
-    var RegexNode = TreeNodes.RegexNode;
+        Nodes.LambdaNode = LambdaNode;
+    })(Nodes || (Nodes = {}));
+    var RegexNode = Nodes.RegexNode;
     const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
         0x53, 0x20, 0x2d, 0x3e, 0x20, 0x52, 0x65, 0x67, 0x65, 0x78, 0x20, 0x24, 0xd, 0xa, 0xd, 0xa, 0x52, 0x65, 0x67, 0x65, 0x78, 0x20, 0x2d, 0x3e, 0x20, 0x41, 0x6c, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0xd, 0xa, 0xd, 0xa, 0x41, 0x6c, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x2d, 0x3e, 0x20, 0x41, 0x6c, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x25, 0x7c, 0x20, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0xd, 0xa, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x20, 0x2d, 0x3e, 0x20, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x20, 0x51, 0x75, 0x61, 0x6e, 0x74, 0x69, 0x66, 0x69, 0x65, 0x72, 0x20, 0x7c, 0x20, 0xce, 0xbb, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x51, 0x75, 0x61, 0x6e, 0x74, 0x69, 0x66, 0x69, 0x65, 0x72, 0xd, 0xa, 0x51, 0x75, 0x61, 0x6e, 0x74, 0x69, 0x66, 0x69, 0x65, 0x72, 0x20, 0x2d, 0x3e, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0x20, 0x25, 0x2a, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0x20, 0x25, 0x2b, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0xd, 0xa, 0xd, 0xa, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0x20, 0x2d, 0x3e, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x69, 0x74, 0x69, 0x76, 0x65, 0x20, 0x7c, 0x20, 0x25, 0x28, 0x20, 0x52, 0x65, 0x67, 0x65, 0x78, 0x20, 0x25, 0x29, 0xd, 0xa, 0x50, 0x72, 0x69, 0x6d, 0x69, 0x74, 0x69, 0x76, 0x65, 0x20, 0x2d, 0x3e, 0x20, 0x63, 0x68, 0x61, 0x72, 0x20, 0x7c, 0x20, 0x63, 0x68, 0x61, 0x72, 0x20, 0x25, 0x2d, 0x20, 0x63, 0x68, 0x61, 0x72, 0x20, 0x7c, 0x20, 0x25, 0x2e
     ])));
@@ -3596,35 +3597,35 @@ var RegexEngine;
         Primitive(node) {
             const [first, , second] = [...node];
             if (first.name === 'char' && (second === null || second === void 0 ? void 0 : second.name) === 'char') {
-                return new TreeNodes.RangeNode(first.value, second.value);
+                return new Nodes.RangeNode(first.value, second.value);
             }
             else if (first.name === 'char') {
-                return new TreeNodes.CharNode(first.value);
+                return new Nodes.CharNode(first.value);
             }
             else if (first.name === '%.') {
-                return new TreeNodes.WildcharNode();
+                return new Nodes.WildcharNode();
             }
         },
         Sequence(node) {
             if (node.length === 1)
                 return node.shift();
-            return new TreeNodes.SeqNode([...node].flatMap(node => node instanceof TreeNodes.SeqNode ? node.getChildNodes() : [node]));
+            return new Nodes.SeqNode([...node].flatMap(node => node instanceof Nodes.SeqNode ? node.getChildNodes() : [node]));
         },
         Alternation(node) {
             const l = node.length;
             const children = node.splice(0, node.length).filter(x => x instanceof RegexNode);
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
             if (2 * children.length - 1 !== l) {
-                children.push(new TreeNodes.LambdaNode());
+                children.push(new Nodes.LambdaNode());
             }
-            return new TreeNodes.AltNode(children); // Todo, flatten this?
+            return new Nodes.AltNode(children); // Todo, flatten this?
         },
         Quantifier(node) {
             const mod = node.at(1);
             if (mod instanceof Parsing.ParseTreeTokenNode) {
                 switch (mod.name) {
-                    case '%+': return new TreeNodes.SeqNode([node.at(0), new TreeNodes.KleenNode(node.shift().clone())]);
-                    case '%*': return new TreeNodes.KleenNode(node.shift());
+                    case '%+': return new Nodes.SeqNode([node.at(0), new Nodes.KleenNode(node.shift().clone())]);
+                    case '%*': return new Nodes.KleenNode(node.shift());
                 }
             }
         },

@@ -142,11 +142,13 @@ namespace LL1 {
     export class LL1Parser<ASTNodeType extends Tree=never> {
         private readonly parseTable: LL1Parser.LL1ParseTable;
         private readonly cfg: CFG;
-        private readonly sdt: Parsing.SyntaxTransformer<ASTNodeType>; 
-        constructor(cfg: CFG, sdt?: Parsing.SyntaxTransformer<ASTNodeType>) {
+        private readonly sdt: Parsing.SyntaxTransformer<ASTNodeType>;
+        private readonly tt: Parsing.TokenTransformer<ASTNodeType>;
+        constructor(cfg: CFG, sdt: Parsing.SyntaxTransformer<ASTNodeType> = new Parsing.SyntaxTransformer({}), tt: Parsing.TokenTransformer<ASTNodeType> = new Parsing.TokenTransformer({})) {
             this.cfg = transform(cfg);
             this.parseTable = createParseTable(this.cfg);
             this.sdt = sdt;
+            this.tt = tt;
         }
         public getCFG() {
             return this.cfg;
@@ -211,7 +213,7 @@ namespace LL1 {
                     }
                     x = ts.shift()!;
                     pos = x?.pos;
-                    Current.push(x instanceof Token ? new ParseTreeTokenNode(x.name as Terminal, x.value, x.pos) : new ParseTreeEOFNode());
+                    Current.push(x instanceof Token ? this.tt.transform(new ParseTreeTokenNode(x.name as Terminal, x.value, x.pos)) : new ParseTreeEOFNode());
                 } else if(CFG.isLambda(x)) {
                     Current.push(new ParseTreeLambdaNode());
                 }
