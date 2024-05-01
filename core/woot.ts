@@ -34,12 +34,9 @@ namespace ZLang {
     }
 }
 
-///#warning value field on token is not set
-
+///#if __MAIN__
 console.log('Tokens:')
 console.log(ZLang.tokenize(`
 int x=1+1;
 `).map(x=>JSON.stringify(x)).toArray().join('\n'))
-
-
-// console.log(JSON.parse(LZCompression.decompressFromUint8Array(system.readFileSync('zlex.json.lz'))).patterns)
+///#endif
