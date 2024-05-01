@@ -72,7 +72,27 @@ namespace ZLang {
                 return [this.lhs,this.rhs];
             }
             get domain() {
-                return 'any';
+                return (() => {
+                    switch(this.name) {
+                        case '-':
+                        case '+':
+                        
+                        case '*':
+                        case '/':
+                        case '%':
+                            return [this.lhs.domain,this.rhs.domain].includes('float') ? 'float' : this.lhs.domain;
+
+                        case '<':
+                        case '<=':
+                        case '==':
+                        case '>=':
+                        case '>':
+                            return 'bool';
+                        // case '!=' unused
+                        default:
+                            throw new Error(`Unknown binary operator '${this.name}'`);
+                    }
+                })();
             }
         }
         export class UnaryOp extends ExpressionNode {
@@ -83,7 +103,7 @@ namespace ZLang {
                 return [this.val];
             }
             get domain() {
-                return 'any';
+                return this.val.domain; // +-~! all leave the type as is
             }
         }
         export class CastNode extends ExpressionNode {
@@ -94,7 +114,7 @@ namespace ZLang {
                 return [this.type,this.val];
             }
             get domain() {
-                return 'any';
+                return this.type.domain;
             }
             get [Graphviz.label]() {
                 return this.type[Graphviz.label];
@@ -138,6 +158,9 @@ namespace ZLang {
             }
             get children() {
                 return [];
+            }
+            get domain() {
+                return this.type;
             }
             get [Graphviz.label]() {
                 return `${this.meta.const ? 'const ' : ''}${this.type}`;
