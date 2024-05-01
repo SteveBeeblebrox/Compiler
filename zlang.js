@@ -3027,18 +3027,6 @@ var ZLang;
     }
     ZLang.Scope = Scope;
 })(ZLang || (ZLang = {}));
-var Scope = ZLang.Scope;
-var ZType = ZLang.ZType;
-var ZFunctionType = ZLang.ZFunctionType;
-const s0 = new Scope();
-s0.declare('myGlobal', new ZType('int'));
-s0.declare('f', new ZFunctionType(new ZType('int'), [new ZType('int'), new ZType('float')]));
-const s1 = new Scope(s0);
-s1.declare('f', new ZType('int'));
-s1.mark('f', { used: true });
-const s2 = new Scope(s1);
-s2.declare('f', new ZType('float'));
-console.log(s2.toString());
 async function dump(name, node, { format = 'png' } = {}) {
     //@ts-ignore
     const dot = new system.Command('dot', {
@@ -3072,6 +3060,7 @@ function output(...args) {
     text.push(' ');
     console.log(text.join(' '));
 }
+// todo build and emit symtable
 // todo catch syntax errors and pos
 // todo semantic checks
 ZLang.visit(ast, function (node) {
