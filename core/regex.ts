@@ -196,6 +196,7 @@ namespace RegexEngine {
             return new Nodes.SeqNode([...node].flatMap(node => node instanceof Nodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]) as StrayTree<Nodes.SeqNode>;
         },
         Alternation(node) {
+            if(node.length === 1) return node.shift();
             const l = node.length;
             const children = node.splice(0,node.length).filter(x=>x instanceof RegexNode) as RegexNode[];
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
