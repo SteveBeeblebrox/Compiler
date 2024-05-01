@@ -88,7 +88,8 @@ namespace ZLang {
                         case '>=':
                         case '>':
                             return 'bool';
-                        // case '!=' unused
+                        
+                        case '!=': // unused
                         default:
                             throw new Error(`Unknown binary operator '${this.name}'`);
                     }
@@ -554,7 +555,7 @@ namespace ZLang {
     const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, ZLang.tt, 'zlang.json.lz');
     console.debug('Done!');
 
-    export function parse(tokens: Iterable<Token>): Program {
+    export function parseTokens(tokens: Iterable<Token>): Program {
         return PARSER.parse(tokens) as Program;
     }
 
@@ -605,7 +606,7 @@ async function dump(name: string, node: Tree, {format = 'png'} = {}) {
 console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x=>x.trim()).map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
 
-const ast = ZLang.parse(tokens);
+const ast = ZLang.parseTokens(tokens);
 
 function output(...args: (string|number)[]) {
     const text = ['OUTPUT'];
@@ -629,7 +630,7 @@ ZLang.visit(ast, function(node) {
     if(node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
-},'post')
+},'post');
 
 dump('zlang', ast);
 ///#endif

@@ -28,6 +28,10 @@ namespace ZLang {
     export function tokenize(text: string) {
         return SCANNER.tokenize(text.split('')[Symbol.iterator]());
     }
+
+    export function parse(text: string): Program {
+        return ZLang.parseTokens(ZLang.tokenize(text)) as Program;
+    }
 }
 
 ///#warning value field on token is not set

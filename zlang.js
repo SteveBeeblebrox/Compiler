@@ -2471,7 +2471,9 @@ var ZLang;
                         case '>=':
                         case '>':
                             return 'bool';
-                        // case '!=' unused
+                        case '!=': // unused
+                        default:
+                            throw new Error(`Unknown binary operator '${this.name}'`);
                     }
                 })();
             }
@@ -2938,10 +2940,10 @@ var ZLang;
     console.debug('Building Parser...');
     const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, ZLang.tt, 'zlang.json.lz');
     console.debug('Done!');
-    function parse(tokens) {
+    function parseTokens(tokens) {
         return PARSER.parse(tokens);
     }
-    ZLang.parse = parse;
+    ZLang.parseTokens = parseTokens;
     function visit(program, f, order = 'pre') {
         const V = new Set;
         function visit(ast) {
@@ -2981,7 +2983,7 @@ async function dump(name, node, { format = 'png' } = {}) {
 }
 console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x => x.trim()).map(x => x.trim().split(' ')).map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
-const ast = ZLang.parse(tokens);
+const ast = ZLang.parseTokens(tokens);
 function output(...args) {
     const text = ['OUTPUT'];
     for (const arg of args) {
