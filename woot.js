@@ -2141,6 +2141,13 @@ var Parsing;
         }
     }
     Parsing.LexError = LexError;
+    class SemanticError extends Error {
+        constructor(message, pos) {
+            super(message);
+            this.pos = pos;
+        }
+    }
+    Parsing.SemanticError = SemanticError;
     /*
         void - nothing happened, run * transform if given
         ParseTreeNode | ASTNodeType | ASTNodeType[] - replace with return value and break
@@ -3018,6 +3025,58 @@ var ZLang;
         visit(program);
     }
     ZLang.visit = visit;
+    // Symtable pass
+    class ZType {
+        constructor(domain, pconst = false) {
+            this.domain = domain;
+            this.const = pconst;
+        }
+        toString() {
+            return this.const ? `const ${this.domain}` : this.domain;
+        }
+    }
+    ZLang.ZType = ZType;
+    class ZFunctionType {
+        constructor(rType, pTypes = []) {
+            this.rType = rType;
+            this.pTypes = pTypes;
+            this.const = true;
+        }
+        toString() {
+            return `const ${this.rType}//${this.pTypes.join('/')}`;
+        }
+    }
+    ZLang.ZFunctionType = ZFunctionType;
+    class Scope {
+        constructor(parent) {
+            this.parent = parent;
+            this.data = new Map;
+            this.n = this.parent ? this.parent.n + 1 : 0;
+        }
+        declare(name, type) {
+            if (this.has(name))
+                throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
+            this.data.set(name, { name, type, used: false, initialized: false });
+        }
+        has(name) {
+            return this.data.has(name);
+        }
+        get(name) {
+            return this.data.has(name) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name) : null;
+        }
+        mark(name, dtls) {
+            if (this.has(name)) {
+                this.data.set(name, Object.assign(this.data.get(name), dtls));
+            }
+            else if (this.parent) {
+                this.parent.mark(name, dtls);
+            }
+        }
+        toString() {
+            return (this.parent ? this.parent.toString() + '\n' : '') + this.data.values().map(d => [this.n, d.type, d.name].join(',')).toArray().join('\n');
+        }
+    }
+    ZLang.Scope = Scope;
 })(ZLang || (ZLang = {}));
 //`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
 var LL1;
@@ -3612,6 +3671,8 @@ var RegexEngine;
             return new Nodes.SeqNode([...node].flatMap(node => node instanceof Nodes.SeqNode ? node.getChildNodes() : [node]));
         },
         Alternation(node) {
+            if (node.length === 1)
+                return node.shift();
             const l = node.length;
             const children = node.splice(0, node.length).filter(x => x instanceof RegexNode);
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
