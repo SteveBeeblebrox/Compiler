@@ -149,7 +149,7 @@ namespace SLR1 {
 
     export class SLR1Parser<ASTNodeType extends Tree=never> {
         private readonly parseTable: SLR1Parser.SLR1ParseTable;
-        constructor(private readonly cfg: CFG, private readonly sdt: Parsing.SyntaxTransformer<ASTNodeType> = new Parsing.SyntaxTransformer({}), cache?: string) {
+        constructor(private readonly cfg: CFG, private readonly sdt: Parsing.SyntaxTransformer<ASTNodeType> = new Parsing.SyntaxTransformer({}), private readonly tt: Parsing.TokenTransformer<ASTNodeType> = new Parsing.TokenTransformer({}), cache?: string) {
             // Try to load from cache
             try {
                 if(cache !== undefined) {
@@ -206,6 +206,7 @@ namespace SLR1 {
             const T = this.parseTable;
             const cfg = this.cfg;
             const sdt = this.sdt;
+            const tt = this.tt;
             const ts = createPeekableIterator(tokens);
             const D: Queue<Token | ParseTree | undefined> = [];
             
@@ -226,7 +227,7 @@ namespace SLR1 {
                         if(CFG.isEOF(expected) && t === undefined) {
                             node.unshift(new ParseTreeEOFNode());
                         } else if(CFG.isTerminal(expected) && t instanceof Token) {
-                            node.unshift(new ParseTreeTokenNode(t.name as Terminal, t.value, t.pos));
+                            node.unshift(tt.transform(new ParseTreeTokenNode(t.name as Terminal, t.value, t.pos)));
                         } else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
                             ///#warning test slr1 sdt
                             const child = sdt.transform(t as StrayTree<ParseTreeNode>);                    

@@ -52,8 +52,11 @@ namespace Parsing {
 
     export class ParseTreeTokenNode extends AbstractParseTree<Terminal> {
         constructor(name: Terminal, public value?: string, public pos?: Position) {super(name);}
-        get [Graphviz.label] () {
+        get [Graphviz.label]() {
             return this.name === this.value ? this.name : `${this.name}:${this.value}`;
+        }
+        get [Graphviz.children]() {
+            return [];
         }
     }
 
@@ -81,8 +84,7 @@ namespace Parsing {
     */
 
     export class SyntaxTransformer<ASTNodeType extends Tree=Tree> {
-
-        private readonly rules: Map<NonTerminal | '*', (node: StrayTree<ParseTreeNode>)=>void | ParseTree | ParseTree[] | StrayTree<ASTNodeType> | StrayTree<ASTNodeType>[]>;
+        private readonly rules: Map<NonTerminal | '*', (node: StrayTree<ParseTreeNode>)=>null | void | ParseTree | ParseTree[] | StrayTree<ASTNodeType> | StrayTree<ASTNodeType>[]>;
 
         constructor(rules: SyntaxTransformer<ASTNodeType>['rules'] | {[key: string]: MapValue<SyntaxTransformer<ASTNodeType>['rules']>}) {
             this.rules = rules instanceof Map ? rules : new Map(Object.entries(rules)) as SyntaxTransformer<ASTNodeType>['rules'];
@@ -96,8 +98,36 @@ namespace Parsing {
                 }
             }
         }
-        transform(node: StrayTree<ParseTreeNode>) {
+        transform(node: StrayTree<ParseTreeNode>): Exclude<ReturnType<MapValue<SyntaxTransformer<ASTNodeType>['rules']>>,void> {
             for(const rule of [node.name,'*'] as [...NonTerminal[], '*']) {
+                if(this.rules.has(rule)) {
+                    const rvalue = this.rules.get(rule).bind(node)(node);
+                    if(rvalue !== undefined) {
+                        return rvalue;
+                    }
+                }
+            }
+            return node;
+        }
+    }
+
+    export class TokenTransformer<TokenNodeType extends Tree=Tree> {
+        private readonly rules: Map<Terminal | '*', (node: ParseTreeTokenNode)=>ParseTreeTokenNode|TokenNodeType|void>;
+
+        constructor(rules: TokenTransformer<TokenNodeType>['rules'] | {[key: string]: MapValue<TokenTransformer<TokenNodeType>['rules']>}) {
+            this.rules = rules instanceof Map ? rules : new Map(Object.entries(rules)) as TokenTransformer<TokenNodeType>['rules'];
+        
+            for(const [key,value] of this.rules.entries()) {
+                if(key.includes('|')) {
+                    for(const branch of key.split('|').map(x=>x.trim())) {
+                        this.rules.set(branch as Terminal | '*',value);
+                    }
+                    this.rules.delete(key);
+                }
+            }
+        }
+        transform(node: ParseTreeTokenNode): Exclude<ReturnType<MapValue<TokenTransformer<TokenNodeType>['rules']>>,void> {
+            for(const rule of [node.name,'*'] as [...Terminal[], '*']) {
                 if(this.rules.has(rule)) {
                     const rvalue = this.rules.get(rule).bind(node)(node);
                     if(rvalue !== undefined) {

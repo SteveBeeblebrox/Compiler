@@ -12,6 +12,10 @@
 
 
 namespace ZLang {
+    function escapeString(text: string) {
+        return JSON.stringify(text).slice(1,-1).replace(/'/g,'\\\'').replace(/\\"/g,'"');
+    }
+
     const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
         ///#embed "zlang.cfg"
     ])));
@@ -26,6 +30,39 @@ namespace ZLang {
         }
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): string;
+        }
+        export abstract class LiteralNode<T> extends ExpressionNode {
+            constructor(public readonly type: string, public readonly value: T) {super()};
+            get children() {
+                return [];
+            }
+            get domain() {
+                return this.type;
+            }
+        }
+        export class IntLiteral extends LiteralNode<number> {
+            constructor(value: number) {
+                super('int',value);
+            }
+            get [Graphviz.label]() {
+                return `${this.domain}val:${this.value}`;
+            }
+        }
+        export class FloatLiteral extends LiteralNode<number> {
+            constructor(value: number) {
+                super('float',value);
+            }
+            get [Graphviz.label]() {
+                return `${this.domain}val:${this.value}`;
+            }
+        }
+        export class StringLiteral extends LiteralNode<string> {
+            constructor(value: string) {
+                super('string',value);
+            }
+            get [Graphviz.label]() {
+                return `${this.domain}val:${escapeString(this.value)}`;
+            }
         }
         export class BinaryOp extends ExpressionNode {
             constructor(public override readonly name: string,public readonly lhs:ExpressionNode, public readonly rhs:ExpressionNode) {
@@ -477,9 +514,21 @@ namespace ZLang {
             }
         }
     });
+
+    export const tt = new Parsing.TokenTransformer<Nodes.LiteralNode<any>>({
+        floatval(node) {
+            return new Nodes.FloatLiteral(+node.value);
+        },
+        intval(node) {
+            return new Nodes.IntLiteral(+node.value);
+        },
+        stringval(node) {
+            return new Nodes.StringLiteral(node.value);
+        }
+    });
     
     console.debug('Building Parser...');
-    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, 'zlang.json.lz');
+    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, ZLang.tt, 'zlang.json.lz');
     console.debug('Done!');
 
     export function parse(tokens: Iterable<Token>): Program {
