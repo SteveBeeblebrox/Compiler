@@ -179,6 +179,7 @@ namespace ZLang {
                 return [...this.args];
             }
             get domain() {
+                ///#warning get function domain
                 return 'any';
             }
             get [Graphviz.label]() {
