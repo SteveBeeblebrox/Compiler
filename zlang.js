@@ -3001,6 +3001,22 @@ function output(...args) {
     text.push(' ');
     console.log(text.join(' '));
 }
+class Scope {
+    constructor(n) {
+        this.n = n;
+        this.data = new Map;
+    }
+    declare(name, type) {
+        // TODO type
+        this.data.set(name, { name, used: false, initialized: false });
+    }
+    get(name) {
+        return { ...this.data.get(name) };
+    }
+    mark(name, dtls) {
+        this.data.set(name, Object.assign(this.data.get(name), dtls));
+    }
+}
 // todo catch syntax errors and pos
 // todo semantic checks
 ZLang.visit(ast, function (node) {

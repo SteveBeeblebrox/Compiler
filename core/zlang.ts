@@ -588,6 +588,28 @@ namespace ZLang {
         }
         visit(program);
     }
+
+    // Symtable pass
+    // todo function types?
+    type ZType = {domain:Domain,const:boolean};
+    type ZFunctionType = {domain:Domain,const:boolean,parameters:ZType[]};
+    type Declaration = {name: string} & DeclarationDetails & (ZType | ZFunctionType);
+    type DeclarationDetails = {used:boolean, initialized:boolean};
+    class Scope {
+        public readonly data = new Map<string,Declaration>;
+        constructor(public readonly n: number) {}
+        declare(name: string, type: ZType | ZFunctionType) {
+            // TODO type
+            this.data.set(name, {name,used:false,initialized:false,...type});
+        }
+        get(name: string) {
+            return {...this.data.get(name)};
+        }
+        mark(name: string, dtls: Partial<DeclarationDetails>) {
+            this.data.set(name,Object.assign(this.data.get(name), dtls));
+        }
+        // todo, helper to get declarations up until <name>, might require having a sperate define to update order?
+    }
 }
 
 ///#if __MAIN__
@@ -629,24 +651,7 @@ function output(...args: (string|number)[]) {
     console.log(text.join(' '));
 }
 
-// Symtable pass
 
-
-type Declaration = {name: string} & DeclarationDetails;
-type DeclarationDetails = {used: boolean, initialized: boolean};
-class Scope {
-    public readonly data = new Map<string,Declaration>;
-    declare(name: string, type: any) {
-        // TODO type
-        this.data.set(name, {name,used:false,initialized:false});
-    }
-    get(name: string) {
-        return {...this.data.get(name)};
-    }
-    mark(name: string, dtls: Partial<DeclarationDetails>) {
-        this.data.set(name,Object.assign(this.data.get(name), dtls));
-    }
-}
 
 // todo catch syntax errors and pos
 // todo semantic checks
