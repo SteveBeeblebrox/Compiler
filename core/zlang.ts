@@ -590,25 +590,53 @@ namespace ZLang {
     }
 
     // Symtable pass
-    // todo function types?
-    type ZType = {domain:Domain,const:boolean};
-    type ZFunctionType = {domain:Domain,const:boolean,parameters:ZType[]};
-    type Declaration = {name: string} & DeclarationDetails & (ZType | ZFunctionType);
+    export class ZType {
+        public readonly const: boolean;
+        public constructor(public readonly domain: Domain, pconst: boolean = false) {
+            this.const = pconst;
+        }
+        public toString() {
+            return this.const ? `const ${this.domain}` : this.domain;
+        }
+    }
+
+    export class ZFunctionType {
+        public readonly const = true;
+        public constructor(public readonly rType: ZType, public readonly pTypes: ZType[] = []) {}
+        public toString() {
+            return `const ${this.rType}//${this.pTypes.join('/')}`;
+        }
+    }
+
+    type Declaration = {name: string, type: ZType | ZFunctionType} & DeclarationDetails
     type DeclarationDetails = {used:boolean, initialized:boolean};
-    class Scope {
+    export class Scope {
         public readonly data = new Map<string,Declaration>;
-        constructor(public readonly n: number) {}
-        declare(name: string, type: ZType | ZFunctionType) {
-            // TODO type
-            this.data.set(name, {name,used:false,initialized:false,...type});
+        public readonly n: number;
+        public constructor(public readonly parent?: Scope) {
+            this.n = this.parent ? this.parent.n + 1 : 0;
         }
-        get(name: string) {
-            return {...this.data.get(name)};
+        public declare(name: string, type: ZType | ZFunctionType) {
+            if(this.has(name)) throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
+            this.data.set(name, {name,type,used:false,initialized:false});
         }
-        mark(name: string, dtls: Partial<DeclarationDetails>) {
-            this.data.set(name,Object.assign(this.data.get(name), dtls));
+        public has(name: string): boolean {
+            return this.data.has(name);
         }
-        // todo, helper to get declarations up until <name>, might require having a sperate define to update order?
+        public get(name: string): Declaration | null {
+            return this.data.has(name) ? {...this.data.get(name)} : this.parent ? this.parent.get(name) : null;
+        }
+        public mark(name: string, dtls: Partial<DeclarationDetails>) {
+            if(this.has(name)) {
+                this.data.set(name,Object.assign(this.data.get(name), dtls));
+            } else if(this.parent) {
+                this.parent.mark(name,dtls);
+            }
+        }
+        public toString() {
+            return (this.parent ? this.parent.toString() + '\n' : '') + this.data.values().map(d => [this.n,d.type,d.name].join(',')).toArray().join('\n');
+        }
+        // TODO, helper to get declarations up until <name>, might require having a sperate define to update order?
     }
 }
 
@@ -652,7 +680,7 @@ function output(...args: (string|number)[]) {
 }
 
 
-
+// todo build and emit symtable
 // todo catch syntax errors and pos
 // todo semantic checks
 

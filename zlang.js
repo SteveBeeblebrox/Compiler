@@ -1865,6 +1865,13 @@ var Parsing;
         }
     }
     Parsing.LexError = LexError;
+    class SemanticError extends Error {
+        constructor(message, pos) {
+            super(message);
+            this.pos = pos;
+        }
+    }
+    Parsing.SemanticError = SemanticError;
     /*
         void - nothing happened, run * transform if given
         ParseTreeNode | ASTNodeType | ASTNodeType[] - replace with return value and break
@@ -2967,7 +2974,71 @@ var ZLang;
         visit(program);
     }
     ZLang.visit = visit;
+    // Symtable pass
+    class ZType {
+        constructor(domain, pconst = false) {
+            this.domain = domain;
+            this.const = pconst;
+        }
+        toString() {
+            return this.const ? `const ${this.domain}` : this.domain;
+        }
+    }
+    ZLang.ZType = ZType;
+    class ZFunctionType {
+        constructor(rType, pTypes = []) {
+            this.rType = rType;
+            this.pTypes = pTypes;
+            this.const = true;
+        }
+        toString() {
+            return `const ${this.rType}//${this.pTypes.join('/')}`;
+        }
+    }
+    ZLang.ZFunctionType = ZFunctionType;
+    class Scope {
+        constructor(parent) {
+            this.parent = parent;
+            this.data = new Map;
+            this.n = this.parent ? this.parent.n + 1 : 0;
+        }
+        declare(name, type) {
+            if (this.has(name))
+                throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
+            this.data.set(name, { name, type, used: false, initialized: false });
+        }
+        has(name) {
+            return this.data.has(name);
+        }
+        get(name) {
+            return this.data.has(name) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name) : null;
+        }
+        mark(name, dtls) {
+            if (this.has(name)) {
+                this.data.set(name, Object.assign(this.data.get(name), dtls));
+            }
+            else if (this.parent) {
+                this.parent.mark(name, dtls);
+            }
+        }
+        toString() {
+            return (this.parent ? this.parent.toString() + '\n' : '') + this.data.values().map(d => [this.n, d.type, d.name].join(',')).toArray().join('\n');
+        }
+    }
+    ZLang.Scope = Scope;
 })(ZLang || (ZLang = {}));
+var Scope = ZLang.Scope;
+var ZType = ZLang.ZType;
+var ZFunctionType = ZLang.ZFunctionType;
+const s0 = new Scope();
+s0.declare('myGlobal', new ZType('int'));
+s0.declare('f', new ZFunctionType(new ZType('int'), [new ZType('int'), new ZType('float')]));
+const s1 = new Scope(s0);
+s1.declare('f', new ZType('int'));
+s1.mark('f', { used: true });
+const s2 = new Scope(s1);
+s2.declare('f', new ZType('float'));
+console.log(s2.toString());
 async function dump(name, node, { format = 'png' } = {}) {
     //@ts-ignore
     const dot = new system.Command('dot', {
@@ -3000,22 +3071,6 @@ function output(...args) {
     }
     text.push(' ');
     console.log(text.join(' '));
-}
-class Scope {
-    constructor(n) {
-        this.n = n;
-        this.data = new Map;
-    }
-    declare(name, type) {
-        // TODO type
-        this.data.set(name, { name, used: false, initialized: false });
-    }
-    get(name) {
-        return { ...this.data.get(name) };
-    }
-    mark(name, dtls) {
-        this.data.set(name, Object.assign(this.data.get(name), dtls));
-    }
 }
 // todo catch syntax errors and pos
 // todo semantic checks
