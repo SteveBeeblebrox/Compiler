@@ -3001,9 +3001,14 @@ function output(...args) {
     text.push(' ');
     console.log(text.join(' '));
 }
+// todo catch syntax errors and pos
+// todo semantic checks
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN', node.pos.line, node.pos.col, node.domain);
     }
+    // if(node instanceof Parsing.ParseTreeTokenNode) {
+    //     console.log(node)
+    // }
 }, 'post');
 dump('zlang', ast);

@@ -12,6 +12,8 @@
 
 
 namespace ZLang {
+    type Domain = 'string' | 'bool' | 'int' | 'float';
+
     function escapeString(text: string) {
         return JSON.stringify(text).slice(1,-1).replace(/'/g,'\\\'').replace(/\\"/g,'"');
     }
@@ -29,10 +31,10 @@ namespace ZLang {
             public abstract get children(): ZNode[];
         }
         export abstract class ExpressionNode extends ZNode {
-            public abstract get domain(): string;
+            public abstract get domain(): Domain;
         }
         export abstract class LiteralNode<T> extends ExpressionNode {
-            constructor(public readonly type: string, public readonly value: T) {super()};
+            constructor(public readonly type: Domain, public readonly value: T) {super()};
             get children() {
                 return [];
             }
@@ -154,7 +156,7 @@ namespace ZLang {
 
         type TypeMeta = {const:boolean};
         export class TypeNode extends ZNode {
-            constructor(public readonly type: string, public readonly meta: TypeMeta) {
+            constructor(public readonly type: Domain, public readonly meta: TypeMeta) {
                 super();
             }
             get children() {
@@ -180,7 +182,7 @@ namespace ZLang {
             }
             get domain() {
                 ///#warning get function domain
-                return 'any';
+                return 'any' as Domain;
             }
             get [Graphviz.label]() {
                 return `${this.name}(...)`;
@@ -438,7 +440,7 @@ namespace ZLang {
         
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
-            return new Nodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const'}) as StrayTree<Nodes.TypeNode>;
+            return new Nodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value as Domain, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const'}) as StrayTree<Nodes.TypeNode>;
         },
         
         // General simplification
@@ -627,10 +629,36 @@ function output(...args: (string|number)[]) {
     console.log(text.join(' '));
 }
 
+// Symtable pass
+
+
+type Declaration = {name: string} & DeclarationDetails;
+type DeclarationDetails = {used: boolean, initialized: boolean};
+class Scope {
+    public readonly data = new Map<string,Declaration>;
+    declare(name: string, type: any) {
+        // TODO type
+        this.data.set(name, {name,used:false,initialized:false});
+    }
+    get(name: string) {
+        return {...this.data.get(name)};
+    }
+    mark(name: string, dtls: Partial<DeclarationDetails>) {
+        this.data.set(name,Object.assign(this.data.get(name), dtls));
+    }
+}
+
+// todo catch syntax errors and pos
+// todo semantic checks
+
 ZLang.visit(ast, function(node) {
     if(node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
+    ///#warning convert id terminals and refactor how they are stored above
+    // if(node instanceof Parsing.ParseTreeTokenNode) {
+    //     console.log(node)
+    // }
 },'post');
 
 dump('zlang', ast);
