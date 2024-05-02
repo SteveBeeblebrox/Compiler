@@ -459,7 +459,13 @@ namespace ZLang {
             
             return new Nodes.DeclareStatement(
                 node.splice(0,1)[0] as Nodes.TypeNode,
-                node.splice(0,node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.ident, x.value] : [x as Nodes.IdentifierNode])
+                node.splice(0,node.length).map(function(tree) {
+                    if(tree instanceof Nodes.AssignmentStatement) {
+                        return tree.destroy() as [Nodes.IdentifierNode, ExpressionNode];
+                    } else {
+                        return [tree] as [Nodes.IdentifierNode];
+                    }
+                })
             ) as StrayTree<Nodes.DeclareStatement>;
         },
         DECLIDS(node) {

@@ -2413,7 +2413,9 @@ var ZLang;
             get children() {
                 return [...super[Tree.iterator]()];
             }
-            ;
+            destroy() {
+                return this[Tree.splice](0, this[Tree.treeLength]);
+            }
         }
         Nodes.ZNode = ZNode;
         class ExpressionNode extends ZNode {
@@ -2640,7 +2642,7 @@ var ZLang;
         Nodes.StatementNode = StatementNode;
         class DeclareStatement extends StatementNode {
             constructor(type, entries) {
-                super();
+                super([type, ...entries.flat()]);
                 this.type = type;
                 this.entries = entries;
             }
@@ -2863,11 +2865,14 @@ var ZLang;
             return new Nodes.AssignmentStatement(ident, value);
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
-            node.splice(0, node.length).map(function (tree) {
+            return new Nodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(function (tree) {
                 if (tree instanceof Nodes.AssignmentStatement) {
+                    return tree.destroy();
                 }
-            });
-            return new Nodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.ident, x.value] : [x]));
+                else {
+                    return [tree];
+                }
+            }));
         },
         DECLIDS(node) {
             return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'comma' : true);
