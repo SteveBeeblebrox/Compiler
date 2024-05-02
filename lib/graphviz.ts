@@ -9,6 +9,7 @@ namespace Graphviz {
     // Note label overrides attributes.label which overrides using Symbol.toStringTag
     export const label = Symbol('Graphviz.label');
     export const children = Symbol('Graphviz.children');
+    export const exclude = Symbol('Graphviz.exclude');
     export const attributes = Symbol('Graphviz.attributes');
 
     export function text(text: string, attributes: GraphvizAttributes = {}): Graphable {
@@ -18,6 +19,7 @@ namespace Graphviz {
     export type Graphable = object & Partial<{
         [children]: string[] | {[key: string]: Graphable},
         [label]: string,
+        [exclude]: string[],
         [attributes]: GraphvizAttributes
     }>;
     export type GraphvizAttributes = Partial<{
@@ -55,6 +57,8 @@ namespace Graphviz {
             
             const name: NodeName = nodes.get(obj);
 
+            const excluded = new Set(obj[Graphviz.exclude] ?? []);
+
             const attributes: GraphvizAttributes = obj[Graphviz.attributes] ?? {};
             
             if(Graphviz.label in obj)
@@ -72,6 +76,9 @@ namespace Graphviz {
             const keys: string[] | object = obj[Graphviz.children] ?? Object.keys(obj);
 
             for(const [key, child] of Array.isArray(keys) && Array.isArray(keys[0]) ? keys : Object.entries(Array.isArray(keys) ? obj : keys)) {
+                if(excluded.has(key)) {
+                    continue;
+                }
                 if(!Array.isArray(keys) || keys.includes(key) || Array.isArray(keys[0])) {
                     if(Array.isArray(child)) {
                         for(const [i,arrayChild] of Array.entries(child)) {

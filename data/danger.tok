@@ -46,6 +46,11 @@ id n 4 15
 comma x2c 4 16
 bool bool 4 18
 id test 4 23
+
+comma x2c 0 0
+int int 0 0
+id p3 0 0
+
 rparen x29 4 27
 returns returns 5 1
 id p 5 9
@@ -265,3 +270,8 @@ div x2f 45 36
 intval 2 45 37
 sc x3b 45 38
 rbrace x7d 46 1
+
+
+emit emit 0 0
+symtable symtable 0 0
+sc sc 0 0

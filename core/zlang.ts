@@ -40,6 +40,10 @@ namespace ZLang {
                 return this[Tree.splice](0,this[Tree.treeLength]);
             }
         }
+        export interface ZNode {
+            get parent() : ZNode;
+
+        }
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): Domain;
         }
@@ -147,17 +151,19 @@ namespace ZLang {
         }
 
         export class FunctionHeaderNode extends ZNode {
+            public override readonly name: string;
             constructor(public readonly ident: IdentifierNode, public readonly rtype: TypeNode, public readonly parameters: ParameterNode[]) {
                 super([rtype,ident,...parameters]);
+                this.name = this.ident.name;
             }
             get [Graphviz.label]() {
                 return `fn ${this.ident.name}(...)`;
             }
         }
 
-        type TypeMeta = {const:boolean};
+        type TypeNodeMetaData = {const:boolean};
         export class TypeNode extends ZNode {
-            constructor(public readonly type: Domain, public readonly meta: TypeMeta = {const: false}) {
+            constructor(public readonly type: Domain, public readonly meta: TypeNodeMetaData = {const: false}) {
                 super();
             }
             get domain() {
@@ -168,6 +174,9 @@ namespace ZLang {
             }
             get [Graphviz.children]() {
                 return [];
+            }
+            public get ztype() {
+                return new ZType(this.type,this.meta.const);
             }
         }
 
@@ -197,6 +206,7 @@ namespace ZLang {
         }
 
         export class Program extends ZNode {
+            public readonly scope = new Scope();
             constructor(public readonly steps: (StatementNode|FunctionNode)[]) {
                 super([...steps]);
             }
@@ -334,11 +344,15 @@ namespace ZLang {
         }
 
         export class StatementGroup extends StatementNode {
+            public readonly scope = new Scope();
             constructor(public readonly statements: StatementNode[]) {
                 super([...statements]);
             }
             get [Graphviz.label]() {
                 return 'Statements';
+            }
+            get[Graphviz.exclude]() {
+                return ['scope'];
             }
         }
     }
@@ -346,6 +360,7 @@ namespace ZLang {
     import ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     import ExpressionNode = Nodes.ExpressionNode;
     import StatementGroup = Nodes.StatementGroup;
+    import ZNode = Nodes.ZNode;
     export import Program = Nodes.Program;
 
     export const sdt = new Parsing.SyntaxTransformer<Nodes.ZNode>({
@@ -392,7 +407,7 @@ namespace ZLang {
                 const [type, ident] = node.splice(0,node.length);
                 return new Nodes.ParameterNode(type as Nodes.TypeNode, ident as Nodes.IdentifierNode) as StrayTree<Nodes.ParameterNode>;
             } else {
-                const [type, ident,...rest] = node.splice(0,node.length);
+                const [type, ident, _comma,...rest] = node.splice(0,node.length);
                 return [new Nodes.ParameterNode(type as Nodes.TypeNode, ident as Nodes.IdentifierNode), ...rest] as StrayTree<Nodes.ParameterNode>[];
             }
         },
@@ -456,7 +471,6 @@ namespace ZLang {
             return new Nodes.AssignmentStatement(ident as Nodes.IdentifierNode, value as ExpressionNode | Nodes.AssignmentStatement) as StrayTree<Nodes.AssignmentStatement>;
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
-            
             return new Nodes.DeclareStatement(
                 node.splice(0,1)[0] as Nodes.TypeNode,
                 node.splice(0,node.length).map(function(tree) {
@@ -521,12 +535,14 @@ namespace ZLang {
         },
         RAND(node) {
             switch(node.length) {
-                case 2:
+                case 2: {
                     const [_rand,ident] = node.splice(0,node.length);
                     return new Nodes.RandStatement(ident as Nodes.IdentifierNode) as StrayTree<Nodes.RandStatement>;
-                case 6:
-                    const [__rand,intIdent,_comma,min,__comma,max] = node.splice(0,node.length);
+                }
+                case 6: {
+                    const [_rand,intIdent,_comma,min,__comma,max] = node.splice(0,node.length);
                     return new Nodes.RandStatement(intIdent as Nodes.IdentifierNode,min as ExpressionNode,max as ExpressionNode) as StrayTree<Nodes.RandStatement>;
+                }
             }
         }
     });
@@ -554,11 +570,12 @@ namespace ZLang {
         return PARSER.parse(tokens) as Program;
     }
 
-    export function visit(program: Program, f: (node:Nodes.ZNode|Parsing.ParseTreeTokenNode)=>void, order: 'post');
-    export function visit(program: Program, f: (node:Nodes.ZNode|Parsing.ParseTreeTokenNode)=>void|boolean, order?: 'pre');
-    export function visit(program: Program, f: (node:Nodes.ZNode|Parsing.ParseTreeTokenNode)=>void|boolean, order: 'pre'|'post' = 'pre') {
+    // For preorder traversal, returning false prevents visiting children
+    export function visit(program: Program, f: (node:Nodes.ZNode)=>void, order: 'post');
+    export function visit(program: Program, f: (node:Nodes.ZNode)=>void|boolean, order?: 'pre');
+    export function visit(program: Program, f: (node:Nodes.ZNode)=>void|boolean, order: 'pre'|'post' = 'pre') {
         const V = new Set<Nodes.ZNode|Parsing.ParseTreeTokenNode>;
-        function visit(ast: Nodes.ZNode | Parsing.ParseTreeTokenNode) {
+        function visit(ast: Nodes.ZNode) {
             if(V.has(ast)) return;
             V.add(ast);
 
@@ -575,7 +592,7 @@ namespace ZLang {
             }
 
             if(order === 'post') {
-                f(ast);
+                f.bind(ast)(ast);
             }
         }
         visit(program);
@@ -600,13 +617,17 @@ namespace ZLang {
         }
     }
 
+    export const enum SemanticErrorType {
+        // TODO, error codes
+    }
+
     type Declaration = {name: string, type: ZType | ZFunctionType} & DeclarationDetails
     type DeclarationDetails = {used:boolean, initialized:boolean};
     export class Scope {
-        public readonly data = new Map<string,Declaration>;
-        public readonly n: number;
-        public constructor(public readonly parent?: Scope) {
-            this.n = this.parent ? this.parent.n + 1 : 0;
+        private readonly data = new Map<string,Declaration>;
+        public constructor(public parent?: Scope) {}
+        protected get n() {
+            return this.parent ? this.parent.n + 1 : 0;
         }
         public declare(name: string, type: ZType | ZFunctionType) {
             if(this.has(name)) throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
@@ -630,6 +651,65 @@ namespace ZLang {
         }
         // TODO, helper to get declarations up until <name>, might require having a sperate define to update order?
     }
+
+    export function getEnclosingScope(node: ZNode): Scope | null {
+        let p: ZNode = node;
+        while(p=p.parent) {
+            if(p instanceof StatementGroup || p instanceof Program) {
+                return p.scope;
+            }
+        }
+        return null;
+    }
+
+    export function initSymbols(program: Program) {
+        ZLang.visit(ast,function(node) {
+            // Set up scopes
+            if(node instanceof StatementGroup && !node.scope.parent) {
+                const scope = getEnclosingScope(node);
+                if(scope) {
+                    node.scope.parent = scope;
+                }
+            }
+        
+
+            function declareFunction(header: Nodes.FunctionHeaderNode) {
+                getEnclosingScope(node).declare(header.name, new ZFunctionType(
+                    header.rtype.ztype,
+                    header.parameters.map(p=>p.type.ztype)
+                ));
+
+            }
+
+            // Load data into scopes
+            switch(node.constructor) {
+                case Nodes.FunctionHeaderNode: {
+                    declareFunction(node as Nodes.FunctionHeaderNode)
+                    return false;
+                }
+                case Nodes.FunctionNode: {
+                    const func = node as Nodes.FunctionNode;
+                    const scope = getEnclosingScope(node);
+                    if(!scope.has(func.header.ident.name)) {
+                        declareFunction(func.header);
+                    }
+                    scope.mark(func.header.ident.name,{initialized:true});
+                    return false;
+                }
+                case Nodes.FunctionCallNode: {
+                    const call = node as Nodes.FunctionCallNode;
+                    const scope = getEnclosingScope(node);
+                    scope.mark(call.ident.name, {used: true});
+                }
+                case Nodes.DeclareStatement: {
+
+                }
+                case Nodes.AssignmentStatement: {
+
+                }
+            }
+        },'pre');
+    }
 }
 
 ///#if __MAIN__
@@ -650,7 +730,7 @@ async function dump(name: string, node: Tree, {format = 'png'} = {}) {
 }
 console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x=>x.trim()).map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
-
+console.log('Done!');
 const ast = ZLang.parseTokens(tokens);
 
 function output(...args: (string|number)[]) {
@@ -676,13 +756,20 @@ function output(...args: (string|number)[]) {
 // todo catch syntax errors and pos
 // todo semantic checks
 
+ZLang.initSymbols(ast);
+
+// emit symtables
+ZLang.visit(ast,function(node) {
+    if(node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
+        console.log('=== Symtable ===');
+        console.log(ZLang.getEnclosingScope(node).toString());
+    }
+})
+
 ZLang.visit(ast, function(node) {
     if(node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
-    // if(node instanceof Parsing.ParseTreeTokenNode) {
-    //     console.log(node)
-    // }
 },'post');
 
 dump('zlang', ast);

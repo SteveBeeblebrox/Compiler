@@ -1713,6 +1713,7 @@ var Graphviz;
     // Note label overrides attributes.label which overrides using Symbol.toStringTag
     Graphviz.label = Symbol('Graphviz.label');
     Graphviz.children = Symbol('Graphviz.children');
+    Graphviz.exclude = Symbol('Graphviz.exclude');
     Graphviz.attributes = Symbol('Graphviz.attributes');
     function text(text, attributes = {}) {
         return { ...attributes, [Graphviz.label]: text };
@@ -1731,23 +1732,27 @@ var Graphviz;
         const data = [];
         data.push('digraph {');
         function recurse(parent, edge, obj) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             if (typeof obj !== 'object' || obj === null)
                 return;
             if (!nodes.has(obj)) {
                 nodes.set(obj, `Node${iter.shift()}`);
             }
             const name = nodes.get(obj);
-            const attributes = (_a = obj[Graphviz.attributes]) !== null && _a !== void 0 ? _a : {};
+            const excluded = new Set((_a = obj[Graphviz.exclude]) !== null && _a !== void 0 ? _a : []);
+            const attributes = (_b = obj[Graphviz.attributes]) !== null && _b !== void 0 ? _b : {};
             if (Graphviz.label in obj)
                 attributes.label = obj[Graphviz.label];
-            (_b = attributes.label) !== null && _b !== void 0 ? _b : (attributes.label = Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj));
+            (_c = attributes.label) !== null && _c !== void 0 ? _c : (attributes.label = Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj));
             data.push(`\t${name}${stringifyAttributes(attributes)}`);
             if (parent != null) {
                 data.push(`${parent}->${name}${stringifyAttributes({ label: edge })}`);
             }
-            const keys = (_c = obj[Graphviz.children]) !== null && _c !== void 0 ? _c : Object.keys(obj);
+            const keys = (_d = obj[Graphviz.children]) !== null && _d !== void 0 ? _d : Object.keys(obj);
             for (const [key, child] of Array.isArray(keys) && Array.isArray(keys[0]) ? keys : Object.entries(Array.isArray(keys) ? obj : keys)) {
+                if (excluded.has(key)) {
+                    continue;
+                }
                 if (!Array.isArray(keys) || keys.includes(key) || Array.isArray(keys[0])) {
                     if (Array.isArray(child)) {
                         for (const [i, arrayChild] of Array.entries(child)) {
@@ -2551,6 +2556,7 @@ var ZLang;
                 this.ident = ident;
                 this.rtype = rtype;
                 this.parameters = parameters;
+                this.name = this.ident.name;
             }
             get [Graphviz.label]() {
                 return `fn ${this.ident.name}(...)`;
@@ -2571,6 +2577,9 @@ var ZLang;
             }
             get [Graphviz.children]() {
                 return [];
+            }
+            get ztype() {
+                return new ZType(this.type, this.meta.const);
             }
         }
         Nodes.TypeNode = TypeNode;
@@ -2608,6 +2617,7 @@ var ZLang;
             constructor(steps) {
                 super([...steps]);
                 this.steps = steps;
+                this.scope = new Scope();
             }
             get [Graphviz.label]() {
                 return 'Program.z';
@@ -2752,14 +2762,19 @@ var ZLang;
             constructor(statements) {
                 super([...statements]);
                 this.statements = statements;
+                this.scope = new Scope();
             }
             get [Graphviz.label]() {
                 return 'Statements';
+            }
+            get [Graphviz.exclude]() {
+                return ['scope'];
             }
         }
         Nodes.StatementGroup = StatementGroup;
     })(Nodes = ZLang.Nodes || (ZLang.Nodes = {}));
     var ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
+    var StatementGroup = Nodes.StatementGroup;
     ZLang.Program = Nodes.Program;
     ZLang.sdt = new Parsing.SyntaxTransformer({
         '*'(node) {
@@ -2806,7 +2821,7 @@ var ZLang;
                 return new Nodes.ParameterNode(type, ident);
             }
             else {
-                const [type, ident, ...rest] = node.splice(0, node.length);
+                const [type, ident, _comma, ...rest] = node.splice(0, node.length);
                 return [new Nodes.ParameterNode(type, ident), ...rest];
             }
         },
@@ -2918,12 +2933,14 @@ var ZLang;
         },
         RAND(node) {
             switch (node.length) {
-                case 2:
+                case 2: {
                     const [_rand, ident] = node.splice(0, node.length);
                     return new Nodes.RandStatement(ident);
-                case 6:
-                    const [__rand, intIdent, _comma, min, __comma, max] = node.splice(0, node.length);
+                }
+                case 6: {
+                    const [_rand, intIdent, _comma, min, __comma, max] = node.splice(0, node.length);
                     return new Nodes.RandStatement(intIdent, min, max);
+                }
             }
         }
     });
@@ -2965,7 +2982,7 @@ var ZLang;
                 }
             }
             if (order === 'post') {
-                f(ast);
+                f.bind(ast)(ast);
             }
         }
         visit(program);
@@ -2993,11 +3010,17 @@ var ZLang;
         }
     }
     ZLang.ZFunctionType = ZFunctionType;
+    let SemanticErrorType;
+    (function (SemanticErrorType) {
+        // TODO, error codes
+    })(SemanticErrorType = ZLang.SemanticErrorType || (ZLang.SemanticErrorType = {}));
     class Scope {
         constructor(parent) {
             this.parent = parent;
             this.data = new Map;
-            this.n = this.parent ? this.parent.n + 1 : 0;
+        }
+        get n() {
+            return this.parent ? this.parent.n + 1 : 0;
         }
         declare(name, type) {
             if (this.has(name))
@@ -3023,6 +3046,56 @@ var ZLang;
         }
     }
     ZLang.Scope = Scope;
+    function getEnclosingScope(node) {
+        let p = node;
+        while (p = p.parent) {
+            if (p instanceof StatementGroup || p instanceof ZLang.Program) {
+                return p.scope;
+            }
+        }
+        return null;
+    }
+    ZLang.getEnclosingScope = getEnclosingScope;
+    function initSymbols(program) {
+        ZLang.visit(ast, function (node) {
+            // Set up scopes
+            if (node instanceof StatementGroup && !node.scope.parent) {
+                const scope = getEnclosingScope(node);
+                if (scope) {
+                    node.scope.parent = scope;
+                }
+            }
+            function declareFunction(header) {
+                getEnclosingScope(node).declare(header.name, new ZFunctionType(header.rtype.ztype, header.parameters.map(p => p.type.ztype)));
+            }
+            // Load data into scopes
+            switch (node.constructor) {
+                case Nodes.FunctionHeaderNode: {
+                    declareFunction(node);
+                    return false;
+                }
+                case Nodes.FunctionNode: {
+                    const func = node;
+                    const scope = getEnclosingScope(node);
+                    if (!scope.has(func.header.ident.name)) {
+                        declareFunction(func.header);
+                    }
+                    scope.mark(func.header.ident.name, { initialized: true });
+                    return false;
+                }
+                case Nodes.FunctionCallNode: {
+                    const call = node;
+                    const scope = getEnclosingScope(node);
+                    scope.mark(call.ident.name, { used: true });
+                }
+                case Nodes.DeclareStatement: {
+                }
+                case Nodes.AssignmentStatement: {
+                }
+            }
+        }, 'pre');
+    }
+    ZLang.initSymbols = initSymbols;
 })(ZLang || (ZLang = {}));
 async function dump(name, node, { format = 'png' } = {}) {
     //@ts-ignore
@@ -3039,6 +3112,7 @@ async function dump(name, node, { format = 'png' } = {}) {
 }
 console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x => x.trim()).map(x => x.trim().split(' ')).map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
+console.log('Done!');
 const ast = ZLang.parseTokens(tokens);
 function output(...args) {
     const text = ['OUTPUT'];
@@ -3060,12 +3134,17 @@ function output(...args) {
 // todo build and emit symtable
 // todo catch syntax errors and pos
 // todo semantic checks
+ZLang.initSymbols(ast);
+// emit symtables
+ZLang.visit(ast, function (node) {
+    if (node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
+        console.log('=== Symtable ===');
+        console.log(ZLang.getEnclosingScope(node).toString());
+    }
+});
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN', node.pos.line, node.pos.col, node.domain);
     }
-    // if(node instanceof Parsing.ParseTreeTokenNode) {
-    //     console.log(node)
-    // }
 }, 'post');
 dump('zlang', ast);
