@@ -2604,6 +2604,7 @@ var ZLang;
                 this.rvar = rvar;
                 this.rvalue = rvalue;
                 this.body = body;
+                this.scope = new Scope();
             }
             get [Graphviz.label]() {
                 return `${this.header[Graphviz.label]} {...}`;
@@ -2967,22 +2968,22 @@ var ZLang;
     ZLang.parseTokens = parseTokens;
     function visit(program, f, order = 'pre') {
         const V = new Set;
-        function visit(ast) {
+        function visit(node) {
             var _a;
-            if (V.has(ast))
+            if (V.has(node))
                 return;
-            V.add(ast);
+            V.add(node);
             let condition = true;
             if (order === 'pre') {
-                condition = (_a = f(ast)) !== null && _a !== void 0 ? _a : condition;
+                condition = (_a = f(node)) !== null && _a !== void 0 ? _a : condition;
             }
-            if (condition && ast instanceof Nodes.ZNode) {
-                for (const child of ast.children) {
+            if (condition && node instanceof Nodes.ZNode) {
+                for (const child of node.children) {
                     visit(child);
                 }
             }
             if (order === 'post') {
-                f.bind(ast)(ast);
+                f.bind(node)(node);
             }
         }
         visit(program);
@@ -3049,7 +3050,7 @@ var ZLang;
     function getEnclosingScope(node) {
         let p = node;
         while (p = p.parent) {
-            if (p instanceof StatementGroup || p instanceof ZLang.Program) {
+            if (p instanceof StatementGroup || p instanceof Nodes.FunctionNode || p instanceof ZLang.Program) {
                 return p.scope;
             }
         }
@@ -3057,9 +3058,9 @@ var ZLang;
     }
     ZLang.getEnclosingScope = getEnclosingScope;
     function initSymbols(program) {
-        ZLang.visit(ast, function (node) {
+        ZLang.visit(program, function (node) {
             // Set up scopes
-            if (node instanceof StatementGroup && !node.scope.parent) {
+            if ((node instanceof StatementGroup || node instanceof Nodes.FunctionNode) && !node.scope.parent) {
                 const scope = getEnclosingScope(node);
                 if (scope) {
                     node.scope.parent = scope;
@@ -3070,9 +3071,11 @@ var ZLang;
             }
             // Load data into scopes
             switch (node.constructor) {
+                // Functions
+                // TODO limit the iterated children so visiting function's header, parameter ids, and assignments lhs don't count
                 case Nodes.FunctionHeaderNode: {
                     declareFunction(node);
-                    return false;
+                    break;
                 }
                 case Nodes.FunctionNode: {
                     const func = node;
@@ -3081,16 +3084,30 @@ var ZLang;
                         declareFunction(func.header);
                     }
                     scope.mark(func.header.ident.name, { initialized: true });
-                    return false;
+                    // return false;
+                    break;
                 }
                 case Nodes.FunctionCallNode: {
                     const call = node;
                     const scope = getEnclosingScope(node);
                     scope.mark(call.ident.name, { used: true });
+                    break;
                 }
+                case Nodes.ParameterNode: {
+                    const param = node;
+                    getEnclosingScope(node).declare(param.ident.name, param.type.ztype);
+                    break;
+                }
+                // Variables
+                // TODO, handle setting used
                 case Nodes.DeclareStatement: {
+                    break;
                 }
                 case Nodes.AssignmentStatement: {
+                    break;
+                }
+                case Nodes.IdentifierNode: {
+                    break;
                 }
             }
         }, 'pre');
@@ -3112,7 +3129,7 @@ async function dump(name, node, { format = 'png' } = {}) {
 }
 console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x => x.trim()).map(x => x.trim().split(' ')).map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
-console.log('Done!');
+console.debug('Done!');
 const ast = ZLang.parseTokens(tokens);
 function output(...args) {
     const text = ['OUTPUT'];
@@ -3131,15 +3148,15 @@ function output(...args) {
     text.push(' ');
     console.log(text.join(' '));
 }
-// todo build and emit symtable
+// todo finish symtables
 // todo catch syntax errors and pos
 // todo semantic checks
-ZLang.initSymbols(ast);
+// ZLang.initSymbols(ast);
 // emit symtables
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
-        console.log('=== Symtable ===');
-        console.log(ZLang.getEnclosingScope(node).toString());
+        console.debug('=== Symtable ===');
+        console.debug(ZLang.getEnclosingScope(node).toString() || '<empty>');
     }
 });
 ZLang.visit(ast, function (node) {
