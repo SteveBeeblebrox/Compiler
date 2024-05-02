@@ -2471,7 +2471,7 @@ var ZLang;
                 this.name = name;
             }
             get domain() {
-                return 'any';
+                return ZLang.getEnclosingScope(this).get(this.name).type.domain;
             }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
@@ -2590,7 +2590,7 @@ var ZLang;
                 this.args = args;
             }
             get domain() {
-                return 'any';
+                return ZLang.getEnclosingScope(this).get(this.ident.name).type.domain;
             }
             get [Graphviz.label]() {
                 return `${this.ident.name}(...)`;
@@ -2819,10 +2819,12 @@ var ZLang;
                 return;
             if (node.length === 2) {
                 const [type, ident] = node.splice(0, node.length);
+                // (type as Nodes.TypeNode).meta.const = true;
                 return new Nodes.ParameterNode(type, ident);
             }
             else {
                 const [type, ident, _comma, ...rest] = node.splice(0, node.length);
+                // (type as Nodes.TypeNode).meta.const = true;
                 return [new Nodes.ParameterNode(type, ident), ...rest];
             }
         },
@@ -2843,7 +2845,7 @@ var ZLang;
         },
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
-            return new Nodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' });
+            return new Nodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' || node.at(-1).value === 'string' });
         },
         // General simplification
         MODULE(node) {
@@ -2975,7 +2977,7 @@ var ZLang;
             V.add(node);
             let condition = true;
             if (order === 'pre') {
-                condition = (_a = f(node)) !== null && _a !== void 0 ? _a : condition;
+                condition = (_a = f(node, V)) !== null && _a !== void 0 ? _a : condition;
             }
             if (condition && node instanceof Nodes.ZNode) {
                 for (const child of node.children) {
@@ -3009,6 +3011,9 @@ var ZLang;
         toString() {
             return `const ${this.rType}//${this.pTypes.join('/')}`;
         }
+        get domain() {
+            return this.rType.domain;
+        }
     }
     ZLang.ZFunctionType = ZFunctionType;
     let SemanticErrorType;
@@ -3023,10 +3028,10 @@ var ZLang;
         get n() {
             return this.parent ? this.parent.n + 1 : 0;
         }
-        declare(name, type) {
+        declare(name, type, dtls) {
             if (this.has(name))
                 throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
-            this.data.set(name, { name, type, used: false, initialized: false });
+            this.data.set(name, { name, type, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
         has(name) {
             return this.data.has(name);
@@ -3042,8 +3047,14 @@ var ZLang;
                 this.parent.mark(name, dtls);
             }
         }
+        entries() {
+            return [
+                ...(this.parent ? this.parent.entries() : []),
+                ...this.data.values().map(d => [this.n, d.type, d.name].join(','))
+            ];
+        }
         toString() {
-            return (this.parent ? this.parent.toString() + '\n' : '') + this.data.values().map(d => [this.n, d.type, d.name].join(',')).toArray().join('\n');
+            return this.entries().join('\n');
         }
     }
     ZLang.Scope = Scope;
@@ -3058,7 +3069,7 @@ var ZLang;
     }
     ZLang.getEnclosingScope = getEnclosingScope;
     function initSymbols(program) {
-        ZLang.visit(program, function (node) {
+        ZLang.visit(program, function (node, V) {
             // Set up scopes
             if ((node instanceof StatementGroup || node instanceof Nodes.FunctionNode) && !node.scope.parent) {
                 const scope = getEnclosingScope(node);
@@ -3069,46 +3080,40 @@ var ZLang;
             function declareFunction(header) {
                 getEnclosingScope(node).declare(header.name, new ZFunctionType(header.rtype.ztype, header.parameters.map(p => p.type.ztype)));
             }
-            // Load data into scopes
-            switch (node.constructor) {
-                // Functions
-                // TODO limit the iterated children so visiting function's header, parameter ids, and assignments lhs don't count
-                case Nodes.FunctionHeaderNode: {
-                    declareFunction(node);
-                    break;
+            if (node instanceof Nodes.FunctionHeaderNode) {
+                declareFunction(node);
+            }
+            else if (node instanceof Nodes.FunctionNode) {
+                const scope = getEnclosingScope(node);
+                if (!scope.has(node.header.ident.name)) {
+                    declareFunction(node.header);
                 }
-                case Nodes.FunctionNode: {
-                    const func = node;
-                    const scope = getEnclosingScope(node);
-                    if (!scope.has(func.header.ident.name)) {
-                        declareFunction(func.header);
+                scope.mark(node.header.ident.name, { initialized: true });
+                V.add(node.header);
+                V.add(node.rvar);
+                for (const { ident: { name }, type: { ztype } } of node.header.parameters) {
+                    node.scope.declare(name, ztype, { initialized: true });
+                }
+                node.scope.declare(node.rvar.name, node.header.rtype.ztype, { initialized: true });
+            }
+            else if (node instanceof Nodes.DeclareStatement) {
+                const scope = getEnclosingScope(node);
+                for (const [ident, value] of node.entries) {
+                    scope.declare(ident.name, node.type.ztype);
+                    if (value !== undefined) {
+                        scope.mark(ident.name, { initialized: true });
                     }
-                    scope.mark(func.header.ident.name, { initialized: true });
-                    // return false;
-                    break;
+                    V.add(ident);
                 }
-                case Nodes.FunctionCallNode: {
-                    const call = node;
-                    const scope = getEnclosingScope(node);
-                    scope.mark(call.ident.name, { used: true });
-                    break;
-                }
-                case Nodes.ParameterNode: {
-                    const param = node;
-                    getEnclosingScope(node).declare(param.ident.name, param.type.ztype);
-                    break;
-                }
-                // Variables
-                // TODO, handle setting used
-                case Nodes.DeclareStatement: {
-                    break;
-                }
-                case Nodes.AssignmentStatement: {
-                    break;
-                }
-                case Nodes.IdentifierNode: {
-                    break;
-                }
+            }
+            else if (node instanceof Nodes.AssignmentStatement) {
+                const scope = getEnclosingScope(node);
+                scope.mark(node.ident.name, { initialized: true });
+                // throw error when assigning to const
+                V.add(node.ident);
+            }
+            else if (node instanceof Nodes.IdentifierNode) {
+                getEnclosingScope(node).mark(node.name, { used: true });
             }
         }, 'pre');
     }
@@ -3148,10 +3153,10 @@ function output(...args) {
     text.push(' ');
     console.log(text.join(' '));
 }
-// todo finish symtables
 // todo catch syntax errors and pos
+// todo finish symtables
+ZLang.initSymbols(ast);
 // todo semantic checks
-// ZLang.initSymbols(ast);
 // emit symtables
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
@@ -3159,6 +3164,7 @@ ZLang.visit(ast, function (node) {
         console.debug(ZLang.getEnclosingScope(node).toString() || '<empty>');
     }
 });
+// emit domain statements
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN', node.pos.line, node.pos.col, node.domain);

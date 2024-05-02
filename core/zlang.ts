@@ -80,7 +80,7 @@ namespace ZLang {
         export class IdentifierNode extends ExpressionNode {
             constructor(public override readonly name: string) {super()}
             get domain() {
-                return 'any'
+                return ZLang.getEnclosingScope(this).get(this.name).type.domain;
             }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
@@ -185,8 +185,8 @@ namespace ZLang {
                 super([ident,...args]);
             }
             get domain() {
-                ///#warning get function domain
-                return 'any';
+                ///#warning limit emit to those before emit and overwrite shadows
+                return ZLang.getEnclosingScope(this).get(this.ident.name).type.domain;
             }
             get [Graphviz.label]() {
                 return `${this.ident.name}(...)`;
@@ -406,9 +406,11 @@ namespace ZLang {
             if(node.length === 1) return;
             if(node.length === 2) {
                 const [type, ident] = node.splice(0,node.length);
+                // (type as Nodes.TypeNode).meta.const = true;
                 return new Nodes.ParameterNode(type as Nodes.TypeNode, ident as Nodes.IdentifierNode) as StrayTree<Nodes.ParameterNode>;
             } else {
                 const [type, ident, _comma,...rest] = node.splice(0,node.length);
+                // (type as Nodes.TypeNode).meta.const = true;
                 return [new Nodes.ParameterNode(type as Nodes.TypeNode, ident as Nodes.IdentifierNode), ...rest] as StrayTree<Nodes.ParameterNode>[];
             }
         },
@@ -434,7 +436,7 @@ namespace ZLang {
         
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
-            return new Nodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value as Domain, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const'}) as StrayTree<Nodes.TypeNode>;
+            return new Nodes.TypeNode((node.at(-1) as ParseTreeTokenNode).value as Domain, {const: node.length > 1 && (node.at(0) as ParseTreeTokenNode).value === 'const' || (node.at(-1) as ParseTreeTokenNode).value === 'string'}) as StrayTree<Nodes.TypeNode>;
         },
         
         // General simplification
@@ -573,9 +575,9 @@ namespace ZLang {
 
     // For preorder traversal, returning false prevents visiting children
     export function visit(program: Program, f: (node:Nodes.ZNode)=>void, order: 'post');
-    export function visit(program: Program, f: (node:Nodes.ZNode)=>void|boolean, order?: 'pre');
-    export function visit(program: Program, f: (node:Nodes.ZNode)=>void|boolean, order: 'pre'|'post' = 'pre') {
-        const V = new Set<Nodes.ZNode|Parsing.ParseTreeTokenNode>;
+    export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order?: 'pre');
+    export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order: 'pre'|'post' = 'pre') {
+        const V = new Set<Nodes.ZNode>;
         function visit(node: Nodes.ZNode) {
             if(V.has(node)) return;
             V.add(node);
@@ -583,7 +585,7 @@ namespace ZLang {
             let condition = true;
 
             if(order === 'pre') {
-                condition = f(node) as undefined | boolean ?? condition;
+                condition = f(node,V) as undefined | boolean ?? condition;
             }
 
             if(condition && node instanceof Nodes.ZNode) {
@@ -616,6 +618,9 @@ namespace ZLang {
         public toString() {
             return `const ${this.rType}//${this.pTypes.join('/')}`;
         }
+        public get domain() {
+            return this.rType.domain;
+        }
     }
 
     export const enum SemanticErrorType {
@@ -630,9 +635,9 @@ namespace ZLang {
         protected get n() {
             return this.parent ? this.parent.n + 1 : 0;
         }
-        public declare(name: string, type: ZType | ZFunctionType) {
+        public declare(name: string, type: ZType | ZFunctionType, dtls?: Partial<DeclarationDetails>) {
             if(this.has(name)) throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
-            this.data.set(name, {name,type,used:false,initialized:false});
+            this.data.set(name, {name,type,used:false,initialized:false,...(dtls??{})});
         }
         public has(name: string): boolean {
             return this.data.has(name);
@@ -647,8 +652,14 @@ namespace ZLang {
                 this.parent.mark(name,dtls);
             }
         }
+        protected entries() {
+            return [
+                ...(this.parent ? this.parent.entries() : []),
+                ...this.data.values().map(d => [this.n,d.type,d.name].join(','))
+            ];
+        }
         public toString() {
-            return (this.parent ? this.parent.toString() + '\n' : '') + this.data.values().map(d => [this.n,d.type,d.name].join(',')).toArray().join('\n');
+            return this.entries().join('\n');
         }
         // TODO, helper to get declarations up until <name>, might require having a sperate define to update order?
     }
@@ -664,7 +675,7 @@ namespace ZLang {
     }
 
     export function initSymbols(program: Program) {
-        ZLang.visit(program,function(node) {
+        ZLang.visit(program,function(node,V: Set<Nodes.ZNode>) {
             // Set up scopes
             if((node instanceof StatementGroup || node instanceof Nodes.FunctionNode) && !node.scope.parent) {
                 const scope = getEnclosingScope(node);
@@ -681,54 +692,43 @@ namespace ZLang {
                 ));
             }
 
-            // Load data into scopes
-            switch(node.constructor) {
-                // Functions
-                // TODO limit the iterated children so visiting function's header, parameter ids, and assignments lhs don't count
-
-                case Nodes.FunctionHeaderNode: {
-                    declareFunction(node as Nodes.FunctionHeaderNode)
-                    break;
+            if(node instanceof Nodes.FunctionHeaderNode) {
+                declareFunction(node);
+            } else if(node instanceof Nodes.FunctionNode) {
+                const scope = getEnclosingScope(node);
+                if(!scope.has(node.header.ident.name)) {
+                    declareFunction(node.header);
                 }
-                case Nodes.FunctionNode: {
-                    const func = node as Nodes.FunctionNode;
-                    const scope = getEnclosingScope(node);
-                    if(!scope.has(func.header.ident.name)) {
-                        declareFunction(func.header);
+                scope.mark(node.header.ident.name,{initialized:true});
+                V.add(node.header);
+                V.add(node.rvar);
+
+                for(const {ident:{name},type:{ztype}} of node.header.parameters) {
+                    node.scope.declare(name,ztype,{initialized: true});
+                }
+                node.scope.declare(node.rvar.name,node.header.rtype.ztype,{initialized: true});
+
+            } else if(node instanceof Nodes.DeclareStatement) {
+                const scope = getEnclosingScope(node);
+                for(const [ident,value] of node.entries) {
+                    scope.declare(ident.name, node.type.ztype);
+                    if(value !== undefined) {
+                        scope.mark(ident.name,{initialized:true});
                     }
-                    scope.mark(func.header.ident.name,{initialized:true});
-                    // return false;
-                    break;
+                    V.add(ident);
                 }
-                case Nodes.FunctionCallNode: {
-                    const call = node as Nodes.FunctionCallNode;
-                    const scope = getEnclosingScope(node);
-                    scope.mark(call.ident.name, {used: true});
-                    break;
-                }
-                case Nodes.ParameterNode: {
-                    const param = node as Nodes.ParameterNode;
-                    getEnclosingScope(node).declare(param.ident.name,param.type.ztype);
-                    break;
-                }
-
-                // Variables
-                // TODO, handle setting used
-                case Nodes.DeclareStatement: {
-
-                    break;
-                }
-                case Nodes.AssignmentStatement: {
-
-                    break;
-                }
-                case Nodes.IdentifierNode: {
-
-                    break;
-                }
+            } else if(node instanceof Nodes.AssignmentStatement) {
+                const scope = getEnclosingScope(node);
+                scope.mark(node.ident.name,{initialized:true});
+                // throw error when assigning to const
+                V.add(node.ident);
+            } else if(node instanceof Nodes.IdentifierNode) {
+                getEnclosingScope(node).mark(node.name,{used: true});
             }
         },'pre');
     }
+
+    
 }
 
 ///#if __MAIN__
@@ -773,7 +773,7 @@ function output(...args: (string|number)[]) {
 // todo catch syntax errors and pos
 
 // todo finish symtables
-// ZLang.initSymbols(ast);
+ZLang.initSymbols(ast);
 
 // todo semantic checks
 

@@ -57,6 +57,11 @@ id p 5 9
 assign x3d 5 11
 id n 5 13
 lbrace x7b 6 1
+
+emit emit 0 0
+symtable symtable 0 0
+sc sc 0 0
+
 bool bool 7 5
 id g 7 10
 assign x3d 7 12
