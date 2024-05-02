@@ -1,0 +1,13 @@
+int int 0 0
+id a 0 0
+comma comma 0 0
+id b 0 0
+sc sc 0 0
+
+id a 0 0
+assign assign 0 0
+id b 0 0
+assign assign 0 0
+intval 117 0 0
+
+const const 1 1
