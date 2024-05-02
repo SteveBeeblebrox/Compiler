@@ -24,20 +24,27 @@ namespace ZLang {
     
     export namespace Nodes {
         export abstract class ZNode extends Tree {
+            constructor(children: ZNode[] = []) {
+                super();
+                this[Tree.push](...children);
+            }
+
             public readonly name = this.constructor.name;
             get [Graphviz.label]() {
                 return this.name;
             }
-            public abstract get children(): ZNode[];
+            public get children(): SubTree<ZNode>[] {
+                return [...super[Tree.iterator]()] as SubTree<ZNode>[];
+            }
+            destroy() {
+                return this[Tree.splice](0,this[Tree.treeLength]);
+            }
         }
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): Domain;
         }
         export abstract class LiteralNode<T> extends ExpressionNode {
             constructor(public readonly type: Domain, public readonly value: T) {super()};
-            get children() {
-                return [];
-            }
             get domain() {
                 return this.type;
             }
@@ -71,19 +78,13 @@ namespace ZLang {
             get domain() {
                 return 'any'
             }
-            get children() {
-                return [];
-            }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
             }
         }
         export class BinaryOp extends ExpressionNode {
             constructor(public override readonly name: string,public readonly lhs:ExpressionNode, public readonly rhs:ExpressionNode) {
-                super();
-            }
-            get children() {
-                return [this.lhs,this.rhs];
+                super([lhs,rhs]);
             }
             get domain() {
                 return (() => {
@@ -112,10 +113,7 @@ namespace ZLang {
         }
         export class UnaryOp extends ExpressionNode {
             constructor(public override readonly name: string,public readonly val:ExpressionNode) {
-                super();
-            }
-            get children() {
-                return [this.val];
+                super([val]);
             }
             get domain() {
                 return this.val.domain; // +-~! all leave the type as is
@@ -123,10 +121,7 @@ namespace ZLang {
         }
         export class CastNode extends ExpressionNode {
             constructor(public type: TypeNode, public readonly val: ExpressionNode) {
-                super();
-            }
-            get children() {
-                return [this.type,this.val];
+                super([type,val]);
             }
             get domain() {
                 return this.type.domain;
@@ -141,10 +136,7 @@ namespace ZLang {
 
         export class ParameterNode extends ZNode {
             constructor(public type: TypeNode, public readonly ident: IdentifierNode) {
-                super();
-            }
-            get children() {
-                return [this.type];
+                super([type,ident]);
             }
             get [Graphviz.label]() {
                 return `${this.type[Graphviz.label]} ${this.ident.name}`;
@@ -156,10 +148,7 @@ namespace ZLang {
 
         export class FunctionHeaderNode extends ZNode {
             constructor(public readonly ident: IdentifierNode, public readonly rtype: TypeNode, public readonly parameters: ParameterNode[]) {
-                super();
-            }
-            get children() {
-                return [this.rtype,...this.parameters,this];
+                super([rtype,ident,...parameters]);
             }
             get [Graphviz.label]() {
                 return `fn ${this.ident.name}(...)`;
@@ -168,11 +157,8 @@ namespace ZLang {
 
         type TypeMeta = {const:boolean};
         export class TypeNode extends ZNode {
-            constructor(public readonly type: Domain, public readonly meta: TypeMeta) {
+            constructor(public readonly type: Domain, public readonly meta: TypeMeta = {const: false}) {
                 super();
-            }
-            get children() {
-                return [];
             }
             get domain() {
                 return this.type;
@@ -187,10 +173,7 @@ namespace ZLang {
 
         export class FunctionCallNode extends ExpressionNode {
             constructor(public readonly ident: IdentifierNode, public readonly args: ExpressionNode[]) {
-                super();
-            }
-            get children() {
-                return [...this.args];
+                super([ident,...args]);
             }
             get domain() {
                 ///#warning get function domain
@@ -203,10 +186,7 @@ namespace ZLang {
 
         export class FunctionNode extends ZNode {
             constructor(public readonly header: FunctionHeaderNode, public readonly rvar: IdentifierNode, public readonly rvalue: ExpressionNode, public readonly body: StatementGroup) {
-                super();
-            }
-            get children() {
-                return [this.header,this.rvalue,this.body];
+                super([header,rvar,rvalue,body]);
             }
             get [Graphviz.label]() {
                 return `${this.header[Graphviz.label]} {...}`;
@@ -217,8 +197,8 @@ namespace ZLang {
         }
 
         export class Program extends ZNode {
-            constructor(public readonly children: (StatementNode|FunctionNode)[]) {
-                super();
+            constructor(public readonly steps: (StatementNode|FunctionNode)[]) {
+                super([...steps]);
             }
             get [Graphviz.label]() {
                 return 'Program.z';
@@ -230,10 +210,7 @@ namespace ZLang {
 
         export class DomainNode extends ExpressionNode {
             constructor(public readonly value: ExpressionNode, public readonly pos: Position) {
-                super();
-            }
-            get children() {
-                return [this.value];
+                super([value]);
             }
             get domain() {
                 return this.value.domain;
@@ -247,9 +224,6 @@ namespace ZLang {
         }
 
         export abstract class StatementNode extends ZNode {
-            constructor() {
-                super();
-            }
             get [Graphviz.label]() {
                 return 'Statement';
             }
@@ -257,10 +231,7 @@ namespace ZLang {
 
         export class DeclareStatement extends StatementNode {
             constructor(public readonly type: TypeNode, public readonly entries: [IdentifierNode, ExpressionNode?][]) {
-                super();
-            }
-            get children() {
-                return [this.type, ...this.entries.flatMap(x=>x.length > 1 ? x[1] : [])];
+                super([type,...entries.flat()]);
             }
             get [Graphviz.label]() {
                 return 'Declare';
@@ -281,10 +252,7 @@ namespace ZLang {
 
         export  class AssignmentStatement extends StatementNode {
             constructor(public readonly ident: IdentifierNode, public readonly value: ExpressionNode | AssignmentStatement) {
-                super();
-            }
-            get children() {
-                return [this.value];
+                super([ident,value]);
             }
             get [Graphviz.label]() {
                 return '=';
@@ -299,10 +267,7 @@ namespace ZLang {
 
         export  class IfStatement extends StatementNode {
             constructor(public readonly predicate: ExpressionNode, public readonly btrue: StatementGroup, public readonly bfalse?: StatementGroup) {
-                super();
-            }
-            get children() {
-                return [this.predicate,this.btrue,...(this.bfalse !== undefined ? [this.bfalse] : [])];
+                super([predicate,btrue,...(bfalse !== undefined ? [bfalse] : [])]);
             }
             get [Graphviz.label]() {
                 return this.bfalse !== undefined ? 'If-Else' : 'If'
@@ -311,10 +276,7 @@ namespace ZLang {
 
         export class DoWhileStatement extends StatementNode {
             constructor(public readonly body: StatementGroup, public readonly predicate: ExpressionNode) {
-                super();
-            }
-            get children() {
-                return [this.body,this.predicate];
+                super([body,predicate]);
             }
             get [Graphviz.label]() {
                 return 'Do While';
@@ -323,10 +285,7 @@ namespace ZLang {
 
         export  class WhileStatement extends StatementNode {
             constructor(public readonly predicate: ExpressionNode, public readonly body: StatementGroup) {
-                super();
-            }
-            get children() {
-                return [this.predicate,this.body];
+                super([predicate,body]);
             }
             get [Graphviz.label]() {
                 return 'While';
@@ -346,13 +305,13 @@ namespace ZLang {
         }
         export class EmitStatement extends StatementNode {
             constructor(public readonly data: EmitMeta) {
-                super();
-            }
-            get children() {
-                switch(this.data.type) {
-                    case 'value': return [this.data.value];
-                    case 'string': return [this.data.index,this.data.length];
-                }
+                super((function() {
+                    switch(data.type) {
+                        case 'value': return [data.value];
+                        case 'string': return [data.index,data.length];
+                        default: return [];
+                    }
+                })());
             }
             get [Graphviz.label]() {
                 return 'Emit'
@@ -364,10 +323,7 @@ namespace ZLang {
 
         export class RandStatement extends StatementNode {
             constructor(public readonly ident: IdentifierNode, public readonly min?: ExpressionNode, public readonly max?: ExpressionNode) {
-                super();
-            }
-            get children() {
-                return [...(this.min !== undefined ? [this.min] : []), ...(this.max !== undefined ? [this.max] : [])];
+                super([...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
             }
             get [Graphviz.label]() {
                 return 'Rand';
@@ -379,10 +335,7 @@ namespace ZLang {
 
         export class StatementGroup extends StatementNode {
             constructor(public readonly statements: StatementNode[]) {
-                super();
-            }
-            get children() {
-                return [...this.statements];
+                super([...statements]);
             }
             get [Graphviz.label]() {
                 return 'Statements';
@@ -421,7 +374,10 @@ namespace ZLang {
             return new Nodes.UnaryOp((node.at(0) as ParseTreeTokenNode).value,node.pop() as ExpressionNode) as StrayTree<Nodes.UnaryOp>;
         },
         CAST(node) {
-            return new Nodes.CastNode(node.at(0) as Nodes.TypeNode, node.at(2) as ExpressionNode) as StrayTree<Nodes.CastNode>;
+            return new Nodes.CastNode(
+                new Nodes.TypeNode((node.at(0) as ParseTreeTokenNode).value as Domain),
+                node.splice(2,1)[0] as ExpressionNode
+            ) as StrayTree<Nodes.CastNode>;
         },
 
         // Functions
@@ -500,6 +456,7 @@ namespace ZLang {
             return new Nodes.AssignmentStatement(ident as Nodes.IdentifierNode, value as ExpressionNode | Nodes.AssignmentStatement) as StrayTree<Nodes.AssignmentStatement>;
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
+            
             return new Nodes.DeclareStatement(
                 node.splice(0,1)[0] as Nodes.TypeNode,
                 node.splice(0,node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.ident, x.value] : [x as Nodes.IdentifierNode])
