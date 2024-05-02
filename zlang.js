@@ -2402,13 +2402,18 @@ var ZLang;
     let Nodes;
     (function (Nodes) {
         class ZNode extends Tree {
-            constructor() {
-                super(...arguments);
+            constructor(children = []) {
+                super();
                 this.name = this.constructor.name;
+                this[Tree.push](...children);
             }
             get [Graphviz.label]() {
                 return this.name;
             }
+            get children() {
+                return [...super[Tree.iterator]()];
+            }
+            ;
         }
         Nodes.ZNode = ZNode;
         class ExpressionNode extends ZNode {
@@ -2421,9 +2426,6 @@ var ZLang;
                 this.value = value;
             }
             ;
-            get children() {
-                return [];
-            }
             get domain() {
                 return this.type;
             }
@@ -2464,9 +2466,6 @@ var ZLang;
             get domain() {
                 return 'any';
             }
-            get children() {
-                return [];
-            }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
             }
@@ -2474,13 +2473,10 @@ var ZLang;
         Nodes.IdentifierNode = IdentifierNode;
         class BinaryOp extends ExpressionNode {
             constructor(name, lhs, rhs) {
-                super();
+                super([lhs, rhs]);
                 this.name = name;
                 this.lhs = lhs;
                 this.rhs = rhs;
-            }
-            get children() {
-                return [this.lhs, this.rhs];
             }
             get domain() {
                 return (() => {
@@ -2507,12 +2503,9 @@ var ZLang;
         Nodes.BinaryOp = BinaryOp;
         class UnaryOp extends ExpressionNode {
             constructor(name, val) {
-                super();
+                super([val]);
                 this.name = name;
                 this.val = val;
-            }
-            get children() {
-                return [this.val];
             }
             get domain() {
                 return this.val.domain; // +-~! all leave the type as is
@@ -2521,12 +2514,9 @@ var ZLang;
         Nodes.UnaryOp = UnaryOp;
         class CastNode extends ExpressionNode {
             constructor(type, val) {
-                super();
+                super([type, val]);
                 this.type = type;
                 this.val = val;
-            }
-            get children() {
-                return [this.type, this.val];
             }
             get domain() {
                 return this.type.domain;
@@ -2541,12 +2531,9 @@ var ZLang;
         Nodes.CastNode = CastNode;
         class ParameterNode extends ZNode {
             constructor(type, ident) {
-                super();
+                super([type, ident]);
                 this.type = type;
                 this.ident = ident;
-            }
-            get children() {
-                return [this.type];
             }
             get [Graphviz.label]() {
                 return `${this.type[Graphviz.label]} ${this.ident.name}`;
@@ -2558,13 +2545,10 @@ var ZLang;
         Nodes.ParameterNode = ParameterNode;
         class FunctionHeaderNode extends ZNode {
             constructor(ident, rtype, parameters) {
-                super();
+                super([rtype, ident, ...parameters]);
                 this.ident = ident;
                 this.rtype = rtype;
                 this.parameters = parameters;
-            }
-            get children() {
-                return [this.rtype, ...this.parameters, this];
             }
             get [Graphviz.label]() {
                 return `fn ${this.ident.name}(...)`;
@@ -2572,13 +2556,10 @@ var ZLang;
         }
         Nodes.FunctionHeaderNode = FunctionHeaderNode;
         class TypeNode extends ZNode {
-            constructor(type, meta) {
+            constructor(type, meta = { const: false }) {
                 super();
                 this.type = type;
                 this.meta = meta;
-            }
-            get children() {
-                return [];
             }
             get domain() {
                 return this.type;
@@ -2593,12 +2574,9 @@ var ZLang;
         Nodes.TypeNode = TypeNode;
         class FunctionCallNode extends ExpressionNode {
             constructor(ident, args) {
-                super();
+                super([ident, ...args]);
                 this.ident = ident;
                 this.args = args;
-            }
-            get children() {
-                return [...this.args];
             }
             get domain() {
                 return 'any';
@@ -2610,14 +2588,11 @@ var ZLang;
         Nodes.FunctionCallNode = FunctionCallNode;
         class FunctionNode extends ZNode {
             constructor(header, rvar, rvalue, body) {
-                super();
+                super([header, rvar, rvalue, body]);
                 this.header = header;
                 this.rvar = rvar;
                 this.rvalue = rvalue;
                 this.body = body;
-            }
-            get children() {
-                return [this.header, this.rvalue, this.body];
             }
             get [Graphviz.label]() {
                 return `${this.header[Graphviz.label]} {...}`;
@@ -2628,9 +2603,9 @@ var ZLang;
         }
         Nodes.FunctionNode = FunctionNode;
         class Program extends ZNode {
-            constructor(children) {
-                super();
-                this.children = children;
+            constructor(steps) {
+                super([...steps]);
+                this.steps = steps;
             }
             get [Graphviz.label]() {
                 return 'Program.z';
@@ -2642,12 +2617,9 @@ var ZLang;
         Nodes.Program = Program;
         class DomainNode extends ExpressionNode {
             constructor(value, pos) {
-                super();
+                super([value]);
                 this.value = value;
                 this.pos = pos;
-            }
-            get children() {
-                return [this.value];
             }
             get domain() {
                 return this.value.domain;
@@ -2661,9 +2633,6 @@ var ZLang;
         }
         Nodes.DomainNode = DomainNode;
         class StatementNode extends ZNode {
-            constructor() {
-                super();
-            }
             get [Graphviz.label]() {
                 return 'Statement';
             }
@@ -2674,9 +2643,6 @@ var ZLang;
                 super();
                 this.type = type;
                 this.entries = entries;
-            }
-            get children() {
-                return [this.type, ...this.entries.flatMap(x => x.length > 1 ? x[1] : [])];
             }
             get [Graphviz.label]() {
                 return 'Declare';
@@ -2697,12 +2663,9 @@ var ZLang;
         Nodes.DeclareStatement = DeclareStatement;
         class AssignmentStatement extends StatementNode {
             constructor(ident, value) {
-                super();
+                super([ident, value]);
                 this.ident = ident;
                 this.value = value;
-            }
-            get children() {
-                return [this.value];
             }
             get [Graphviz.label]() {
                 return '=';
@@ -2717,13 +2680,10 @@ var ZLang;
         Nodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
             constructor(predicate, btrue, bfalse) {
-                super();
+                super([predicate, btrue, ...(bfalse !== undefined ? [bfalse] : [])]);
                 this.predicate = predicate;
                 this.btrue = btrue;
                 this.bfalse = bfalse;
-            }
-            get children() {
-                return [this.predicate, this.btrue, ...(this.bfalse !== undefined ? [this.bfalse] : [])];
             }
             get [Graphviz.label]() {
                 return this.bfalse !== undefined ? 'If-Else' : 'If';
@@ -2732,12 +2692,9 @@ var ZLang;
         Nodes.IfStatement = IfStatement;
         class DoWhileStatement extends StatementNode {
             constructor(body, predicate) {
-                super();
+                super([body, predicate]);
                 this.body = body;
                 this.predicate = predicate;
-            }
-            get children() {
-                return [this.body, this.predicate];
             }
             get [Graphviz.label]() {
                 return 'Do While';
@@ -2746,12 +2703,9 @@ var ZLang;
         Nodes.DoWhileStatement = DoWhileStatement;
         class WhileStatement extends StatementNode {
             constructor(predicate, body) {
-                super();
+                super([predicate, body]);
                 this.predicate = predicate;
                 this.body = body;
-            }
-            get children() {
-                return [this.predicate, this.body];
             }
             get [Graphviz.label]() {
                 return 'While';
@@ -2760,14 +2714,14 @@ var ZLang;
         Nodes.WhileStatement = WhileStatement;
         class EmitStatement extends StatementNode {
             constructor(data) {
-                super();
+                super((function () {
+                    switch (data.type) {
+                        case 'value': return [data.value];
+                        case 'string': return [data.index, data.length];
+                        default: return [];
+                    }
+                })());
                 this.data = data;
-            }
-            get children() {
-                switch (this.data.type) {
-                    case 'value': return [this.data.value];
-                    case 'string': return [this.data.index, this.data.length];
-                }
             }
             get [Graphviz.label]() {
                 return 'Emit';
@@ -2779,13 +2733,10 @@ var ZLang;
         Nodes.EmitStatement = EmitStatement;
         class RandStatement extends StatementNode {
             constructor(ident, min, max) {
-                super();
+                super([...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
                 this.ident = ident;
                 this.min = min;
                 this.max = max;
-            }
-            get children() {
-                return [...(this.min !== undefined ? [this.min] : []), ...(this.max !== undefined ? [this.max] : [])];
             }
             get [Graphviz.label]() {
                 return 'Rand';
@@ -2797,11 +2748,8 @@ var ZLang;
         Nodes.RandStatement = RandStatement;
         class StatementGroup extends StatementNode {
             constructor(statements) {
-                super();
+                super([...statements]);
                 this.statements = statements;
-            }
-            get children() {
-                return [...this.statements];
             }
             get [Graphviz.label]() {
                 return 'Statements';
@@ -2840,7 +2788,7 @@ var ZLang;
             return new Nodes.UnaryOp(node.at(0).value, node.pop());
         },
         CAST(node) {
-            return new Nodes.CastNode(node.at(0), node.at(2));
+            return new Nodes.CastNode(new Nodes.TypeNode(node.at(0).value), node.splice(2, 1)[0]);
         },
         // Functions
         FUNSIG(node) {
@@ -2915,6 +2863,10 @@ var ZLang;
             return new Nodes.AssignmentStatement(ident, value);
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
+            node.splice(0, node.length).map(function (tree) {
+                if (tree instanceof Nodes.AssignmentStatement) {
+                }
+            });
             return new Nodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.ident, x.value] : [x]));
         },
         DECLIDS(node) {
