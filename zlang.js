@@ -2282,26 +2282,27 @@ var SLR1;
                 // Save to cache
                 try {
                     if (cache !== undefined) {
-                        system.writeFileSync(cache, LZCompression.compressToUint8Array(JSON.stringify({ signature: Signature.create(cfg), table: this.serializeTableToCSV() })));
+                        system.writeFileSync(cache, LZCompression.compressToUint8Array(JSON.stringify({ signature: Signature.create(cfg), table: this.toCSV() })));
                     }
                 }
                 catch (e) { }
             }
         }
         deserializeTableFromCSV(csv) {
-            var _a;
             const T = new Map();
             const [[_, ...header], ...rows] = csv.trim().split('\n').map(x => x.split(','));
             for (const row of rows) {
                 const R = new Map();
                 T.set(+row.shift(), R);
                 for (const i of range(row.length)) {
-                    R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i], (_a = row[i]) !== null && _a !== void 0 ? _a : undefined);
+                    if (row[i]) {
+                        R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i], row[i]);
+                    }
                 }
             }
             return T;
         }
-        serializeTableToCSV() {
+        toCSV() {
             const T = this.getParseTable();
             const data = [['.', ...this.cfg.getGrammarSymbols().map(s => s !== null && s !== void 0 ? s : CFG.EOF_CHARACTER)].join(',')];
             for (const [i, R] of T.entries()) {
@@ -2309,7 +2310,7 @@ var SLR1;
                 for (const [k, v] of R.entries()) {
                     row.set(k, v);
                 }
-                data.push([i, ...row.values().map(x => x !== null && x !== void 0 ? x : null)].join(','));
+                data.push([i, ...row.values().map(x => x !== null && x !== void 0 ? x : '')].join(','));
             }
             return data.join('\n');
         }
@@ -2363,8 +2364,7 @@ var SLR1;
                 }
                 return node;
             }
-            while (D.length || ts.peek() || S.at(-1).state !== 0) { //todo not in 0
-                console.log(D.length, !!ts.peek(), S.at(-1).state, ts.peek(0));
+            while (D.length || ts.peek() || T.get(S.at(-1).state).has(undefined)) {
                 let t = (_a = D.at(0)) !== null && _a !== void 0 ? _a : ts.peek();
                 const [action, v] = (_c = (_b = T.get(S.at(-1).state).get(t === null || t === void 0 ? void 0 : t.name)) === null || _b === void 0 ? void 0 : _b.split('-')) !== null && _c !== void 0 ? _c : [];
                 if (action === undefined) {
@@ -2382,6 +2382,7 @@ var SLR1;
                     return this.sdt.transform(reduce(n));
                 }
             }
+            throw new Parsing.SyntaxError(`Unexpected token 'EOF'`);
         }
     }
     SLR1.SLR1Parser = SLR1Parser;
@@ -3065,8 +3066,6 @@ var ZLang;
         }
     }
     ZLang.Scope = Scope;
-    console.log(PARSER.getParseTable().get(45));
-    // system.exit(0)
 })(ZLang || (ZLang = {}));
 async function dump(name, node, { format = 'png' } = {}) {
     //@ts-ignore
