@@ -166,7 +166,7 @@ namespace SLR1 {
                 // Save to cache
                 try {
                     if(cache !== undefined) {
-                        system.writeFileSync(cache,LZCompression.compressToUint8Array(JSON.stringify({signature: Signature.create(cfg as any), table: this.serializeTableToCSV()})));
+                        system.writeFileSync(cache,LZCompression.compressToUint8Array(JSON.stringify({signature: Signature.create(cfg as any), table: this.toCSV()})));
                     }
                 } catch(e) {}
             }
@@ -178,12 +178,14 @@ namespace SLR1 {
                 const R = new Map();
                 T.set(+row.shift(), R);
                 for(const i of range(row.length)) {
-                    R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i],row[i]??undefined);
+                    if(row[i]) {
+                        R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i],row[i]);
+                    }
                 }
             }
             return T;
         }
-        private serializeTableToCSV(): string {
+        public toCSV(): string {
             const T = this.getParseTable();
             const data: string[] = [['.',...this.cfg.getGrammarSymbols().map(s=>s??CFG.EOF_CHARACTER)].join(',')];
             for(const [i,R] of T.entries()) {
@@ -192,7 +194,7 @@ namespace SLR1 {
                     row.set(k,v);
                 }
     
-                data.push([i,...row.values().map(x=>x??null)].join(','));
+                data.push([i,...row.values().map(x=>x??'')].join(','));
             }
             return data.join('\n');
         }
@@ -248,7 +250,7 @@ namespace SLR1 {
                 return node as StrayTree<InnerParseTree>;
             }
 
-            while(true) { //todo not in 0
+            while(D.length || ts.peek() || T.get(S.at(-1).state).has(undefined)) {
                 let t = D.at(0) ?? ts.peek();
                 const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
                 if(action === undefined) {
@@ -265,6 +267,7 @@ namespace SLR1 {
                     return this.sdt.transform(reduce(n) as StrayTree<ParseTreeNode>) as ParseResult<ASTNodeType>;
                 }
             }
+            throw new Parsing.SyntaxError(`Unexpected token 'EOF'`);
         }
     }
 
