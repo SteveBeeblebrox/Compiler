@@ -178,7 +178,7 @@ namespace SLR1 {
                 const R = new Map();
                 T.set(+row.shift(), R);
                 for(const i of range(row.length)) {
-                    R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i],row[i]);
+                    R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i],row[i]??undefined);
                 }
             }
             return T;
@@ -192,7 +192,7 @@ namespace SLR1 {
                     row.set(k,v);
                 }
     
-                data.push([i,...row.values().map(x=>x??'')].join(','));
+                data.push([i,...row.values().map(x=>x??null)].join(','));
             }
             return data.join('\n');
         }
