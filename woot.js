@@ -2504,6 +2504,22 @@ var ZLang;
             }
         }
         Nodes.StringLiteral = StringLiteral;
+        class IdentifierNode extends ExpressionNode {
+            constructor(name) {
+                super();
+                this.name = name;
+            }
+            get domain() {
+                return 'any';
+            }
+            get children() {
+                return [];
+            }
+            get [Graphviz.label]() {
+                return `id:${this.name}`;
+            }
+        }
+        Nodes.IdentifierNode = IdentifierNode;
         class BinaryOp extends ExpressionNode {
             constructor(name, lhs, rhs) {
                 super();
@@ -2993,6 +3009,9 @@ var ZLang;
         },
         stringval(node) {
             return new Nodes.StringLiteral(node.value);
+        },
+        id(node) {
+            return new Nodes.IdentifierNode(node.value);
         }
     });
     console.debug('Building Parser...');

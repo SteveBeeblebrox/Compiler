@@ -66,6 +66,18 @@ namespace ZLang {
                 return `${this.domain}val:${escapeString(this.value)}`;
             }
         }
+        export class IdentifierNode extends ExpressionNode {
+            constructor(public override readonly name: string) {super()}
+            get domain() {
+                return 'any'
+            }
+            get children() {
+                return [];
+            }
+            get [Graphviz.label]() {
+                return `id:${this.name}`;
+            }
+        }
         export class BinaryOp extends ExpressionNode {
             constructor(public override readonly name: string,public readonly lhs:ExpressionNode, public readonly rhs:ExpressionNode) {
                 super();
@@ -128,14 +140,14 @@ namespace ZLang {
         }
 
         export class ParameterNode extends ZNode {
-            constructor(public type: TypeNode, public override readonly name: string) {
+            constructor(public type: TypeNode, public readonly ident: IdentifierNode) {
                 super();
             }
             get children() {
                 return [this.type];
             }
             get [Graphviz.label]() {
-                return `${this.type[Graphviz.label]} ${this.name}`;
+                return `${this.type[Graphviz.label]} ${this.ident.name}`;
             }
             get [Graphviz.children]() {
                 return [];
@@ -143,14 +155,14 @@ namespace ZLang {
         }
 
         export class FunctionHeaderNode extends ZNode {
-            constructor(public override readonly name: string, public readonly rtype: TypeNode, public readonly parameters: ParameterNode[]) {
+            constructor(public readonly ident: IdentifierNode, public readonly rtype: TypeNode, public readonly parameters: ParameterNode[]) {
                 super();
             }
             get children() {
                 return [this.rtype,...this.parameters,this];
             }
             get [Graphviz.label]() {
-                return `fn ${this.name}(...)`;
+                return `fn ${this.ident.name}(...)`;
             }
         }
 
@@ -174,7 +186,7 @@ namespace ZLang {
         }
 
         export class FunctionCallNode extends ExpressionNode {
-            constructor(public override readonly name: string, public readonly args: ExpressionNode[]) {
+            constructor(public readonly ident: IdentifierNode, public readonly args: ExpressionNode[]) {
                 super();
             }
             get children() {
@@ -182,15 +194,15 @@ namespace ZLang {
             }
             get domain() {
                 ///#warning get function domain
-                return 'any' as Domain;
+                return 'any';
             }
             get [Graphviz.label]() {
-                return `${this.name}(...)`;
+                return `${this.ident.name}(...)`;
             }
         }
 
         export class FunctionNode extends ZNode {
-            constructor(public readonly header: FunctionHeaderNode, public readonly rvar: string, public readonly rvalue: ExpressionNode, public readonly body: StatementGroup) {
+            constructor(public readonly header: FunctionHeaderNode, public readonly rvar: IdentifierNode, public readonly rvalue: ExpressionNode, public readonly body: StatementGroup) {
                 super();
             }
             get children() {
@@ -200,7 +212,7 @@ namespace ZLang {
                 return `${this.header[Graphviz.label]} {...}`;
             }
             get [Graphviz.children]() {
-                return [['header',this.header],['var',new ParseTreeTokenNode('id' as Terminal, this.rvar)],['rvalue',this.rvalue], ['body',this.body]];
+                return [['header',this.header],['var',this.rvar],['rvalue',this.rvalue], ['body',this.body]];
             }
         }
 
@@ -217,7 +229,7 @@ namespace ZLang {
         }
 
         export class DomainNode extends ExpressionNode {
-            constructor(public readonly value: ExpressionNode,public readonly pos: Position) {
+            constructor(public readonly value: ExpressionNode, public readonly pos: Position) {
                 super();
             }
             get children() {
@@ -244,7 +256,7 @@ namespace ZLang {
         }
 
         export class DeclareStatement extends StatementNode {
-            constructor(public readonly type: TypeNode, public readonly entries: [string, ExpressionNode?][]) {
+            constructor(public readonly type: TypeNode, public readonly entries: [IdentifierNode, ExpressionNode?][]) {
                 super();
             }
             get children() {
@@ -255,12 +267,12 @@ namespace ZLang {
             }
             get [Graphviz.children]() {
                 return [...Object.entries({type:this.type}), ...this.entries.map(function(entry,i) {
-                    return entry.length === 1 ? ['',new ParseTreeTokenNode('id' as Terminal, entry[0])] : ['',{
+                    return entry.length === 1 ? ['',entry[0]] : ['',{
                         get [Graphviz.label]() {
                             return '=';
                         },
                         get [Graphviz.children]() {
-                            return [['',new ParseTreeTokenNode('id' as Terminal, entry[0])], ['',entry[1]]];
+                            return [['',entry[0]], ['',entry[1]]];
                         }
                     }];
                 })];
@@ -268,7 +280,7 @@ namespace ZLang {
         }
 
         export  class AssignmentStatement extends StatementNode {
-            constructor(public readonly id: string, public readonly value: ExpressionNode) {
+            constructor(public readonly ident: IdentifierNode, public readonly value: ExpressionNode | AssignmentStatement) {
                 super();
             }
             get children() {
@@ -278,7 +290,10 @@ namespace ZLang {
                 return '=';
             }
             get [Graphviz.children]() {
-                return [['id',new ParseTreeTokenNode('id' as Terminal, this.id)],...Object.entries({value:this.value})]
+                return [['id',this.ident],...Object.entries({value:this.value})];
+            }
+            get domain() {
+                return this.value.domain;
             }
         }
 
@@ -325,7 +340,7 @@ namespace ZLang {
             readonly value: ExpressionNode
         } | {
             readonly type: 'string',
-            readonly id: string,
+            readonly ident: IdentifierNode,
             readonly index: ExpressionNode,
             readonly length: ExpressionNode
         }
@@ -343,12 +358,12 @@ namespace ZLang {
                 return 'Emit'
             }
             get [Graphviz.children]() {
-                return [...(this.data.type==='string' ? [['id',new ParseTreeTokenNode('id' as Terminal,this.data.id)]] : []),...Object.entries(this.data)];
+                return [...(this.data.type==='string' ? [['id',this.data.ident]] : []),...Object.entries(this.data)];
             }
         }
 
         export class RandStatement extends StatementNode {
-            constructor(public readonly id: string, public readonly min?: ExpressionNode, public readonly max?: ExpressionNode) {
+            constructor(public readonly ident: IdentifierNode, public readonly min?: ExpressionNode, public readonly max?: ExpressionNode) {
                 super();
             }
             get children() {
@@ -358,7 +373,7 @@ namespace ZLang {
                 return 'Rand';
             }
             get [Graphviz.children]() {
-                return [['id',new ParseTreeTokenNode('id' as Terminal,this.id)],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
+                return [['id',this.ident],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
             }
         }
 
@@ -411,18 +426,24 @@ namespace ZLang {
 
         // Functions
         FUNSIG(node) {
-            return new Nodes.FunctionHeaderNode((node.at(1) as ParseTreeTokenNode).value, node.at(0) as Nodes.TypeNode, node.children.splice(3,node.length-4) as Nodes.ParameterNode[]) as StrayTree<Nodes.FunctionHeaderNode>
+            const [type,ident,_lraren,...parameters] = node.splice(0,node.length);
+            const _rparen = parameters.pop();
+            return new Nodes.FunctionHeaderNode(ident as Nodes.IdentifierNode, type as Nodes.TypeNode, parameters as Nodes.ParameterNode[]) as StrayTree<Nodes.FunctionHeaderNode>
         },
         PARAMLIST(node) {
             if(node.length === 1) return;
             if(node.length === 2) {
-                return new Nodes.ParameterNode(node.at(0) as Nodes.TypeNode, (node.at(1) as ParseTreeTokenNode).value) as StrayTree<Nodes.ParameterNode>;
+                const [type, ident] = node.splice(0,node.length);
+                return new Nodes.ParameterNode(type as Nodes.TypeNode, ident as Nodes.IdentifierNode) as StrayTree<Nodes.ParameterNode>;
             } else {
-                return [new Nodes.ParameterNode(node.at(0) as Nodes.TypeNode, (node.at(1) as ParseTreeTokenNode).value), ...node.splice(3,node.length)] as StrayTree<Nodes.ParameterNode>[];
+                const [type, ident,...rest] = node.splice(0,node.length);
+                return [new Nodes.ParameterNode(type as Nodes.TypeNode, ident as Nodes.IdentifierNode), ...rest] as StrayTree<Nodes.ParameterNode>[];
             }
         },
         FUNCALL(node) {
-            return new Nodes.FunctionCallNode((node.at(0) as ParseTreeTokenNode).value, node.splice(2,node.length-3) as ExpressionNode[]) as StrayTree<Nodes.FunctionCallNode>;
+            const [ident,_lparen,...args] = node.splice(0,node.length);
+            const _rparen = args.pop();
+            return new Nodes.FunctionCallNode(ident as Nodes.IdentifierNode, args as ExpressionNode[]) as StrayTree<Nodes.FunctionCallNode>;
         },
         ARGLIST(node) {
             if(node.length === 1) return;
@@ -430,11 +451,12 @@ namespace ZLang {
             return node.splice(0,node.length);
         },
         FUNCTION(node) {
+            const [header,_returns,ident,_assign,expr,body] = node.splice(0,node.length);
             return new Nodes.FunctionNode(
-                node.splice(0,1)[0] as Nodes.FunctionHeaderNode,
-                (node.at(1) as ParseTreeTokenNode).value,
-                node.splice(-2,1)[0] as ExpressionNode,
-                node.splice(-1,1)[0] as StatementGroup
+                header as Nodes.FunctionHeaderNode,
+                ident as Nodes.IdentifierNode,
+                expr as ExpressionNode,
+                body as StatementGroup
             ) as StrayTree<Nodes.FunctionNode>;
         },
         
@@ -474,12 +496,14 @@ namespace ZLang {
 
         // Assignment and declaration
         ASSIGN(node) {
-            return new Nodes.AssignmentStatement((node.at(0) as ParseTreeTokenNode).value, node.splice(-1,1)[0] as ExpressionNode) as StrayTree<Nodes.AssignmentStatement>;
+            const [ident,_assign,value] = node.splice(0,node.length);
+            ///#warning nested assignment
+            return new Nodes.AssignmentStatement(ident as Nodes.IdentifierNode, value as ExpressionNode | Nodes.AssignmentStatement) as StrayTree<Nodes.AssignmentStatement>;
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
             return new Nodes.DeclareStatement(
                 node.splice(0,1)[0] as Nodes.TypeNode,
-                node.splice(0,node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.id, x.value] : [(x as ParseTreeTokenNode).value])
+                node.splice(0,node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.ident, x.value] : [x as Nodes.IdentifierNode])
             ) as StrayTree<Nodes.DeclareStatement>;
         },
         DECLIDS(node) {
@@ -488,22 +512,26 @@ namespace ZLang {
 
         // Control Statements
         WHILE(node) {
-            return new Nodes.WhileStatement(node.splice(2,1)[0] as ExpressionNode,node.splice(-1,1)[0] as StatementGroup) as StrayTree<Nodes.WhileStatement>;
+            const [_while,_lparen,predicate,_rparen,body] = node.splice(0,node.length);
+            return new Nodes.WhileStatement(predicate as ExpressionNode,body as StatementGroup) as StrayTree<Nodes.WhileStatement>;
         },
         DOWHILE(node) {
-            return new Nodes.DoWhileStatement(node.splice(1,1)[0] as StatementGroup, node.splice(-3,1)[0] as ExpressionNode) as StrayTree<Nodes.WhileStatement>;
+            const [_do,body,_while,_lparen,predicate,_rparen,_sc] = node.splice(0,node.length);
+            return new Nodes.DoWhileStatement(body as StatementGroup, predicate as ExpressionNode) as StrayTree<Nodes.WhileStatement>;
         },
         IF(node) {
+            const [_if,_rparen,predicate,_lparen,btrue] = node.splice(0,node.length);
             return new Nodes.IfStatement(
-                node.splice(2,1)[0] as ExpressionNode,
-                node.splice(-1,1)[0] as StatementGroup
+                predicate as ExpressionNode,
+                btrue as StatementGroup
             ) as StrayTree<Nodes.IfStatement>;
         },
         IFELSE(node) {
+            const [_if,_lparen,predicate,_rparen,btrue,_else,bfalse] = node.splice(0,node.length);
             return new Nodes.IfStatement(
-                node.splice(2,1)[0] as ExpressionNode,
-                node.splice(-3,1)[0] as StatementGroup,
-                node.splice(-1,1)[0] as StatementGroup
+                predicate as ExpressionNode,
+                btrue as StatementGroup,
+                bfalse as StatementGroup
             ) as StrayTree<Nodes.IfStatement>;
         },
 
@@ -512,7 +540,7 @@ namespace ZLang {
             switch(node.length) {
                 case 2:
                     return new Nodes.EmitStatement({
-                        type: (node.at(-1) as ParseTreeTokenNode).value as 'symbtable'
+                        type: 'symbtable'
                     }) as StrayTree<Nodes.EmitStatement>;
                 case 4:
                     return new Nodes.EmitStatement({
@@ -520,29 +548,28 @@ namespace ZLang {
                         value: node.splice(2,1)[0] as ExpressionNode
                     }) as StrayTree<Nodes.EmitStatement>;
                 case 6:
+                    const [_emit,ident,_comma,index,__comma,length] = node.splice(0,node.length);
                     return new Nodes.EmitStatement({
                         type: 'string',
-                        id: (node.at(1) as ParseTreeTokenNode).value,
-                        index: node.splice(3,1)[0] as ExpressionNode,
-                        length: node.splice(-1,1)[0] as ExpressionNode
+                        ident: ident as Nodes.IdentifierNode,
+                        index: index as ExpressionNode,
+                        length: length as ExpressionNode
                     }) as StrayTree<Nodes.EmitStatement>;
             }
         },
         RAND(node) {
             switch(node.length) {
                 case 2:
-                    return new Nodes.RandStatement((node.at(1) as ParseTreeTokenNode).value) as StrayTree<Nodes.RandStatement>;
+                    const [_rand,ident] = node.splice(0,node.length);
+                    return new Nodes.RandStatement(ident as Nodes.IdentifierNode) as StrayTree<Nodes.RandStatement>;
                 case 6:
-                    return new Nodes.RandStatement(
-                        (node.at(1) as ParseTreeTokenNode).value,
-                        node.splice(3,1)[0] as ExpressionNode,
-                        node.splice(-1,1)[0] as ExpressionNode
-                    ) as StrayTree<Nodes.RandStatement>;
+                    const [__rand,intIdent,_comma,min,__comma,max] = node.splice(0,node.length);
+                    return new Nodes.RandStatement(intIdent as Nodes.IdentifierNode,min as ExpressionNode,max as ExpressionNode) as StrayTree<Nodes.RandStatement>;
             }
         }
     });
 
-    export const tt = new Parsing.TokenTransformer<Nodes.LiteralNode<any>>({
+    export const tt = new Parsing.TokenTransformer<Nodes.LiteralNode<any> | Nodes.IdentifierNode>({
         floatval(node) {
             return new Nodes.FloatLiteral(+node.value);
         },
@@ -551,6 +578,9 @@ namespace ZLang {
         },
         stringval(node) {
             return new Nodes.StringLiteral(node.value);
+        },
+        id(node) {
+            return new Nodes.IdentifierNode(node.value);
         }
     });
     
@@ -688,7 +718,6 @@ ZLang.visit(ast, function(node) {
     if(node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
-    ///#warning convert id terminals and refactor how they are stored above
     // if(node instanceof Parsing.ParseTreeTokenNode) {
     //     console.log(node)
     // }

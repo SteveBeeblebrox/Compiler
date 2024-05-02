@@ -17,7 +17,6 @@ namespace ZLang {
     ])), 'zlex.json.lz');
     console.log('Done!');
 
-
     export async function* tokenizeFile(file: string) {
         const inStream = await system.createTextFileReadStream(file);
         yield* SCANNER.tokenize((function*() {

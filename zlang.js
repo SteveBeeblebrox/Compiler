@@ -2362,7 +2362,8 @@ var SLR1;
                 }
                 return node;
             }
-            while (true) { //todo not in 0
+            while (D.length || ts.peek() || S.at(-1).state !== 0) { //todo not in 0
+                console.log(D.length, !!ts.peek(), S.at(-1).state);
                 let t = (_a = D.at(0)) !== null && _a !== void 0 ? _a : ts.peek();
                 const [action, v] = (_c = (_b = T.get(S.at(-1).state).get(t === null || t === void 0 ? void 0 : t.name)) === null || _b === void 0 ? void 0 : _b.split('-')) !== null && _c !== void 0 ? _c : [];
                 if (action === undefined) {
@@ -2453,6 +2454,22 @@ var ZLang;
             }
         }
         Nodes.StringLiteral = StringLiteral;
+        class IdentifierNode extends ExpressionNode {
+            constructor(name) {
+                super();
+                this.name = name;
+            }
+            get domain() {
+                return 'any';
+            }
+            get children() {
+                return [];
+            }
+            get [Graphviz.label]() {
+                return `id:${this.name}`;
+            }
+        }
+        Nodes.IdentifierNode = IdentifierNode;
         class BinaryOp extends ExpressionNode {
             constructor(name, lhs, rhs) {
                 super();
@@ -2521,16 +2538,16 @@ var ZLang;
         }
         Nodes.CastNode = CastNode;
         class ParameterNode extends ZNode {
-            constructor(type, name) {
+            constructor(type, ident) {
                 super();
                 this.type = type;
-                this.name = name;
+                this.ident = ident;
             }
             get children() {
                 return [this.type];
             }
             get [Graphviz.label]() {
-                return `${this.type[Graphviz.label]} ${this.name}`;
+                return `${this.type[Graphviz.label]} ${this.ident.name}`;
             }
             get [Graphviz.children]() {
                 return [];
@@ -2538,9 +2555,9 @@ var ZLang;
         }
         Nodes.ParameterNode = ParameterNode;
         class FunctionHeaderNode extends ZNode {
-            constructor(name, rtype, parameters) {
+            constructor(ident, rtype, parameters) {
                 super();
-                this.name = name;
+                this.ident = ident;
                 this.rtype = rtype;
                 this.parameters = parameters;
             }
@@ -2548,7 +2565,7 @@ var ZLang;
                 return [this.rtype, ...this.parameters, this];
             }
             get [Graphviz.label]() {
-                return `fn ${this.name}(...)`;
+                return `fn ${this.ident.name}(...)`;
             }
         }
         Nodes.FunctionHeaderNode = FunctionHeaderNode;
@@ -2573,9 +2590,9 @@ var ZLang;
         }
         Nodes.TypeNode = TypeNode;
         class FunctionCallNode extends ExpressionNode {
-            constructor(name, args) {
+            constructor(ident, args) {
                 super();
-                this.name = name;
+                this.ident = ident;
                 this.args = args;
             }
             get children() {
@@ -2585,7 +2602,7 @@ var ZLang;
                 return 'any';
             }
             get [Graphviz.label]() {
-                return `${this.name}(...)`;
+                return `${this.ident.name}(...)`;
             }
         }
         Nodes.FunctionCallNode = FunctionCallNode;
@@ -2604,7 +2621,7 @@ var ZLang;
                 return `${this.header[Graphviz.label]} {...}`;
             }
             get [Graphviz.children]() {
-                return [['header', this.header], ['var', new ParseTreeTokenNode('id', this.rvar)], ['rvalue', this.rvalue], ['body', this.body]];
+                return [['header', this.header], ['var', this.rvar], ['rvalue', this.rvalue], ['body', this.body]];
             }
         }
         Nodes.FunctionNode = FunctionNode;
@@ -2664,12 +2681,12 @@ var ZLang;
             }
             get [Graphviz.children]() {
                 return [...Object.entries({ type: this.type }), ...this.entries.map(function (entry, i) {
-                        return entry.length === 1 ? ['', new ParseTreeTokenNode('id', entry[0])] : ['', {
+                        return entry.length === 1 ? ['', entry[0]] : ['', {
                                 get [Graphviz.label]() {
                                     return '=';
                                 },
                                 get [Graphviz.children]() {
-                                    return [['', new ParseTreeTokenNode('id', entry[0])], ['', entry[1]]];
+                                    return [['', entry[0]], ['', entry[1]]];
                                 }
                             }];
                     })];
@@ -2677,9 +2694,9 @@ var ZLang;
         }
         Nodes.DeclareStatement = DeclareStatement;
         class AssignmentStatement extends StatementNode {
-            constructor(id, value) {
+            constructor(ident, value) {
                 super();
-                this.id = id;
+                this.ident = ident;
                 this.value = value;
             }
             get children() {
@@ -2689,7 +2706,10 @@ var ZLang;
                 return '=';
             }
             get [Graphviz.children]() {
-                return [['id', new ParseTreeTokenNode('id', this.id)], ...Object.entries({ value: this.value })];
+                return [['id', this.ident], ...Object.entries({ value: this.value })];
+            }
+            get domain() {
+                return this.value.domain;
             }
         }
         Nodes.AssignmentStatement = AssignmentStatement;
@@ -2751,14 +2771,14 @@ var ZLang;
                 return 'Emit';
             }
             get [Graphviz.children]() {
-                return [...(this.data.type === 'string' ? [['id', new ParseTreeTokenNode('id', this.data.id)]] : []), ...Object.entries(this.data)];
+                return [...(this.data.type === 'string' ? [['id', this.data.ident]] : []), ...Object.entries(this.data)];
             }
         }
         Nodes.EmitStatement = EmitStatement;
         class RandStatement extends StatementNode {
-            constructor(id, min, max) {
+            constructor(ident, min, max) {
                 super();
-                this.id = id;
+                this.ident = ident;
                 this.min = min;
                 this.max = max;
             }
@@ -2769,7 +2789,7 @@ var ZLang;
                 return 'Rand';
             }
             get [Graphviz.children]() {
-                return [['id', new ParseTreeTokenNode('id', this.id)], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
+                return [['id', this.ident], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
             }
         }
         Nodes.RandStatement = RandStatement;
@@ -2822,20 +2842,26 @@ var ZLang;
         },
         // Functions
         FUNSIG(node) {
-            return new Nodes.FunctionHeaderNode(node.at(1).value, node.at(0), node.children.splice(3, node.length - 4));
+            const [type, ident, _lraren, ...parameters] = node.splice(0, node.length);
+            const _rparen = parameters.pop();
+            return new Nodes.FunctionHeaderNode(ident, type, parameters);
         },
         PARAMLIST(node) {
             if (node.length === 1)
                 return;
             if (node.length === 2) {
-                return new Nodes.ParameterNode(node.at(0), node.at(1).value);
+                const [type, ident] = node.splice(0, node.length);
+                return new Nodes.ParameterNode(type, ident);
             }
             else {
-                return [new Nodes.ParameterNode(node.at(0), node.at(1).value), ...node.splice(3, node.length)];
+                const [type, ident, ...rest] = node.splice(0, node.length);
+                return [new Nodes.ParameterNode(type, ident), ...rest];
             }
         },
         FUNCALL(node) {
-            return new Nodes.FunctionCallNode(node.at(0).value, node.splice(2, node.length - 3));
+            const [ident, _lparen, ...args] = node.splice(0, node.length);
+            const _rparen = args.pop();
+            return new Nodes.FunctionCallNode(ident, args);
         },
         ARGLIST(node) {
             if (node.length === 1)
@@ -2844,7 +2870,8 @@ var ZLang;
             return node.splice(0, node.length);
         },
         FUNCTION(node) {
-            return new Nodes.FunctionNode(node.splice(0, 1)[0], node.at(1).value, node.splice(-2, 1)[0], node.splice(-1, 1)[0]);
+            const [header, _returns, ident, _assign, expr, body] = node.splice(0, node.length);
+            return new Nodes.FunctionNode(header, ident, expr, body);
         },
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
@@ -2882,33 +2909,38 @@ var ZLang;
         },
         // Assignment and declaration
         ASSIGN(node) {
-            return new Nodes.AssignmentStatement(node.at(0).value, node.splice(-1, 1)[0]);
+            const [ident, _assign, value] = node.splice(0, node.length);
+            return new Nodes.AssignmentStatement(ident, value);
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
-            return new Nodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.id, x.value] : [x.value]));
+            return new Nodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.ident, x.value] : [x]));
         },
         DECLIDS(node) {
             return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'comma' : true);
         },
         // Control Statements
         WHILE(node) {
-            return new Nodes.WhileStatement(node.splice(2, 1)[0], node.splice(-1, 1)[0]);
+            const [_while, _lparen, predicate, _rparen, body] = node.splice(0, node.length);
+            return new Nodes.WhileStatement(predicate, body);
         },
         DOWHILE(node) {
-            return new Nodes.DoWhileStatement(node.splice(1, 1)[0], node.splice(-3, 1)[0]);
+            const [_do, body, _while, _lparen, predicate, _rparen, _sc] = node.splice(0, node.length);
+            return new Nodes.DoWhileStatement(body, predicate);
         },
         IF(node) {
-            return new Nodes.IfStatement(node.splice(2, 1)[0], node.splice(-1, 1)[0]);
+            const [_if, _rparen, predicate, _lparen, btrue] = node.splice(0, node.length);
+            return new Nodes.IfStatement(predicate, btrue);
         },
         IFELSE(node) {
-            return new Nodes.IfStatement(node.splice(2, 1)[0], node.splice(-3, 1)[0], node.splice(-1, 1)[0]);
+            const [_if, _lparen, predicate, _rparen, btrue, _else, bfalse] = node.splice(0, node.length);
+            return new Nodes.IfStatement(predicate, btrue, bfalse);
         },
         // Special Statements
         EMIT(node) {
             switch (node.length) {
                 case 2:
                     return new Nodes.EmitStatement({
-                        type: node.at(-1).value
+                        type: 'symbtable'
                     });
                 case 4:
                     return new Nodes.EmitStatement({
@@ -2916,20 +2948,23 @@ var ZLang;
                         value: node.splice(2, 1)[0]
                     });
                 case 6:
+                    const [_emit, ident, _comma, index, __comma, length] = node.splice(0, node.length);
                     return new Nodes.EmitStatement({
                         type: 'string',
-                        id: node.at(1).value,
-                        index: node.splice(3, 1)[0],
-                        length: node.splice(-1, 1)[0]
+                        ident: ident,
+                        index: index,
+                        length: length
                     });
             }
         },
         RAND(node) {
             switch (node.length) {
                 case 2:
-                    return new Nodes.RandStatement(node.at(1).value);
+                    const [_rand, ident] = node.splice(0, node.length);
+                    return new Nodes.RandStatement(ident);
                 case 6:
-                    return new Nodes.RandStatement(node.at(1).value, node.splice(3, 1)[0], node.splice(-1, 1)[0]);
+                    const [__rand, intIdent, _comma, min, __comma, max] = node.splice(0, node.length);
+                    return new Nodes.RandStatement(intIdent, min, max);
             }
         }
     });
@@ -2942,6 +2977,9 @@ var ZLang;
         },
         stringval(node) {
             return new Nodes.StringLiteral(node.value);
+        },
+        id(node) {
+            return new Nodes.IdentifierNode(node.value);
         }
     });
     console.debug('Building Parser...');
