@@ -668,10 +668,6 @@ namespace ZLang {
         }
         // TODO, helper to get declarations up until <name>, might require having a sperate define to update order?
     }
-
-
-    console.log(PARSER.getParseTable().get(45))
-    // system.exit(0)
 }
 
 ///#if __MAIN__
