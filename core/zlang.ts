@@ -497,7 +497,6 @@ namespace ZLang {
         // Assignment and declaration
         ASSIGN(node) {
             const [ident,_assign,value] = node.splice(0,node.length);
-            ///#warning nested assignment
             return new Nodes.AssignmentStatement(ident as Nodes.IdentifierNode, value as ExpressionNode | Nodes.AssignmentStatement) as StrayTree<Nodes.AssignmentStatement>;
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
