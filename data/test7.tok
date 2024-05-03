@@ -1,0 +1,15 @@
+string string 0 0
+id str 0 0
+assign assign 0 0
+intval 1 0 0
+mod mod 17 17
+intval 1 0 0
+sc sc 0 0
+
+string string 0 0
+id str2 0 0
+assign assign 0 0
+floatval 1.1 0 0
+mod mod 17 17
+intval 1 0 0
+sc sc 0 0

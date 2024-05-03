@@ -856,37 +856,23 @@ ZLang.visit(ast, function(node) {
     // Validate operator types
     // This is not the same as typechecking for assignment
     if(node instanceof ZLang.Nodes.BinaryOp) {
-        const invalid = ['string','bool'];
-        for(const domain of invalid) {
-            if(node.lhs.domain === domain || node.rhs.domain === domain) {
+        if(
+            (node.name === 'mod' && (node.lhs.domain !== 'int' || node.rhs.domain !== 'int'))
+            || node.lhs.domain === 'bool' || node.lhs.domain === 'string'
+            || node.rhs.domain === 'bool' || node.rhs.domain === 'string'
+        ) {
                 ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for types ${node.lhs.domain} and ${node.rhs.domain}`,node.pos);                
                 return false;
-            }
         }
     }
     if(node instanceof ZLang.Nodes.UnaryOp) {
-        switch(node.name) {
-            case 'compl': {
-                if(node.val.domain !== 'int') {
-                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos)
-                    return false;
-                }
-            }
-            case 'not': {
-                if(node.val.domain !== 'bool') {
-                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos)
-                    return false;
-                }
-            }
-            case 'plus': {
-                const invalid = ['string','bool'];
-                for(const domain of invalid) {
-                    if(node.val.domain === domain) {
-                        ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos);                
-                        return false;
-                    }
-                }
-            }
+        if(
+            (node.name === 'compl' && node.val.domain !== 'int')
+            || (node.name === 'not' && node.val.domain !== 'bool')
+            || ((node.name === 'plus' || node.name === 'minus') && (node.val.domain === 'string' || node.val.domain === 'bool'))
+        ) {
+            ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos)
+            return false;
         }
     }
 

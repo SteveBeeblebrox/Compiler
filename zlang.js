@@ -3241,39 +3241,22 @@ ZLang.visit(ast, function (node) {
         output('DOMAIN', node.pos.line, node.pos.col, node.domain);
         return;
     }
-    // TODO check expr errors
+    // Validate operator types
+    // This is not the same as typechecking for assignment
     if (node instanceof ZLang.Nodes.BinaryOp) {
-        const invalid = ['string', 'bool'];
-        for (const domain of invalid) {
-            if (node.lhs.domain === domain || node.rhs.domain === domain) {
-                ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for types ${node.lhs.domain} and ${node.rhs.domain}`, node.pos);
-                return false;
-            }
+        if ((node.name === 'mod' && (node.lhs.domain !== 'int' || node.rhs.domain !== 'int'))
+            || node.lhs.domain === 'bool' || node.lhs.domain === 'string'
+            || node.rhs.domain === 'bool' || node.rhs.domain === 'string') {
+            ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for types ${node.lhs.domain} and ${node.rhs.domain}`, node.pos);
+            return false;
         }
     }
     if (node instanceof ZLang.Nodes.UnaryOp) {
-        switch (node.name) {
-            case 'compl': {
-                if (node.val.domain !== 'int') {
-                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
-                    return false;
-                }
-            }
-            case 'not': {
-                if (node.val.domain !== 'bool') {
-                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
-                    return false;
-                }
-            }
-            case 'plus': {
-                const invalid = ['string', 'bool'];
-                for (const domain of invalid) {
-                    if (node.val.domain === domain) {
-                        ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
-                        return false;
-                    }
-                }
-            }
+        if ((node.name === 'compl' && node.val.domain !== 'int')
+            || (node.name === 'not' && node.val.domain !== 'bool')
+            || ((node.name === 'plus' || node.name === 'minus') && (node.val.domain === 'string' || node.val.domain === 'bool'))) {
+            ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
+            return false;
         }
     }
     // Validate function identifiers are not used as variables
@@ -3285,10 +3268,6 @@ ZLang.visit(ast, function (node) {
             ZLang.raise(SemanticErrors.EXPR, `Function '${node.name}' cannot be treated like a variable!`, parent.pos); // node.pos for ident location, parent.pos for what expects a var
             return false;
         }
-    }
-    if (false) {
-        ZLang.raise(SemanticErrors.EXPR, `Invalid expression types`);
-        return false;
     }
 }, 'post');
 // Emit Symtables
