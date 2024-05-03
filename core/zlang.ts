@@ -742,8 +742,6 @@ namespace ZLang {
             }
         },'pre');
     }
-
-    
 }
 
 ///#if __MAIN__
@@ -791,22 +789,40 @@ function readTokenStream(path: string) {
     ;
 }
 
-const [tokenSrc,astOutput,symbtableOutput = 'program.sym'] = system.args.slice(1);
+/*
+try {
+    
+    
+} catch(e) {
+    
+    if(e instanceof Parsing.SyntaxError) {
+        output('SYNTAX',0,0,'SYNTAX');
+        system.exit(7);
+    }
 
+    else {
+        console.error('IO ERROR');
+        system.exit(1);
+    }
+}
+*/
 
 
 // todo catch syntax errors and pos
-
-console.debug('Parsing...');
-const tokens = readTokenStream(tokenSrc);
-const ast = ZLang.parseTokens(tokens);
-console.debug('Done!');
-
-ZLang.initSymbols(ast);
-
 // todo semantic checks
 
 
+
+const [tokenSrc,astOutput,symbtableOutput = 'program.sym'] = system.args.slice(1);
+console.debug('Parsing...');
+
+// Read tokens
+const tokens = readTokenStream(tokenSrc);
+
+// Parse
+const ast = ZLang.parseTokens(tokens);
+
+ZLang.initSymbols(ast);
 
 
 
@@ -818,12 +834,20 @@ ZLang.visit(ast, function(node) {
     }
 },'post');
 
+
+
+
 // Emit Symtables
 ZLang.visit(ast,function(node) {
     if(symbtableOutput && node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
         system.writeTextFileSync(symbtableOutput,ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n,d.type,d.name].join(',')).join('\n'));
     }
 });
+
+
+console.debug('Done!');
+
+
 
 dump('zlang', ast);
 ///#endif
