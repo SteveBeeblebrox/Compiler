@@ -762,10 +762,6 @@ async function dump(name: string, node: Tree, {format = 'png'} = {}) {
     await writer.ready;
     await writer.close();
 }
-console.debug('Parsing...');
-const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x=>x.trim()).map(x=>x.trim().split(' ')).map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}));
-const ast = ZLang.parseTokens(tokens);
-console.debug('Done!');
 
 function output(...args: (string|number)[]) {
     const text = ['OUTPUT'];
@@ -785,7 +781,26 @@ function output(...args: (string|number)[]) {
     console.log(text.join(' '));
 }
 
+function readTokenStream(path: string) {
+    return system.readTextFileSync(path)
+        .trim()
+        .split('\n')
+        .filter(x=>x.trim())
+        .map(x=>x.trim().split(' '))
+        .map(([name,value,line,col]) => new Token(name,alphaDecode(value),{line:+line,col:+col}))
+    ;
+}
+
+const [tokenSrc,astOutput,symbtableOutput = 'program.sym'] = system.args.slice(1);
+
+
+
 // todo catch syntax errors and pos
+
+console.debug('Parsing...');
+const tokens = readTokenStream(tokenSrc);
+const ast = ZLang.parseTokens(tokens);
+console.debug('Done!');
 
 ZLang.initSymbols(ast);
 
@@ -795,9 +810,6 @@ ZLang.initSymbols(ast);
 
 
 
-
-
-const [tokenSrc,astOutput,symbtableOutput = 'program.sym'] = system.args.slice(1);
 
 // Emit Domain Statements
 ZLang.visit(ast, function(node) {
