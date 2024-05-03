@@ -1947,6 +1947,22 @@ class Token {
         return this.constructor.name;
     }
 }
+var Position;
+(function (Position) {
+    /**
+     * offset(a,b):
+     * 0 => a == b (a is the same as b)
+     * + => a < b  (a is before b)
+     * - => a > b  (a is after b)
+     */
+    function offset(from, to) {
+        if (to.line !== from.line)
+            return to.line - from.line;
+        else
+            return to.col - from.col;
+    }
+    Position.offset = offset;
+})(Position || (Position = {}));
 class CFG {
     constructor(startingSymbol, rules, terminals) {
         this.startingSymbol = startingSymbol;
@@ -2864,7 +2880,7 @@ var ZLang;
             }
             else if (node.length === 4) {
                 const pos = { ...node.at(0).pos };
-                return new Nodes.DomainNode(node.pos, node.splice(2, 1)[0], pos);
+                return new Nodes.DomainNode(node.pos, node.splice(2, 1)[0]);
             }
         },
         BSTMT(node) {
@@ -3035,7 +3051,7 @@ var ZLang;
         declare(name, type, pos, dtls) {
             if (this.has(name))
                 throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
-            this.data.set(name, { name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
+            this.data.set(name, { n: this.n, name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
         has(name) {
             return this.data.has(name);
@@ -3054,11 +3070,20 @@ var ZLang;
         entries() {
             return [
                 ...(this.parent ? this.parent.entries() : []),
-                ...this.data.values().map(d => { var _a, _b; return [this.n, d.type, d.name, (_a = d.pos) === null || _a === void 0 ? void 0 : _a.line, (_b = d.pos) === null || _b === void 0 ? void 0 : _b.col].join(','); })
+                ...this.data.entries()
             ];
         }
-        toString() {
-            return this.entries().join('\n');
+        dir(pos) {
+            const data = new Map();
+            for (const [k, v] of this.entries()) {
+                if (pos === undefined || Position.offset(pos, v.pos) <= 0) {
+                    if (data.has(k)) {
+                        data.delete(k);
+                    }
+                    data.set(k, v);
+                }
+            }
+            return [...data.values()];
         }
     }
     ZLang.Scope = Scope;
@@ -3165,7 +3190,7 @@ ZLang.initSymbols(ast);
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
         console.debug('=== Symtable ===');
-        console.debug(ZLang.getEnclosingScope(node).toString() || '<empty>');
+        console.debug(ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n, d.type, d.name].join(',')).join('\n') || '<empty>');
     }
 });
 // emit domain statements

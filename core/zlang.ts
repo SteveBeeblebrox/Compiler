@@ -452,7 +452,7 @@ namespace ZLang {
                 return node.splice(1,1) as StrayTree<ZNode>[];
             } else if(node.length === 4) {
                 const pos = {...(node.at(0) as ParseTreeTokenNode).pos};
-                return new Nodes.DomainNode(node.pos,node.splice(2,1)[0] as ExpressionNode,pos) as StrayTree<Nodes.DomainNode>;
+                return new Nodes.DomainNode(node.pos,node.splice(2,1)[0] as ExpressionNode) as StrayTree<Nodes.DomainNode>;
             }
         },
         BSTMT(node) {
@@ -631,7 +631,7 @@ namespace ZLang {
         // TODO, error codes
     }
 
-    type Declaration = {name: string, type: ZType | ZFunctionType, pos: Position} & DeclarationDetails
+    type Declaration = {n: number, name: string, type: ZType | ZFunctionType, pos: Position} & DeclarationDetails
     type DeclarationDetails = {used:boolean, initialized:boolean};
     export class Scope {
         private readonly data = new Map<string,Declaration>;
@@ -641,8 +641,10 @@ namespace ZLang {
         }
         public declare(name: string, type: ZType | ZFunctionType, pos: Position, dtls?: Partial<DeclarationDetails>) {
             if(this.has(name)) throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
-            this.data.set(name, {name,type,pos,used:false,initialized:false,...(dtls??{})});
+            this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
+
+        ///#waring Scope#get and Scope#has should respect position
         public has(name: string): boolean {
             return this.data.has(name);
         }
@@ -656,16 +658,27 @@ namespace ZLang {
                 this.parent.mark(name,dtls);
             }
         }
-        protected entries() {
+
+        public entries(): [string,Declaration][] {
             return [
                 ...(this.parent ? this.parent.entries() : []),
-                ...this.data.values().map(d => [this.n,d.type,d.name,d.pos?.line,d.pos?.col].join(','))
+                ...this.data.entries()
             ];
         }
-        public toString() {
-            return this.entries().join('\n');
+
+        public dir(pos?: Position): Declaration[] {
+            const data = new Map();
+            for(const [k,v] of this.entries()) {
+                if(pos === undefined || Position.offset(pos,v.pos) <= 0) {
+                    if(data.has(k)) {
+                        data.delete(k);
+                    }
+                    data.set(k,v);
+                }
+            }
+
+            return [...data.values()];
         }
-        // TODO, helper to get declarations up until <name>, might require having a sperate define to update order?
     }
 
     export function getEnclosingScope(node: ZNode): Scope | null {
@@ -775,20 +788,20 @@ function output(...args: (string|number)[]) {
 
 // todo catch syntax errors and pos
 
-// todo finish symtables
 ZLang.initSymbols(ast);
 
 // todo semantic checks
 
 
-// emit symtables
+// Emit Symtables
+const symbtableOutput: string | undefined = 'program.sym';
 ZLang.visit(ast,function(node) {
-    if(node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
-        console.debug('=== Symtable ===');
-        console.debug(ZLang.getEnclosingScope(node).toString()||'<empty>');
+    if(symbtableOutput && node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
+        system.writeTextFileSync(symbtableOutput,ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n,d.type,d.name].join(',')).join('\n'));
     }
-})
-// emit domain statements
+});
+
+// Emit Domain Statements
 ZLang.visit(ast, function(node) {
     if(node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);

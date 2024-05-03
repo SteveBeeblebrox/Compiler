@@ -15,9 +15,10 @@ class Token {
 
 namespace Position {
     /**
-     * 0 => a==b;
-     * + => a < b
-     * - => a > b
+     * offset(a,b):
+     * 0 => a == b (a is the same as b) 
+     * + => a < b  (a is before b)
+     * - => a > b  (a is after b)
      */
     export function offset(from: Position, to: Position) {
         if(to.line !== from.line) return to.line-from.line;
