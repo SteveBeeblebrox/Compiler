@@ -3078,18 +3078,21 @@ var ZLang;
             return this.parent ? this.parent.n + 1 : 0;
         }
         declare(name, type, pos, dtls) {
-            if (this.has(name, pos))
+            if (this.hasLocal(name, pos))
                 ZLang.raise(SemanticErrors.REIDENT, `Cannot redeclare '${name}'`, pos);
             this.data.set(name, { n: this.n, name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
         has(name, pos) {
+            return this.hasLocal(name, pos) || (this.parent && this.parent.has(name, pos));
+        }
+        hasLocal(name, pos) {
             return this.data.has(name) && (pos === undefined || Position.offset(pos, this.data.get(name).pos) <= 0);
         }
         get(name, pos) {
-            return this.has(name, pos) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name, pos) : null;
+            return this.hasLocal(name, pos) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name, pos) : null;
         }
         mark(name, pos, dtls) {
-            if (this.has(name, pos)) {
+            if (this.hasLocal(name, pos)) {
                 this.data.set(name, Object.assign(this.data.get(name), dtls));
             }
             else if (this.parent) {
@@ -3278,6 +3281,8 @@ ZLang.visit(ast, function (node) {
     }
     // Validate function identifiers are not used as variables
     if (node instanceof ZLang.Nodes.IdentifierNode
+        // Ignore parameters in lone function prototype, they aren't declared
+        && ZLang.getEnclosingScope(node).has(node.name, node.pos)
         && ZLang.getEnclosingScope(node).get(node.name, node.pos).type instanceof ZLang.ZFunctionType) {
         const parent = node.parent;
         if (!((parent instanceof ZLang.Nodes.FunctionCallNode && parent.ident === node)

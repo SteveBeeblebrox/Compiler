@@ -663,18 +663,22 @@ namespace ZLang {
             return this.parent ? this.parent.n + 1 : 0;
         }
         public declare(name: string, type: ZType | ZFunctionType, pos: Position, dtls?: Partial<DeclarationDetails>) {
-            if(this.has(name,pos)) ZLang.raise(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
+            if(this.hasLocal(name,pos)) ZLang.raise(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
 
         public has(name: string, pos?: Position): boolean {
+            return this.hasLocal(name,pos)|| (this.parent && this.parent.has(name,pos));
+        }
+
+        public hasLocal(name: string, pos?: Position): boolean {
             return this.data.has(name) && (pos === undefined || Position.offset(pos,this.data.get(name).pos) <= 0);
         }
         public get(name: string ,pos?: Position): Declaration | null {
-            return this.has(name,pos) ? {...this.data.get(name)} : this.parent ? this.parent.get(name,pos) : null;
+            return this.hasLocal(name,pos) ? {...this.data.get(name)} : this.parent ? this.parent.get(name,pos) : null;
         }
         public mark(name: string, pos: Position | undefined, dtls: Partial<DeclarationDetails>) {
-            if(this.has(name,pos)) {
+            if(this.hasLocal(name,pos)) {
                 this.data.set(name,Object.assign(this.data.get(name), dtls));
             } else if(this.parent) {
                 this.parent.mark(name,pos,dtls);
@@ -888,6 +892,8 @@ ZLang.visit(ast, function(node) {
     // Validate function identifiers are not used as variables
     if(
         node instanceof ZLang.Nodes.IdentifierNode
+        // Ignore parameters in lone function prototype, they aren't declared
+        && ZLang.getEnclosingScope(node).has(node.name,node.pos)
         && ZLang.getEnclosingScope(node).get(node.name,node.pos).type instanceof ZLang.ZFunctionType
     ) {
         const parent = node.parent;
