@@ -212,7 +212,7 @@ namespace SLR1 {
             const ts = createPeekableIterator(tokens);
             const D: Queue<Token | ParseTree | undefined> = [];
             
-            let pos: Position | undefined = undefined;
+            let pos: Position = {line:0,col:0};
 
             type StackT = {state: number, tree?: ParseTree | Token | undefined};
             const S: Stack<StackT> = [];
