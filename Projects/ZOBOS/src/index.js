@@ -460,6 +460,14 @@ var ObjectConstructorPolyfill;
         return Object.prototype.hasOwnProperty.call(o, v);
     }
     ObjectConstructorPolyfill.hasOwn = hasOwn;
+    function fromEntries(entries) {
+        const obj = {};
+        for (const [key, value] of entries) {
+            obj[key] = value;
+        }
+        return obj;
+    }
+    ObjectConstructorPolyfill.fromEntries = fromEntries;
 })(ObjectConstructorPolyfill || (ObjectConstructorPolyfill = {}));
 installPolyfill({ prototype: Object }, ObjectConstructorPolyfill);
 // Set Polyfill based off of work by
