@@ -2346,7 +2346,7 @@ var SLR1;
             return this.parseTable;
         }
         parse(tokens) {
-            var _a, _b, _c, _d, _e, _f;
+            var _a, _b, _c, _d, _e, _f, _g;
             const T = this.parseTable;
             const cfg = this.cfg;
             const sdt = this.sdt;
@@ -2391,14 +2391,14 @@ var SLR1;
             }
             while (D.length || ts.peek() || T.get(S.at(-1).state).has(undefined)) {
                 let t = (_a = D.at(0)) !== null && _a !== void 0 ? _a : ts.peek();
-                pos = t.pos;
-                const [action, v] = (_c = (_b = T.get(S.at(-1).state).get(t === null || t === void 0 ? void 0 : t.name)) === null || _b === void 0 ? void 0 : _b.split('-')) !== null && _c !== void 0 ? _c : [];
+                pos = (_b = t === null || t === void 0 ? void 0 : t.pos) !== null && _b !== void 0 ? _b : pos;
+                const [action, v] = (_d = (_c = T.get(S.at(-1).state).get(t === null || t === void 0 ? void 0 : t.name)) === null || _c === void 0 ? void 0 : _c.split('-')) !== null && _d !== void 0 ? _d : [];
                 if (action === undefined) {
-                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x => `'${x !== null && x !== void 0 ? x : 'EOF'}'`).toArray().join(', ')} got '${(_e = (_d = t === null || t === void 0 ? void 0 : t.name) !== null && _d !== void 0 ? _d : t) !== null && _e !== void 0 ? _e : 'EOF'}'`, pos);
+                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x => `'${x !== null && x !== void 0 ? x : 'EOF'}'`).toArray().join(', ')} got '${(_f = (_e = t === null || t === void 0 ? void 0 : t.name) !== null && _e !== void 0 ? _e : t) !== null && _f !== void 0 ? _f : 'EOF'}'`, pos);
                 }
                 const n = +v;
                 if (action === 'sh') {
-                    const t = (_f = D.shift()) !== null && _f !== void 0 ? _f : ts.shift();
+                    const t = (_g = D.shift()) !== null && _g !== void 0 ? _g : ts.shift();
                     S.push({ state: n, tree: t });
                 }
                 else if (action === 'r') {
@@ -2442,6 +2442,9 @@ var ZLang;
             }
             destroy() {
                 return this[Tree.splice](0, this[Tree.treeLength]);
+            }
+            get [Graphviz.exclude]() {
+                return ['pos'];
             }
         }
         Nodes.ZNode = ZNode;
@@ -2751,7 +2754,7 @@ var ZLang;
                 super(pos, (function () {
                     switch (data.type) {
                         case 'value': return [data.value];
-                        case 'string': return [data.index, data.length];
+                        case 'string': return [data.ident, data.index, data.length];
                         default: return [];
                     }
                 })());
@@ -2790,7 +2793,7 @@ var ZLang;
                 return 'Statements';
             }
             get [Graphviz.exclude]() {
-                return ['scope'];
+                return ['scope', ...super[Graphviz.exclude]];
             }
         }
         Nodes.StatementGroup = StatementGroup;
@@ -2798,7 +2801,7 @@ var ZLang;
     var ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
     var StatementGroup = Nodes.StatementGroup;
     ZLang.Program = Nodes.Program;
-    ZLang.sdt = new Parsing.SyntaxTransformer({
+    const sdt = new Parsing.SyntaxTransformer({
         '*'(node) {
             if (node.length === 1) {
                 if (node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
@@ -2968,7 +2971,7 @@ var ZLang;
             }
         }
     });
-    ZLang.tt = new Parsing.TokenTransformer({
+    const tt = new Parsing.TokenTransformer({
         floatval(node) {
             return new Nodes.FloatLiteral(node.pos, +node.value);
         },
@@ -2983,7 +2986,7 @@ var ZLang;
         }
     });
     console.debug('Building Parser...');
-    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, ZLang.tt, 'zlang.json.lz');
+    const PARSER = new SLR1.SLR1Parser(GRAMMAR, sdt, tt, 'zlang.json.lz');
     console.debug('Done!');
     function parseTokens(tokens) {
         return PARSER.parse(tokens);
@@ -2992,22 +2995,24 @@ var ZLang;
     function visit(program, f, order = 'pre') {
         const V = new Set;
         function visit(node) {
-            var _a;
+            var _a, _b;
             if (V.has(node))
                 return;
             V.add(node);
-            let condition = true;
+            let precondition = true;
+            let postcondition = true;
             if (order === 'pre') {
-                condition = (_a = f(node, V)) !== null && _a !== void 0 ? _a : condition;
+                precondition = (_a = f(node, V)) !== null && _a !== void 0 ? _a : precondition;
             }
-            if (condition && node instanceof Nodes.ZNode) {
+            if (precondition && node instanceof Nodes.ZNode) {
                 for (const child of node.children) {
-                    visit(child);
+                    postcondition = ((_b = visit(child)) !== null && _b !== void 0 ? _b : postcondition) && postcondition; // &&= short circuits, and we don't want that
                 }
             }
-            if (order === 'post') {
-                f.bind(node)(node);
+            if (order === 'post' && postcondition) {
+                postcondition = f.bind(node)(node);
             }
+            return postcondition;
         }
         visit(program);
     }
@@ -3044,7 +3049,7 @@ var ZLang;
         SemanticErrors[SemanticErrors["EXPR"] = 2] = "EXPR";
         SemanticErrors[SemanticErrors["CONST"] = 3] = "CONST";
     })(SemanticErrors = ZLang.SemanticErrors || (ZLang.SemanticErrors = {}));
-    ZLang.raise = function onError(errno, message, pos) {
+    ZLang.raise = function raise(errno, message, pos) {
         throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
     };
     class Scope {
@@ -3203,12 +3208,12 @@ console.debug('Parsing...');
 const tokens = readTokenStream(tokenSrc);
 // Parse
 const ast = (function () {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     try {
         return ZLang.parseTokens(tokens);
     }
     catch (e) {
-        output('SYNTAX', (_b = (_a = e === null || e === void 0 ? void 0 : e.pos) === null || _a === void 0 ? void 0 : _a.line) !== null && _b !== void 0 ? _b : 0, (_c = e === null || e === void 0 ? void 0 : e.pos) === null || _c === void 0 ? void 0 : _c.col, 'SYNTAX');
+        output('SYNTAX', (_b = (_a = e === null || e === void 0 ? void 0 : e.pos) === null || _a === void 0 ? void 0 : _a.line) !== null && _b !== void 0 ? _b : 0, (_d = (_c = e === null || e === void 0 ? void 0 : e.pos) === null || _c === void 0 ? void 0 : _c.col) !== null && _d !== void 0 ? _d : 0, 'SYNTAX');
         system.exit(1);
     }
 })();
@@ -3223,17 +3228,67 @@ ZLang.raise = function (errno, message, pos) {
         }
         case SemanticErrors.EXPR: {
             hasErrors = true;
+            console.error(message);
             output('ERROR', pos.line, pos.col, SemanticErrors[SemanticErrors.EXPR]);
             return;
         }
     }
 };
 ZLang.applySemantics(ast);
-// TODO expr errors
 // Emit Domain Statements
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN', node.pos.line, node.pos.col, node.domain);
+        return;
+    }
+    // TODO check expr errors
+    if (node instanceof ZLang.Nodes.BinaryOp) {
+        const invalid = ['string', 'bool'];
+        for (const domain of invalid) {
+            if (node.lhs.domain === domain || node.rhs.domain === domain) {
+                ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for types ${node.lhs.domain} and ${node.rhs.domain}`, node.pos);
+                return false;
+            }
+        }
+    }
+    if (node instanceof ZLang.Nodes.UnaryOp) {
+        switch (node.name) {
+            case 'compl': {
+                if (node.val.domain !== 'int') {
+                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
+                    return false;
+                }
+            }
+            case 'not': {
+                if (node.val.domain !== 'bool') {
+                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
+                    return false;
+                }
+            }
+            case 'plus': {
+                const invalid = ['string', 'bool'];
+                for (const domain of invalid) {
+                    if (node.val.domain === domain) {
+                        ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    // Validate function identifiers are not used as variables
+    if (node instanceof ZLang.Nodes.IdentifierNode
+        && ZLang.getEnclosingScope(node).get(node.name).type instanceof ZLang.ZFunctionType) {
+        const parent = node.parent;
+        if (!((parent instanceof ZLang.Nodes.FunctionCallNode && parent.ident === node)
+            || (parent instanceof ZLang.Nodes.FunctionHeaderNode && parent.ident === node))) {
+            ZLang.raise(SemanticErrors.EXPR, `Function '${node.name}' cannot be treated like a variable!`, parent.pos); // node.pos for ident location, parent.pos for what expects a var
+            return false;
+        }
+    }
+    if (false) {
+        ZLang.raise(SemanticErrors.EXPR, `Invalid expression types`);
+        return false;
     }
 }, 'post');
 // Emit Symtables
@@ -3245,4 +3300,4 @@ ZLang.visit(ast, function (node) {
 // TODO, dump ast
 dump('zlang', ast);
 console.debug('Done!');
-system.exit(hasErrors ? 1 : 0);
+// system.exit(hasErrors ? 1 : 0); TODO enable after awaiting ast write
