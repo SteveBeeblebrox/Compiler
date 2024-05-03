@@ -1385,6 +1385,392 @@ var AlphabetEncoding;
     AlphabetEncoding.encode = encode;
 })(AlphabetEncoding || (AlphabetEncoding = {}));
 const { decode: alphaDecode, encode: alphaEncode } = AlphabetEncoding;
+class Tape {
+    constructor(iter, initialCount = 0) {
+        this.iter = iter;
+        this.buffer = [];
+        this.index = -1;
+        this.growBuffer(initialCount - 1);
+    }
+    growBuffer(index) {
+        while (this.buffer.length < index + 1) {
+            this.buffer.push(this.iter.shift());
+        }
+    }
+    // Advance to the next value
+    next() {
+        this.growBuffer(++this.index);
+        return this.buffer[this.index];
+    }
+    // Discard all values before the current position
+    erase() {
+        this.buffer.splice(0, this.index + 1); // [0,this.index]
+        this.index = -1;
+    }
+    // Go back n entries
+    rewind(n) {
+        if (this.index - n < -1) {
+            throw new Error('Cannot rewind past end of tape');
+        }
+        this.index -= n;
+    }
+    // Skip n entries (lazy)
+    skip(n) {
+        this.index += n;
+    }
+    // When n=0, returns the current value that the prior next() did; when n>0, acts like a n lookahead
+    top(n = 0) {
+        this.growBuffer(this.index + n);
+        return this.buffer[this.index + n];
+    }
+    toString() {
+        function escape(t) {
+            return `'${JSON.stringify(t).slice(1, -1).replace(/'/g, '\\\'').replace(/\\"/g, '"')}'`;
+        }
+        return `[${[...this.buffer.slice(0, this.index + 1).map(escape)].join(', ')} | ${this.buffer.slice(this.index + 1).map(escape).join(', ')}]`;
+    }
+    // The number of items that can be rewinded back; forward length has little to no meaning
+    get length() {
+        return this.index + 1;
+    }
+}
+function* range(arg0, arg1, arg2) {
+    var _a;
+    function numerical(t) {
+        return typeof arg0 === 'bigint' ? BigInt(t) : t;
+    }
+    function destr(t) {
+        return typeof t === 'string' ? t.charCodeAt(0) : t;
+    }
+    const [min, max] = (arg1 === undefined ? [numerical(0), destr(arg0)] : [destr(arg0), destr(arg1)]);
+    const step = ((_a = destr(arg2)) !== null && _a !== void 0 ? _a : numerical(1));
+    let n = min;
+    if (max < min) {
+        throw new RangeError('Range min cannot be greater than max');
+    }
+    if (typeof arg0 === 'string') {
+        while (n <= max) {
+            yield String.fromCharCode(n);
+            n += step;
+        }
+    }
+    else {
+        while (n < max) {
+            yield n;
+            n += step;
+        }
+    }
+}
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
+var Graphviz;
+(function (Graphviz) {
+    // Note label overrides attributes.label which overrides using Symbol.toStringTag
+    Graphviz.label = Symbol('Graphviz.label');
+    Graphviz.children = Symbol('Graphviz.children');
+    Graphviz.exclude = Symbol('Graphviz.exclude');
+    Graphviz.attributes = Symbol('Graphviz.attributes');
+    function text(text, attributes = {}) {
+        return { ...attributes, [Graphviz.label]: text };
+    }
+    Graphviz.text = text;
+    function stringifyAttributes(attributes) {
+        return attributes ? `[${Object.entries(attributes).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(', ')}]` : '';
+    }
+    function serialize(obj, { output } = {}) {
+        const iter = (function* () {
+            let start = 0;
+            while (true)
+                yield start++;
+        })();
+        const nodes = new Map();
+        const data = [];
+        data.push('digraph {');
+        function recurse(parent, edge, obj) {
+            var _a, _b, _c, _d;
+            if (typeof obj !== 'object' || obj === null)
+                return;
+            if (!nodes.has(obj)) {
+                nodes.set(obj, `Node${iter.shift()}`);
+            }
+            const name = nodes.get(obj);
+            const excluded = new Set((_a = obj[Graphviz.exclude]) !== null && _a !== void 0 ? _a : []);
+            const attributes = (_b = obj[Graphviz.attributes]) !== null && _b !== void 0 ? _b : {};
+            if (Graphviz.label in obj)
+                attributes.label = obj[Graphviz.label];
+            (_c = attributes.label) !== null && _c !== void 0 ? _c : (attributes.label = Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj));
+            data.push(`\t${name}${stringifyAttributes(attributes)}`);
+            if (parent != null) {
+                data.push(`${parent}->${name}${stringifyAttributes({ label: edge })}`);
+            }
+            const keys = (_d = obj[Graphviz.children]) !== null && _d !== void 0 ? _d : Object.keys(obj);
+            for (const [key, child] of Array.isArray(keys) && Array.isArray(keys[0]) ? keys : Object.entries(Array.isArray(keys) ? obj : keys)) {
+                if (excluded.has(key)) {
+                    continue;
+                }
+                if (!Array.isArray(keys) || keys.includes(key) || Array.isArray(keys[0])) {
+                    if (Array.isArray(child)) {
+                        for (const [i, arrayChild] of Array.entries(child)) {
+                            recurse(name, `${key}[${i}]`, arrayChild);
+                        }
+                    }
+                    else {
+                        recurse(name, key, child);
+                    }
+                }
+            }
+        }
+        recurse(null, null, obj);
+        data.push('}');
+        const text = data.join('\n');
+        if (typeof output === 'string') {
+            system.writeTextFileSync(output, text);
+        }
+        return text;
+    }
+    Graphviz.serialize = serialize;
+})(Graphviz || (Graphviz = {}));
+class Token {
+    constructor(name, value, pos) {
+        this.name = name;
+        this.value = value;
+        this.pos = pos;
+    }
+    get [Symbol.toStringTag]() {
+        return this.constructor.name;
+    }
+}
+var Position;
+(function (Position) {
+    /**
+     * offset(a,b):
+     * 0 => a == b (a is the same as b)
+     * + => a < b  (a is before b)
+     * - => a > b  (a is after b)
+     */
+    function offset(from, to) {
+        if (to.line !== from.line)
+            return to.line - from.line;
+        else
+            return to.col - from.col;
+    }
+    Position.offset = offset;
+})(Position || (Position = {}));
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
+class CFG {
+    constructor(startingSymbol, rules, terminals) {
+        this.startingSymbol = startingSymbol;
+        this.rules = rules;
+        this.terminals = terminals;
+    }
+    getTerminals() {
+        return [...this.terminals];
+    }
+    getTerminalsAndEOF() {
+        return [...this.terminals, CFG.EOF];
+    }
+    getNonTerminals() {
+        return [...new Set(this.rules.keys())];
+    }
+    getGrammarSymbols() {
+        return [CFG.EOF, ...this.getTerminals(), ...this.getNonTerminals()];
+    }
+    isStartingRule(rule) {
+        if (typeof rule !== 'string')
+            return this.isStartingRule(rule[0]);
+        return rule === this.startingSymbol;
+    }
+    static isTerminal(string) {
+        return !this.isEOF(string) && !this.isLambda(string) && string.toLowerCase() === string && string.length >= 1;
+    }
+    static isTerminalOrEOF(string) {
+        return CFG.isEOF(string) || CFG.isTerminal(string);
+    }
+    static isEOF(string) {
+        return string === CFG.EOF;
+    }
+    static isLambda(string) {
+        return string === CFG.LAMBDA_CHARACTER;
+    }
+    static isNonTerminal(arg) {
+        return typeof arg === 'string' && !this.isEOF(arg) && !this.isLambda(arg) && arg.toLowerCase() !== arg && arg.length >= 1;
+    }
+    derivesToLambda(L, T = []) {
+        var _a;
+        const P = this.rules;
+        for (const p of ((_a = P.get(L)) !== null && _a !== void 0 ? _a : [])) {
+            if ([...T].includes(p)) {
+                continue;
+            }
+            if (!p.length) {
+                return true;
+            }
+            if (p.some(x => CFG.isTerminal(x))) {
+                continue;
+            }
+            let adl = true;
+            for (const X of p.filter(x => CFG.isNonTerminal(x))) {
+                T.push(p);
+                adl = this.derivesToLambda(X, T);
+                T.pop();
+                if (!adl) {
+                    break;
+                }
+            }
+            if (adl) {
+                return true;
+            }
+        }
+        return false;
+    }
+    firstSet([X, ...B], T = new Set()) {
+        var _a;
+        const P = this.rules;
+        if (X === undefined) {
+            return [new Set(), T];
+        }
+        if (CFG.isTerminalOrEOF(X)) {
+            return [new Set([X]), T];
+        }
+        const F = new Set();
+        if (!T.has(X)) {
+            T.add(X);
+            for (const p of ((_a = P.get(X)) !== null && _a !== void 0 ? _a : []).map(x => [X, x])) {
+                const [lhs, rhs] = p;
+                const [G, I] = this.firstSet(this.startingSymbol === X ? [...rhs, CFG.EOF] : rhs, T);
+                F.takeUnion(G);
+            }
+        }
+        if (this.derivesToLambda(X) && B.length) {
+            const [G, I] = this.firstSet(B, T);
+            F.takeUnion(G);
+        }
+        return [F, T];
+    }
+    followSet(A, T = new Set()) {
+        const followSet = (function (A, T = new Set()) {
+            const P = this.rules;
+            if (T.has(A)) {
+                return [new Set(), T];
+            }
+            T.add(A);
+            const F = new Set();
+            for (const p of [...P.entries()].flatMap(([sym, rs]) => rs.flatMap(rule => rule.includes(A) ? [[sym, rule]] : []))) {
+                const [lhs, rhs] = p;
+                for (const [i, gamma] of [...rhs.entries()].filter(([_, x]) => x === A)) {
+                    const pi = rhs.slice(i + 1);
+                    if (pi.length) {
+                        const [G, I] = this.firstSet(pi, new Set());
+                        F.takeUnion(G);
+                    }
+                    if (!pi.length || (pi.every(x => CFG.isNonTerminal(x) && this.derivesToLambda(x)))) {
+                        if (this.isStartingRule(lhs)) {
+                            F.add(CFG.EOF);
+                        }
+                        const [G, I] = followSet(lhs, T);
+                        F.takeUnion(G);
+                    }
+                }
+            }
+            return [F, T];
+        }).bind(this);
+        return followSet(A, T)[0];
+    }
+    predictSet([lhs, rhs]) {
+        const F = this.firstSet(rhs)[0];
+        if (rhs.every(x => this.derivesToLambda(x))) {
+            [...this.followSet(lhs).values()].forEach(x => F.add(x));
+        }
+        return F;
+    }
+    getRuleList() {
+        return this.rules.entries().flatMap(([lhs, rules]) => rules.flatMap(rhs => [[lhs, rhs]])).toArray();
+    }
+    getRuleListFor(lhs) {
+        return this.rules.get(lhs).map(rhs => [lhs, rhs]);
+    }
+    static makeUniqueNonTerminal(cfg, name, suffix = '\'') {
+        // @ts-expect-error
+        while (cfg.getNonTerminals().includes(name))
+            name += suffix;
+        return name;
+    }
+    stringifyRule(rule, lhs = true) {
+        if (lhs)
+            return `${rule[0]} -> ${this.stringifyRule(rule, false)}`;
+        else
+            return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA_CHARACTER) + (this.isStartingRule(rule) ? ' ' + CFG.EOF_CHARACTER : '');
+    }
+    stringifySet(set) {
+        return `{${set.values().map(c => c === CFG.EOF
+            ? CFG.EOF_CHARACTER
+            : `'${JSON.stringify(c).slice(1, -1).replace(/'/g, '\\\'').replace(/\\"/g, '"')}'`).toArray().join(', ')}}`;
+    }
+    getRuleNumber(rule) {
+        if (this.isStartingRule(rule[0])) {
+            rule = [rule[0], rule[1].filter(x => x !== CFG.EOF)];
+        }
+        return this.getRuleList().findIndex(([lhs, rhs]) => rule[0] === lhs && rule[1].length === rhs.length && rule[1].every((p, i) => p === rhs[i]));
+    }
+    static fromString(text, allowComments = true) {
+        var _a;
+        const cfgKeywords = Object.assign(Object.create(null), {
+            ARROW: '->',
+            UC_LAMBDA: CFG.LAMBDA_CHARACTER,
+            LAMBDA: 'lambda',
+            OR: '|',
+            EOF: CFG.EOF_CHARACTER
+        });
+        const tokens = [];
+        for (const line of text.split('\n').map(x => x.trim())) {
+            if (line.startsWith('#') && allowComments)
+                continue;
+            tokens.push(...line.split(' ').filter(x => x));
+        }
+        const rules = new Map();
+        let startingSymbol = null;
+        const terminals = new Set();
+        while (tokens.length) {
+            const target = tokens.shift();
+            if (tokens.shift() !== cfgKeywords.ARROW)
+                throw new Error(`Expected '${cfgKeywords.ARROW}' after '${target}'!`);
+            rules.set(target, (_a = rules.get(target)) !== null && _a !== void 0 ? _a : []);
+            const ruleSet = rules.get(target);
+            let currentRule;
+            ruleSet.push(currentRule = []);
+            while (tokens[1] !== cfgKeywords.ARROW && tokens.length) {
+                const token = tokens.shift();
+                switch (token) {
+                    case cfgKeywords.LAMBDA:
+                    case cfgKeywords.UC_LAMBDA:
+                        break;
+                    case cfgKeywords.EOF:
+                        if (startingSymbol === null)
+                            startingSymbol = target;
+                        else if (startingSymbol !== target)
+                            throw new Error(`Multiple starting rules containing '${cfgKeywords.EOF}' found!`);
+                        break;
+                    case cfgKeywords.OR:
+                        ruleSet.push(currentRule = []);
+                        break;
+                    default:
+                        if (CFG.isTerminal(token))
+                            terminals.add(token);
+                        currentRule.push(token);
+                        break;
+                }
+            }
+        }
+        if (startingSymbol === null)
+            throw new Error(`No starting rule containing '${cfgKeywords.EOF}' found!`);
+        return new CFG(startingSymbol, rules, terminals);
+    }
+    cfsm() {
+        return new SLR1.CFSM(this);
+    }
+}
+CFG.EOF = undefined;
+CFG.EOF_CHARACTER = '$';
+CFG.LAMBDA_CHARACTER = '\u03bb';
 var DecoratorFactory;
 (function (DecoratorFactory) {
     DecoratorFactory.addLazyDecoratorSymbol = Symbol('addLazyDecorator');
@@ -1616,173 +2002,6 @@ function createPeekableIterator(iterable) {
     };
     return it;
 }
-/*
- * MIT License
- *
- * Copyright (c) 2022 Trin Wasinger
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-var CSV;
-(function (CSV) {
-    function validateDelimiter(delimiter) {
-        if (delimiter.length !== 1)
-            throw new Error('CSV delimiter must be exactly one character (code unit) long');
-    }
-    function escapeDelimiterForRegExp(delimiter) {
-        return delimiter.replace(/[.*+?^${}()|[\]\\\-]/g, String.raw `\$&`);
-    }
-    function stringify(values, replacer, { header = true, delimiter = ',' } = {}) {
-        validateDelimiter(delimiter);
-        const quotePattern = new RegExp(String.raw `[\n${escapeDelimiterForRegExp(delimiter)}"]`);
-        function q([key, value]) {
-            const s = `${replacer ? replacer(key, value) : value}`;
-            return quotePattern.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-        }
-        function l(values) {
-            return values.map(q).join(delimiter);
-        }
-        return (header ? `${l(Object.keys(values[0]).map(key => [null, key]))}\n` : '') + values.map(o => l(Object.entries(o))).join('\n');
-    }
-    CSV.stringify = stringify;
-    function parse(text, reviver, { header = true, delimiter = ',' } = {}) {
-        var _a;
-        validateDelimiter(delimiter);
-        const escapedDelimiter = escapeDelimiterForRegExp(delimiter), pattern = new RegExp(String.raw `(${escapedDelimiter}|\r?\n|\r|^)(?:"((?:\\.|""|[^\\"])*)"|([^${escapedDelimiter}"\r\n]*))`, 'gi'), entries = [[]];
-        let matches = null;
-        while (matches = pattern.exec(text)) {
-            if (matches[1].length && matches[1] !== delimiter)
-                entries.push([]);
-            entries.at(-1).push(matches[2] ?
-                matches[2].replace(/[\\"](.)/g, '$1') :
-                (_a = matches[3]) !== null && _a !== void 0 ? _a : '');
-        }
-        if (!header || !entries.length)
-            return entries.map((value, i) => reviver ? reviver(i.toString(), value) : value);
-        const headerEntry = entries.shift().map(key => reviver ? reviver(null, key) : key);
-        return entries.map(entry => Object.fromEntries(entry.map((value, i) => [headerEntry[i], reviver ? reviver(headerEntry[i], value) : value])));
-    }
-    CSV.parse = parse;
-    function fromCammelCase(s) {
-        return s[0].toUpperCase() + s.slice(1).replace(/[A-Z]/, ' $&');
-    }
-    CSV.fromCammelCase = fromCammelCase;
-    function toCammelCase(s) {
-        return s[0].toLowerCase() + s.slice(1).replaceAll(' ', '');
-    }
-    CSV.toCammelCase = toCammelCase;
-})(CSV || (CSV = {}));
-function* range(arg0, arg1, arg2) {
-    var _a;
-    function numerical(t) {
-        return typeof arg0 === 'bigint' ? BigInt(t) : t;
-    }
-    function destr(t) {
-        return typeof t === 'string' ? t.charCodeAt(0) : t;
-    }
-    const [min, max] = (arg1 === undefined ? [numerical(0), destr(arg0)] : [destr(arg0), destr(arg1)]);
-    const step = ((_a = destr(arg2)) !== null && _a !== void 0 ? _a : numerical(1));
-    let n = min;
-    if (max < min) {
-        throw new RangeError('Range min cannot be greater than max');
-    }
-    if (typeof arg0 === 'string') {
-        while (n <= max) {
-            yield String.fromCharCode(n);
-            n += step;
-        }
-    }
-    else {
-        while (n < max) {
-            yield n;
-            n += step;
-        }
-    }
-}
-//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
-var Graphviz;
-(function (Graphviz) {
-    // Note label overrides attributes.label which overrides using Symbol.toStringTag
-    Graphviz.label = Symbol('Graphviz.label');
-    Graphviz.children = Symbol('Graphviz.children');
-    Graphviz.exclude = Symbol('Graphviz.exclude');
-    Graphviz.attributes = Symbol('Graphviz.attributes');
-    function text(text, attributes = {}) {
-        return { ...attributes, [Graphviz.label]: text };
-    }
-    Graphviz.text = text;
-    function stringifyAttributes(attributes) {
-        return attributes ? `[${Object.entries(attributes).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(', ')}]` : '';
-    }
-    function serialize(obj, { output } = {}) {
-        const iter = (function* () {
-            let start = 0;
-            while (true)
-                yield start++;
-        })();
-        const nodes = new Map();
-        const data = [];
-        data.push('digraph {');
-        function recurse(parent, edge, obj) {
-            var _a, _b, _c, _d;
-            if (typeof obj !== 'object' || obj === null)
-                return;
-            if (!nodes.has(obj)) {
-                nodes.set(obj, `Node${iter.shift()}`);
-            }
-            const name = nodes.get(obj);
-            const excluded = new Set((_a = obj[Graphviz.exclude]) !== null && _a !== void 0 ? _a : []);
-            const attributes = (_b = obj[Graphviz.attributes]) !== null && _b !== void 0 ? _b : {};
-            if (Graphviz.label in obj)
-                attributes.label = obj[Graphviz.label];
-            (_c = attributes.label) !== null && _c !== void 0 ? _c : (attributes.label = Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj));
-            data.push(`\t${name}${stringifyAttributes(attributes)}`);
-            if (parent != null) {
-                data.push(`${parent}->${name}${stringifyAttributes({ label: edge })}`);
-            }
-            const keys = (_d = obj[Graphviz.children]) !== null && _d !== void 0 ? _d : Object.keys(obj);
-            for (const [key, child] of Array.isArray(keys) && Array.isArray(keys[0]) ? keys : Object.entries(Array.isArray(keys) ? obj : keys)) {
-                if (excluded.has(key)) {
-                    continue;
-                }
-                if (!Array.isArray(keys) || keys.includes(key) || Array.isArray(keys[0])) {
-                    if (Array.isArray(child)) {
-                        for (const [i, arrayChild] of Array.entries(child)) {
-                            recurse(name, `${key}[${i}]`, arrayChild);
-                        }
-                    }
-                    else {
-                        recurse(name, key, child);
-                    }
-                }
-            }
-        }
-        recurse(null, null, obj);
-        data.push('}');
-        const text = data.join('\n');
-        if (typeof output === 'string') {
-            system.writeTextFileSync(output, text);
-        }
-        return text;
-    }
-    Graphviz.serialize = serialize;
-})(Graphviz || (Graphviz = {}));
 var Parsing;
 (function (Parsing) {
     var _a, _b;
@@ -1945,247 +2164,899 @@ var Parsing;
     }
     Parsing.TokenTransformer = TokenTransformer;
 })(Parsing || (Parsing = {}));
-class Token {
-    constructor(name, value, pos) {
-        this.name = name;
-        this.value = value;
-        this.pos = pos;
-    }
-    get [Symbol.toStringTag]() {
-        return this.constructor.name;
-    }
-}
-var Position;
-(function (Position) {
-    /**
-     * offset(a,b):
-     * 0 => a == b (a is the same as b)
-     * + => a < b  (a is before b)
-     * - => a > b  (a is after b)
-     */
-    function offset(from, to) {
-        if (to.line !== from.line)
-            return to.line - from.line;
-        else
-            return to.col - from.col;
-    }
-    Position.offset = offset;
-})(Position || (Position = {}));
-class CFG {
-    constructor(startingSymbol, rules, terminals) {
-        this.startingSymbol = startingSymbol;
-        this.rules = rules;
-        this.terminals = terminals;
-    }
-    getTerminals() {
-        return [...this.terminals];
-    }
-    getTerminalsAndEOF() {
-        return [...this.terminals, CFG.EOF];
-    }
-    getNonTerminals() {
-        return [...new Set(this.rules.keys())];
-    }
-    getGrammarSymbols() {
-        return [CFG.EOF, ...this.getTerminals(), ...this.getNonTerminals()];
-    }
-    isStartingRule(rule) {
-        if (typeof rule !== 'string')
-            return this.isStartingRule(rule[0]);
-        return rule === this.startingSymbol;
-    }
-    static isTerminal(string) {
-        return !this.isEOF(string) && !this.isLambda(string) && string.toLowerCase() === string && string.length >= 1;
-    }
-    static isTerminalOrEOF(string) {
-        return CFG.isEOF(string) || CFG.isTerminal(string);
-    }
-    static isEOF(string) {
-        return string === CFG.EOF;
-    }
-    static isLambda(string) {
-        return string === CFG.LAMBDA_CHARACTER;
-    }
-    static isNonTerminal(arg) {
-        return typeof arg === 'string' && !this.isEOF(arg) && !this.isLambda(arg) && arg.toLowerCase() !== arg && arg.length >= 1;
-    }
-    derivesToLambda(L, T = []) {
-        var _a;
-        const P = this.rules;
-        for (const p of ((_a = P.get(L)) !== null && _a !== void 0 ? _a : [])) {
-            if ([...T].includes(p)) {
-                continue;
+var LL1;
+(function (LL1) {
+    function convertLeftRecursion(cfg) {
+        const newRules = new Map();
+        function getTailOverrlap(a, b) {
+            let overlap = [];
+            let i = -1;
+            while (a.at(i) === b.at(i) && a.at(i) !== undefined) {
+                overlap.unshift(a.at(i--));
             }
-            if (!p.length) {
-                return true;
-            }
-            if (p.some(x => CFG.isTerminal(x))) {
-                continue;
-            }
-            let adl = true;
-            for (const X of p.filter(x => CFG.isNonTerminal(x))) {
-                T.push(p);
-                adl = this.derivesToLambda(X, T);
-                T.pop();
-                if (!adl) {
-                    break;
-                }
-            }
-            if (adl) {
-                return true;
-            }
+            return overlap;
         }
-        return false;
-    }
-    firstSet([X, ...B], T = new Set()) {
-        var _a;
-        const P = this.rules;
-        if (X === undefined) {
-            return [new Set(), T];
+        function arrayEquals(a, b) {
+            return a.length === b.length && a.every((e, i) => e === b[i]);
         }
-        if (CFG.isTerminalOrEOF(X)) {
-            return [new Set([X]), T];
-        }
-        const F = new Set();
-        if (!T.has(X)) {
-            T.add(X);
-            for (const p of ((_a = P.get(X)) !== null && _a !== void 0 ? _a : []).map(x => [X, x])) {
-                const [lhs, rhs] = p;
-                const [G, I] = this.firstSet(this.startingSymbol === X ? [...rhs, CFG.EOF] : rhs, T);
-                F.takeUnion(G);
-            }
-        }
-        if (this.derivesToLambda(X) && B.length) {
-            const [G, I] = this.firstSet(B, T);
-            F.takeUnion(G);
-        }
-        return [F, T];
-    }
-    followSet(A, T = new Set()) {
-        const followSet = (function (A, T = new Set()) {
-            const P = this.rules;
-            if (T.has(A)) {
-                return [new Set(), T];
-            }
-            T.add(A);
-            const F = new Set();
-            for (const p of [...P.entries()].flatMap(([sym, rs]) => rs.flatMap(rule => rule.includes(A) ? [[sym, rule]] : []))) {
-                const [lhs, rhs] = p;
-                for (const [i, gamma] of [...rhs.entries()].filter(([_, x]) => x === A)) {
-                    const pi = rhs.slice(i + 1);
-                    if (pi.length) {
-                        const [G, I] = this.firstSet(pi, new Set());
-                        F.takeUnion(G);
-                    }
-                    if (!pi.length || (pi.every(x => CFG.isNonTerminal(x) && this.derivesToLambda(x)))) {
-                        if (this.isStartingRule(lhs)) {
-                            F.add(CFG.EOF);
+        for (const N of cfg.getNonTerminals()) {
+            // Sort by descending length to ensure we see non lambda rules first
+            const rules = new Set(cfg.getRuleListFor(N).sort(([lhsA, rhsA], [lhsB, rhsB]) => rhsB.length - rhsA.length));
+            newRules.set(N, []);
+            refactor: for (const [lhs1, rhs1, ref1] of rules.values().map(r => [...r, r])) {
+                if (rhs1[0] === lhs1) {
+                    for (const [lhs2, rhs2, ref2] of rules.values().map(x => [...x, x])) {
+                        if (rhs1 === rhs2) {
+                            continue;
                         }
-                        const [G, I] = followSet(lhs, T);
-                        F.takeUnion(G);
+                        const beta = getTailOverrlap(rhs1, rhs2);
+                        if (arrayEquals(rhs2, beta)) {
+                            const A = lhs1;
+                            const gamma = rhs1.slice(1, rhs1.length - beta.length);
+                            rules.delete(ref1);
+                            rules.delete(ref2); // Don't visit again
+                            const R = CFG.makeUniqueNonTerminal(cfg, N);
+                            newRules.get(N).push([...beta, R]);
+                            newRules.set(R, [[...gamma, ...beta, R], []]);
+                            continue refactor;
+                        }
+                    }
+                }
+                newRules.get(N).push(rhs1); // No refactor happened
+            }
+        }
+        return new CFG(cfg.startingSymbol, newRules, new Set(cfg.getTerminals()));
+    }
+    function leftFactor(cfg) {
+        const newRules = new Map();
+        for (const N of cfg.getNonTerminals()) {
+            const rules = new Set(cfg.getRuleListFor(N));
+            newRules.set(N, []);
+            for (const [lhs1, rhs1, ref1] of rules.values().map(r => [...r, r])) {
+                if (rhs1.length < 1) {
+                    newRules.get(N).push(rhs1);
+                    continue;
+                }
+                const pre1 = rhs1[0];
+                const W = CFG.makeUniqueNonTerminal(cfg, N);
+                let anyOverlaps = false;
+                for (const [lhs2, rhs2, ref2] of rules.values().map(r => [...r, r])) {
+                    const pre2 = rhs2[0];
+                    if (rhs1 !== rhs2 && pre1 === pre2) {
+                        if (!anyOverlaps) {
+                            newRules.set(W, []);
+                        }
+                        anyOverlaps = true;
+                        newRules.get(W).push(rhs2.slice(1));
+                        rules.delete(ref2);
+                    }
+                }
+                if (anyOverlaps) {
+                    newRules.get(W).push(rhs1.slice(1));
+                    newRules.get(N).push([pre1, W]);
+                    rules.delete(ref1);
+                }
+                else {
+                    newRules.get(N).push(rhs1);
+                }
+            }
+        }
+        return new CFG(cfg.startingSymbol, newRules, new Set(cfg.getTerminals()));
+    }
+    // Note, some of the optimizations can't see through  A -> B -> C rules
+    // Ideally, we'd optimize those out first, but that's nyi (or maybe compare with first sets?)
+    function transform(cfg) {
+        let k;
+        do {
+            k = cfg.getRuleList().length;
+            cfg = leftFactor(cfg);
+        } while (k != cfg.getRuleList().length);
+        return convertLeftRecursion(cfg);
+    }
+    function createParseTable(cfg) {
+        const parseTable = new Map(cfg.getNonTerminals().map(N => [N, new Map(cfg.getTerminalsAndEOF().map(a => [a, -1]))]));
+        let i = 0;
+        for (const lhs of cfg.getNonTerminals()) {
+            const rules = cfg.getRuleListFor(lhs).map(([_, rhs]) => rhs);
+            const row = parseTable.get(lhs);
+            for (const rhs of rules) {
+                const P = cfg.predictSet([lhs, rhs]);
+                for (const a of P) {
+                    if (row.get(a) != -1) {
+                        // Possibly implement C hack for dangling bracket here later on or just mark issue
+                        throw new Error(`Grammar is not LL(1) (Caused by rules ${row.get(a)} and ${i})`);
+                    }
+                    else {
+                        row.set(a, i);
+                    }
+                }
+                i++;
+            }
+        }
+        return parseTable;
+    }
+    class LL1Parser {
+        constructor(cfg, sdt = new Parsing.SyntaxTransformer({}), tt = new Parsing.TokenTransformer({})) {
+            this.cfg = transform(cfg);
+            this.parseTable = createParseTable(this.cfg);
+            this.sdt = sdt;
+            this.tt = tt;
+        }
+        getCFG() {
+            return this.cfg;
+        }
+        getParseTable() {
+            return this.parseTable;
+        }
+        parse(tokens) {
+            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+            const LLT = this.parseTable;
+            const P = this.cfg.getRuleList();
+            const ts = createPeekableIterator(tokens);
+            const MARKER = Symbol();
+            const T = new ParseTreeNode();
+            const K = [];
+            let Current = T;
+            K.push(this.cfg.startingSymbol);
+            let pos = undefined;
+            while (K.length) {
+                let x = K.pop();
+                if (x === MARKER) {
+                    // Hold a reference to the current parrent
+                    const parent = Current.parent;
+                    // Disjoin completed node
+                    const node = this.sdt.transform(parent.pop());
+                    // Restore connections
+                    if (Array.isArray(node)) {
+                        parent.push(...node);
+                    }
+                    else if (node != null) {
+                        parent.push(node);
+                    }
+                    // Continue parsing
+                    Current = parent;
+                }
+                else if (CFG.isNonTerminal(x)) {
+                    let p = (_f = P[(_c = (_a = LLT.get(x)) === null || _a === void 0 ? void 0 : _a.get((_b = ts.peek()) === null || _b === void 0 ? void 0 : _b.name)) !== null && _c !== void 0 ? _c : throws(new Parsing.SyntaxError(`Unexpected token ${(_e = (_d = ts.peek()) === null || _d === void 0 ? void 0 : _d.name) !== null && _e !== void 0 ? _e : 'EOF'}`, pos))]) !== null && _f !== void 0 ? _f : throws(new Parsing.SyntaxError(`Syntax Error: Unexpected token ${(_h = (_g = ts.peek()) === null || _g === void 0 ? void 0 : _g.name) !== null && _h !== void 0 ? _h : 'EOF'}`, pos));
+                    K.push(MARKER);
+                    const R = p[1];
+                    if (this.cfg.isStartingRule(p)) {
+                        K.push(CFG.EOF);
+                    }
+                    if (R.length) {
+                        K.push(...[...R].reverse());
+                    }
+                    else {
+                        K.push(CFG.LAMBDA_CHARACTER);
+                    }
+                    const n = new ParseTreeNode(x);
+                    Current.push(n);
+                    Current = Current.at(-1);
+                }
+                else if (CFG.isTerminalOrEOF(x)) {
+                    if (x !== ((_j = ts.peek()) === null || _j === void 0 ? void 0 : _j.name)) {
+                        throw new Parsing.SyntaxError(`Unexpected token ${(_l = (_k = ts.peek()) === null || _k === void 0 ? void 0 : _k.name) !== null && _l !== void 0 ? _l : 'EOF'} expected ${x}`, pos);
+                    }
+                    x = ts.shift();
+                    pos = x === null || x === void 0 ? void 0 : x.pos;
+                    Current.push(x instanceof Token ? this.tt.transform(new ParseTreeTokenNode(x.name, x.value, x.pos)) : new ParseTreeEOFNode());
+                }
+                else if (CFG.isLambda(x)) {
+                    Current.push(new ParseTreeLambdaNode());
+                }
+            }
+            if (T.length !== 1) {
+                throw new Parsing.SyntaxError('Parse returned multiple disjoint trees', pos);
+            }
+            return T.pop();
+        }
+    }
+    LL1.LL1Parser = LL1Parser;
+    var ParseTreeNode = Parsing.ParseTreeNode;
+    var ParseTreeLambdaNode = Parsing.ParseTreeLambdaNode;
+    var ParseTreeEOFNode = Parsing.ParseTreeEOFNode;
+    var ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
+})(LL1 || (LL1 = {}));
+var LL1Parser = LL1.LL1Parser;
+var FiniteAutomata;
+(function (FiniteAutomata) {
+    class NFAContext {
+        constructor(alphabet) {
+            this.alphabet = alphabet;
+            this.iter = (function* (i = 0) {
+                while (true)
+                    yield i++;
+            })();
+        }
+        createState() {
+            return this.iter.shift();
+        }
+        createStates(n = 1) {
+            return [...this.iter.shift(n)];
+        }
+        lambdaWrap(nfa) {
+            const [start, end] = this.createStates(2);
+            return {
+                start,
+                end,
+                edges: [[start, nfa.start], ...nfa.edges, [nfa.end, end]]
+            };
+        }
+    }
+    FiniteAutomata.NFAContext = NFAContext;
+    function toDFA(nfa, ctx) {
+        function followLambda(S) {
+            S = new Set(S);
+            const M = [...S];
+            while (M.length) {
+                const t = M.pop();
+                for (const q of nfa.edges.flatMap(function ([from, to, char]) {
+                    return char === undefined && from === t ? [to] : [];
+                })) {
+                    if (!S.has(q)) {
+                        S.add(q);
+                        M.push(q);
                     }
                 }
             }
-            return [F, T];
-        }).bind(this);
-        return followSet(A, T)[0];
-    }
-    predictSet([lhs, rhs]) {
-        const F = this.firstSet(rhs)[0];
-        if (rhs.every(x => this.derivesToLambda(x))) {
-            [...this.followSet(lhs).values()].forEach(x => F.add(x));
+            return sorted(S);
         }
-        return F;
-    }
-    getRuleList() {
-        return this.rules.entries().flatMap(([lhs, rules]) => rules.flatMap(rhs => [[lhs, rhs]])).toArray();
-    }
-    getRuleListFor(lhs) {
-        return this.rules.get(lhs).map(rhs => [lhs, rhs]);
-    }
-    static makeUniqueNonTerminal(cfg, name, suffix = '\'') {
-        // @ts-expect-error
-        while (cfg.getNonTerminals().includes(name))
-            name += suffix;
-        return name;
-    }
-    stringifyRule(rule, lhs = true) {
-        if (lhs)
-            return `${rule[0]} -> ${this.stringifyRule(rule, false)}`;
-        else
-            return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA_CHARACTER) + (this.isStartingRule(rule) ? ' ' + CFG.EOF_CHARACTER : '');
-    }
-    stringifySet(set) {
-        return `{${set.values().map(c => c === CFG.EOF
-            ? CFG.EOF_CHARACTER
-            : `'${JSON.stringify(c).slice(1, -1).replace(/'/g, '\\\'').replace(/\\"/g, '"')}'`).toArray().join(', ')}}`;
-    }
-    getRuleNumber(rule) {
-        if (this.isStartingRule(rule[0])) {
-            rule = [rule[0], rule[1].filter(x => x !== CFG.EOF)];
+        function followChar(S, c) {
+            const F = new Set();
+            for (const t of S) {
+                for (const q of nfa.edges.flatMap(function ([from, to, char]) {
+                    return char === c && from === t ? [to] : [];
+                })) {
+                    F.add(q);
+                }
+            }
+            return sorted(F);
         }
-        return this.getRuleList().findIndex(([lhs, rhs]) => rule[0] === lhs && rule[1].length === rhs.length && rule[1].every((p, i) => p === rhs[i]));
-    }
-    static fromString(text, allowComments = true) {
-        var _a;
-        const cfgKeywords = Object.assign(Object.create(null), {
-            ARROW: '->',
-            UC_LAMBDA: CFG.LAMBDA_CHARACTER,
-            LAMBDA: 'lambda',
-            OR: '|',
-            EOF: CFG.EOF_CHARACTER
-        });
-        const tokens = [];
-        for (const line of text.split('\n').map(x => x.trim())) {
-            if (line.startsWith('#') && allowComments)
-                continue;
-            tokens.push(...line.split(' ').filter(x => x));
+        function sorted(S) {
+            return new Set([...S].sort((a, b) => a - b));
         }
-        const rules = new Map();
-        let startingSymbol = null;
-        const terminals = new Set();
-        while (tokens.length) {
-            const target = tokens.shift();
-            if (tokens.shift() !== cfgKeywords.ARROW)
-                throw new Error(`Expected '${cfgKeywords.ARROW}' after '${target}'!`);
-            rules.set(target, (_a = rules.get(target)) !== null && _a !== void 0 ? _a : []);
-            const ruleSet = rules.get(target);
-            let currentRule;
-            ruleSet.push(currentRule = []);
-            while (tokens[1] !== cfgKeywords.ARROW && tokens.length) {
-                const token = tokens.shift();
-                switch (token) {
-                    case cfgKeywords.LAMBDA:
-                    case cfgKeywords.UC_LAMBDA:
-                        break;
-                    case cfgKeywords.EOF:
-                        if (startingSymbol === null)
-                            startingSymbol = target;
-                        else if (startingSymbol !== target)
-                            throw new Error(`Multiple starting rules containing '${cfgKeywords.EOF}' found!`);
-                        break;
-                    case cfgKeywords.OR:
-                        ruleSet.push(currentRule = []);
-                        break;
-                    default:
-                        if (CFG.isTerminal(token))
-                            terminals.add(token);
-                        currentRule.push(token);
-                        break;
+        const T = new SignatureMap();
+        const L = [];
+        const A = sorted(new Set([nfa.end]));
+        const i = nfa.start;
+        const B = followLambda([i]);
+        T.set(B, Object.assign(new Map(), { start: true }));
+        if (A.intersection(new Set(B)).size) {
+            T.get(B).accepting = true;
+        }
+        L.push(B);
+        do {
+            const S = L.pop();
+            for (const c of ctx.alphabet) {
+                const R = followLambda(followChar(S, c));
+                T.get(S).set(c, R);
+                if (R.size && !(T.has(R))) {
+                    T.set(R, new Map());
+                    if (A.intersection(new Set(R)).size) {
+                        T.get(R).accepting = true;
+                    }
+                    L.push(R);
+                }
+            }
+        } while (L.length);
+        const dfa = new Map();
+        const n = (function () {
+            const M = new SignatureMap();
+            let n = 0;
+            return function (state) {
+                if (!M.has(state)) {
+                    M.set(state, n++);
+                }
+                return M.get(state);
+            };
+        })();
+        for (const [state, value] of T.entries()) {
+            dfa.set(n(state), Object.assign(new Map(value.entries().flatMap(([c, state]) => state.size ? [[c, n(state)]] : [])), Object.fromEntries(Object.entries(value))));
+        }
+        return dfa;
+    }
+    FiniteAutomata.toDFA = toDFA;
+    function optimizeDFA(dfa, ctx) {
+        const T = dfa;
+        // Remove dead states
+        // console.log(FiniteAutomata.optimizeDFA(new Map([
+        //     [0,Object.assign(new Map([['a',1],['b',2]]),{start:true})],
+        //     [1,Object.assign(new Map([['a',1]]),{accepting:true})],
+        //     [2,Object.assign(new Map([['a',2]]),{})] // Dead
+        // ] as any), new FiniteAutomata.NFAContext(new Set(['a','b','c']))));
+        function removeDeadStates() {
+            var _a;
+            const A = new Set(); // Accessible states
+            const M = new Map(T.entries().map(([k, _]) => [k, T.entries().flatMap(([n, v]) => v.values().toArray().includes(k) ? [n] : []).toArray()]));
+            const L = T.entries().filter(([k, v]) => v.accepting).map(([k]) => k).toArray();
+            while (L.length) {
+                const s = L.pop();
+                if (!A.has(s)) {
+                    for (const p of (_a = M.get(s)) !== null && _a !== void 0 ? _a : []) {
+                        L.push(p);
+                    }
+                    A.add(s);
+                }
+            }
+            const V = new Set(); // Removed states
+            for (const [k, v] of T.entries()) {
+                if (A.has(k))
+                    continue;
+                V.add(k);
+                T.delete(k);
+            }
+            // Fix ids
+            for (const v of T.values()) {
+                for (const [k, t] of v.entries()) {
+                    if (V.has(t)) {
+                        v.delete(k);
+                    }
                 }
             }
         }
-        if (startingSymbol === null)
-            throw new Error(`No starting rule containing '${cfgKeywords.EOF}' found!`);
-        return new CFG(startingSymbol, rules, terminals);
+        function mergeStates() {
+            const T = dfa;
+            const M = new Set();
+            const L = [];
+            L.push([T.entries().filter(([k, v]) => v.accepting).map(([k]) => k).toArray(), [...ctx.alphabet]]);
+            L.push([T.entries().filter(([k, v]) => !v.accepting).map(([k]) => k).toArray(), [...ctx.alphabet]]);
+            // Identify duplicates
+            do {
+                const [S, C] = L.pop();
+                const c = C.shift();
+                const P = Object.values(Object.groupBy(S, s => { var _a; return (_a = T.get(s).get(c)) !== null && _a !== void 0 ? _a : `${undefined}`; }));
+                for (const X of P.filter(X => X.length > 1)) {
+                    if (!C.length) {
+                        M.add(X);
+                    }
+                    else {
+                        L.push([X, [...C]]);
+                    }
+                }
+            } while (L.length);
+            // Merge into first
+            for (const X of M) {
+                const s0 = X.shift();
+                const J = T.get(s0);
+                const V = new Set(); // Removed states
+                for (const s of X) {
+                    J.accepting || (J.accepting = T.get(s).accepting);
+                    T.delete(s);
+                    V.add(s);
+                }
+                // Fix ids
+                for (const v of T.values()) {
+                    for (const [k, t] of v.entries()) {
+                        if (V.has(t)) {
+                            v.set(k, s0);
+                        }
+                    }
+                }
+            }
+        }
+        removeDeadStates();
+        let size;
+        do {
+            size = T.size;
+            mergeStates();
+        } while (size != T.size);
+        // Pull down ids
+        const G = T.keys().reduce((G, s) => { G[s] = s; return G; }, []).reduce((a, c) => [...a, c], []);
+        for (const [k, v] of [...T.entries()]) { // Get initial state with ... to ignore updates
+            T.delete(k);
+            const g = G.indexOf(k);
+            T.set(g, v);
+            for (const [k, t] of v) {
+                v.set(k, G.indexOf(t));
+            }
+        }
+        return dfa;
     }
-    cfsm() {
-        return new SLR1.CFSM(this);
+    FiniteAutomata.optimizeDFA = optimizeDFA;
+})(FiniteAutomata || (FiniteAutomata = {}));
+var RegexEngine;
+(function (RegexEngine) {
+    var NFAContext = FiniteAutomata.NFAContext;
+    let Nodes;
+    (function (Nodes) {
+        var _a, _b;
+        class RegexNode extends Tree {
+            constructor() {
+                super(...arguments);
+                this.name = this.constructor.name;
+            }
+        }
+        Nodes.RegexNode = RegexNode;
+        class AltNode extends RegexNode {
+            constructor(nodes) {
+                super();
+                this.nodes = nodes;
+            }
+            getChildNodes() {
+                return [...this.nodes];
+            }
+            clone() {
+                return new this.constructor(this.nodes.map(node => node.clone()));
+            }
+            toNFA(ctx) {
+                const [start, end] = ctx.createStates(2);
+                const nfa = { start, end, edges: [] };
+                for (const subgraph of this.nodes[Symbol.iterator]().map(node => node.toNFA(ctx))) {
+                    nfa.edges.push([start, subgraph.start]);
+                    nfa.edges.push(...subgraph.edges);
+                    nfa.edges.push([subgraph.end, end]);
+                }
+                return ctx.lambdaWrap(nfa);
+            }
+        }
+        Nodes.AltNode = AltNode;
+        class SeqNode extends RegexNode {
+            constructor(nodes) {
+                super();
+                this.nodes = nodes;
+            }
+            getChildNodes() {
+                return [...this.nodes];
+            }
+            clone() {
+                return new this.constructor(this.nodes.map(node => node.clone()));
+            }
+            toNFA(ctx) {
+                const [start, end] = ctx.createStates(2);
+                const nfa = { start, end, edges: [] };
+                let prev = nfa.start;
+                for (const subgraph of this.nodes[Symbol.iterator]().map(node => node.toNFA(ctx))) {
+                    nfa.edges.push([prev, subgraph.start]);
+                    nfa.edges.push(...subgraph.edges);
+                    prev = subgraph.end;
+                }
+                nfa.edges.push([prev, nfa.end]);
+                return ctx.lambdaWrap(nfa);
+            }
+        }
+        Nodes.SeqNode = SeqNode;
+        class RangeNode extends RegexNode {
+            constructor(min, max) {
+                super();
+                this.min = min;
+                this.max = max;
+            }
+            get [Graphviz.children]() {
+                return {
+                    min: Graphviz.text(this.min),
+                    max: Graphviz.text(this.max),
+                };
+            }
+            clone() {
+                return new this.constructor(this.min, this.max);
+            }
+            toNFA(ctx) {
+                const [start, end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: range(this.min, this.max).filter(char => ctx.alphabet.has(char)).map(char => [start, end, char]).toArray()
+                });
+            }
+        }
+        Nodes.RangeNode = RangeNode;
+        class KleenNode extends RegexNode {
+            constructor(node) {
+                super();
+                this.node = node;
+                this[_a] = '*';
+            }
+            clone() {
+                return new this.constructor(this.node.clone());
+            }
+            toNFA(ctx) {
+                const state = ctx.createState();
+                const nfa = { start: state, end: state, edges: [] };
+                const subgraph = this.node.toNFA(ctx);
+                nfa.edges.push([state, subgraph.start]);
+                nfa.edges.push(...subgraph.edges);
+                nfa.edges.push([subgraph.end, state]);
+                return ctx.lambdaWrap(nfa);
+            }
+        }
+        _a = Graphviz.label;
+        Nodes.KleenNode = KleenNode;
+        class CharNode extends RegexNode {
+            constructor(char) {
+                super();
+                this.char = char;
+            }
+            get [Graphviz.label]() {
+                return this.char;
+            }
+            clone() {
+                return new this.constructor(this.char);
+            }
+            toNFA(ctx) {
+                const [start, end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: [[start, end, this.char]]
+                });
+            }
+        }
+        Nodes.CharNode = CharNode;
+        class WildcharNode extends RegexNode {
+            // TODO, it might be better to support wildchars and charsets in the matcher to reduce nfa size?
+            clone() {
+                return new this.constructor();
+            }
+            toNFA(ctx) {
+                const [start, end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: ctx.alphabet.values().map(char => [start, end, char]).toArray()
+                });
+            }
+        }
+        Nodes.WildcharNode = WildcharNode;
+        class LambdaNode extends RegexNode {
+            constructor() {
+                super(...arguments);
+                this[_b] = CFG.LAMBDA_CHARACTER;
+            }
+            clone() {
+                return new this.constructor();
+            }
+            toNFA(ctx) {
+                const [start, end] = ctx.createStates(2);
+                return ctx.lambdaWrap({
+                    start,
+                    end,
+                    edges: [[start, end]]
+                });
+            }
+        }
+        _b = Graphviz.label;
+        Nodes.LambdaNode = LambdaNode;
+    })(Nodes || (Nodes = {}));
+    var RegexNode = Nodes.RegexNode;
+    const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
+        0x53, 0x20, 0x2d, 0x3e, 0x20, 0x52, 0x65, 0x67, 0x65, 0x78, 0x20, 0x24, 0xd, 0xa, 0xd, 0xa, 0x52, 0x65, 0x67, 0x65, 0x78, 0x20, 0x2d, 0x3e, 0x20, 0x41, 0x6c, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0xd, 0xa, 0xd, 0xa, 0x41, 0x6c, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x2d, 0x3e, 0x20, 0x41, 0x6c, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x25, 0x7c, 0x20, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0xd, 0xa, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x20, 0x2d, 0x3e, 0x20, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x20, 0x51, 0x75, 0x61, 0x6e, 0x74, 0x69, 0x66, 0x69, 0x65, 0x72, 0x20, 0x7c, 0x20, 0xce, 0xbb, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x51, 0x75, 0x61, 0x6e, 0x74, 0x69, 0x66, 0x69, 0x65, 0x72, 0xd, 0xa, 0x51, 0x75, 0x61, 0x6e, 0x74, 0x69, 0x66, 0x69, 0x65, 0x72, 0x20, 0x2d, 0x3e, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0x20, 0x25, 0x2a, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0x20, 0x25, 0x2b, 0xd, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7c, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0xd, 0xa, 0xd, 0xa, 0x50, 0x72, 0x69, 0x6d, 0x61, 0x72, 0x79, 0x20, 0x2d, 0x3e, 0x20, 0x50, 0x72, 0x69, 0x6d, 0x69, 0x74, 0x69, 0x76, 0x65, 0x20, 0x7c, 0x20, 0x25, 0x28, 0x20, 0x52, 0x65, 0x67, 0x65, 0x78, 0x20, 0x25, 0x29, 0xd, 0xa, 0x50, 0x72, 0x69, 0x6d, 0x69, 0x74, 0x69, 0x76, 0x65, 0x20, 0x2d, 0x3e, 0x20, 0x63, 0x68, 0x61, 0x72, 0x20, 0x7c, 0x20, 0x63, 0x68, 0x61, 0x72, 0x20, 0x25, 0x2d, 0x20, 0x63, 0x68, 0x61, 0x72, 0x20, 0x7c, 0x20, 0x25, 0x2e
+    ])));
+    const PARSER = new LL1Parser(GRAMMAR, new Parsing.SyntaxTransformer({
+        '*'(node) {
+            if (node.length === 1) {
+                if (node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
+                    // Remove empty lambdas
+                    return null;
+                }
+                else {
+                    // Squish tree
+                    return node.pop();
+                }
+            }
+            else if (node.name.endsWith('\'')) {
+                // Simplify generated nodes
+                return node.splice(0, node.length);
+            }
+        },
+        Primitive(node) {
+            const [first, , second] = [...node];
+            if (first.name === 'char' && (second === null || second === void 0 ? void 0 : second.name) === 'char') {
+                return new Nodes.RangeNode(first.value, second.value);
+            }
+            else if (first.name === 'char') {
+                return new Nodes.CharNode(first.value);
+            }
+            else if (first.name === '%.') {
+                return new Nodes.WildcharNode();
+            }
+        },
+        Sequence(node) {
+            if (node.length === 1)
+                return node.shift();
+            return new Nodes.SeqNode([...node].flatMap(node => node instanceof Nodes.SeqNode ? node.getChildNodes() : [node]));
+        },
+        Alternation(node) {
+            if (node.length === 1)
+                return node.shift();
+            const l = node.length;
+            const children = node.splice(0, node.length).filter(x => x instanceof RegexNode);
+            // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
+            if (2 * children.length - 1 !== l) {
+                children.push(new Nodes.LambdaNode());
+            }
+            return new Nodes.AltNode(children); // Todo, flatten this?
+        },
+        Quantifier(node) {
+            const mod = node.at(1);
+            if (mod instanceof Parsing.ParseTreeTokenNode) {
+                switch (mod.name) {
+                    case '%+': return new Nodes.SeqNode([node.at(0), new Nodes.KleenNode(node.shift().clone())]);
+                    case '%*': return new Nodes.KleenNode(node.shift());
+                }
+            }
+        },
+        Primary(node) {
+            return node.length === 1 ? node.shift() : node.splice(1, 1);
+        },
+        S(node) {
+            return node.shift();
+        }
+    }));
+    function isHex(text) {
+        return text.split('').every(c => '0123456789abcdef'.includes(c.toLowerCase()));
+    }
+    function* tokenize(text) {
+        const iter = text[Symbol.iterator]();
+        let c;
+        let col = 0, line = 1;
+        while ((c = iter.shift()) !== undefined) {
+            switch (c) {
+                case '\\':
+                    {
+                        const e = iter.shift();
+                        switch (e) {
+                            case '\\':
+                            case '(':
+                            case ')':
+                            case '+':
+                            case '*':
+                            case '-':
+                            case '.':
+                            case '|':
+                                yield new Token('char', e, { line, col });
+                                break;
+                            case 's':
+                                yield new Token('char', ' ', { line, col });
+                                break;
+                            case 'n':
+                                yield new Token('char', '\n', { line, col });
+                                break;
+                            case 'u':
+                                const hex = iter.take(4).toArray().join('');
+                                const n = Number.parseInt(hex, 16);
+                                if (hex.length != 4 || !isHex(hex) || Number.isNaN(n)) {
+                                    throw new Error(`Invalid unicode escape sequence '\\u${hex}'`);
+                                }
+                                yield new Token('char', String.fromCharCode(n), { line, col });
+                                break;
+                            default:
+                                throw new Error(`Unknown escape sequence '\\${e}'`);
+                        }
+                        break;
+                    }
+                    ;
+                case '(':
+                case ')':
+                case '+':
+                case '*':
+                case '-':
+                case '.':
+                case '|':
+                    yield new Token('%' + c, c, { line, col });
+                    break;
+                default:
+                    yield new Token('char', c, { line, col });
+                    break;
+            }
+            if (c === '\n')
+                line++;
+            col++;
+        }
+    }
+    RegexEngine.tokenize = tokenize;
+    function parse(text) {
+        return PARSER.parse(tokenize(text));
+    }
+    RegexEngine.parse = parse;
+    function compile(text, alphabet) {
+        const ctx = new NFAContext(alphabet);
+        const [start, end] = ctx.createStates(2);
+        const ast = RegexEngine.parse(text);
+        const nfa = ast.toNFA(ctx);
+        return {
+            start,
+            end,
+            edges: [[start, nfa.start], ...nfa.edges, [nfa.end, end]],
+        };
+    }
+    RegexEngine.compile = compile;
+})(RegexEngine || (RegexEngine = {}));
+class Scanner {
+    constructor(alphabet, lambdaChar, patterns) {
+        this.alphabet = alphabet;
+        this.lambdaChar = lambdaChar;
+        this.patterns = patterns;
+    }
+    static fromString(text, cache) {
+        // Try to load from cache
+        try {
+            if (cache !== undefined) {
+                const { signature, alphabet, patterns, lambdaChar } = JSON.parse(LZCompression.decompressFromUint8Array(system.readFileSync(cache)));
+                if (Signature.create(text) === signature) {
+                    return new Scanner(new Set(alphabet), lambdaChar, new Map(patterns.map(([k, { dfa, value }]) => [k, { dfa: new Map(dfa.map(([k, { entries, props }]) => [k, Object.assign(new Map(entries), props)])), value }])));
+                }
+            }
+        }
+        catch (e) { }
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+        const alphabet = new Set(lines.shift().split(/\s+/g).flatMap(x => alphaDecode(x).split('')));
+        const lambdaCharacter = (function (alphabet) {
+            for (const c of range(String.fromCharCode(1), String.fromCharCode(127))) {
+                if (!alphabet.has(c))
+                    return c;
+            }
+            throw new Error('No sutible lambda ascii character found!');
+        })(new Set(alphabet));
+        const patterns = new Map();
+        const ctx = new FiniteAutomata.NFAContext(alphabet);
+        for (const line of lines) {
+            const [regex, name, value] = line.split(/\s+/g);
+            // console.debug(`Compiling regex ${name}...`)
+            const nfa = RegexEngine.compile(regex, alphabet);
+            const dfa = FiniteAutomata.optimizeDFA(FiniteAutomata.toDFA(nfa, ctx), ctx);
+            patterns.set(name, {
+                dfa, value: value !== null && value !== void 0 ? value : undefined
+            });
+        }
+        const scanner = new Scanner(alphabet, lambdaCharacter, patterns);
+        // Save to cache
+        try {
+            if (cache !== undefined) {
+                system.writeFileSync(cache, LZCompression.compressToUint8Array(JSON.stringify({
+                    signature: Signature.create(text),
+                    alphabet: [...scanner.alphabet],
+                    patterns: scanner.patterns.entries().map(([k, { dfa, value }]) => [k, { dfa: dfa.entries().map(([k, v]) => [k, { entries: v.entries().toArray(), props: { ...v } }]).toArray(), value }]).toArray(),
+                    lambdaCharacter
+                })));
+            }
+        }
+        catch (e) { }
+        return scanner;
+    }
+    *tokenize(iter) {
+        var _a, _b;
+        class TokenMatcher {
+            constructor(type, dfa) {
+                this.type = type;
+                this.dfa = dfa;
+                this.state = 0;
+            }
+            reset() {
+                this.state = 0;
+            }
+            accept(byte) {
+                var _a;
+                if (this.state !== TokenMatcher.NO_MATCH) {
+                    this.state = (_a = this.dfa.get(this.state).get(byte)) !== null && _a !== void 0 ? _a : TokenMatcher.NO_MATCH;
+                }
+            }
+            isComplete() {
+                var _a;
+                return this.state !== TokenMatcher.NO_MATCH && ((_a = this.dfa.get(this.state)) === null || _a === void 0 ? void 0 : _a.accepting);
+            }
+            getType() {
+                return this.type;
+            }
+            isFailed() {
+                return this.state === TokenMatcher.NO_MATCH;
+            }
+        }
+        TokenMatcher.NO_MATCH = -1;
+        const tape = new Tape(iter);
+        let byte;
+        let matchers = this.patterns.entries().map(([name, { value, dfa }]) => new TokenMatcher({ name, value }, dfa)).toArray();
+        let bestMatch = null;
+        let currentPos = { line: 1, col: 1 };
+        let startPos = { ...currentPos };
+        let bytes = [];
+        while ((byte = tape.next()) || bytes.length) {
+            if (byte !== undefined && !this.alphabet.has(byte)) {
+                throw new Parsing.LexError(`Unexpected character '${JSON.stringify(byte).slice(1, -1).replace(/'/g, '\\\'').replace(/\\"/g, '"')}'`, currentPos);
+            }
+            if (byte) {
+                bytes.push(byte);
+                matchers.forEach(matcher => matcher.accept(byte));
+            }
+            const matcher = (_a = matchers.find(matcher => matcher.isComplete())) !== null && _a !== void 0 ? _a : null;
+            if (matchers.every(matcher => matcher.isFailed()) || !byte) {
+                if (!bestMatch) {
+                    throw new Parsing.LexError('Language matched nothing!', currentPos);
+                }
+                if (bestMatch[0].name.toUpperCase() !== bestMatch[0].name) {
+                    yield new Token(bestMatch[0].name, (_b = bestMatch[0].value) !== null && _b !== void 0 ? _b : bytes.slice(0, bestMatch[1]).join(''), { ...startPos });
+                }
+                matchers.forEach(matcher => matcher.reset());
+                tape.rewind(bytes.length - bestMatch[1]);
+                tape.erase();
+                bytes = [];
+                startPos = bestMatch[2];
+                currentPos = { ...startPos };
+                bestMatch = null;
+            }
+            else {
+                currentPos.col++;
+                if (byte === '\n') {
+                    currentPos.line++;
+                    currentPos.col = 1;
+                }
+                bestMatch = matcher ? [matcher.getType(), bytes.length, { ...currentPos }] : bestMatch;
+            }
+        }
     }
 }
-CFG.EOF = undefined;
-CFG.EOF_CHARACTER = '$';
-CFG.LAMBDA_CHARACTER = '\u03bb';
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
+/*
+ * MIT License
+ *
+ * Copyright (c) 2022 Trin Wasinger
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+var CSV;
+(function (CSV) {
+    function validateDelimiter(delimiter) {
+        if (delimiter.length !== 1)
+            throw new Error('CSV delimiter must be exactly one character (code unit) long');
+    }
+    function escapeDelimiterForRegExp(delimiter) {
+        return delimiter.replace(/[.*+?^${}()|[\]\\\-]/g, String.raw `\$&`);
+    }
+    function stringify(values, replacer, { header = true, delimiter = ',' } = {}) {
+        validateDelimiter(delimiter);
+        const quotePattern = new RegExp(String.raw `[\n${escapeDelimiterForRegExp(delimiter)}"]`);
+        function q([key, value]) {
+            const s = `${replacer ? replacer(key, value) : value}`;
+            return quotePattern.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+        }
+        function l(values) {
+            return values.map(q).join(delimiter);
+        }
+        return (header ? `${l(Object.keys(values[0]).map(key => [null, key]))}\n` : '') + values.map(o => l(Object.entries(o))).join('\n');
+    }
+    CSV.stringify = stringify;
+    function parse(text, reviver, { header = true, delimiter = ',' } = {}) {
+        var _a;
+        validateDelimiter(delimiter);
+        const escapedDelimiter = escapeDelimiterForRegExp(delimiter), pattern = new RegExp(String.raw `(${escapedDelimiter}|\r?\n|\r|^)(?:"((?:\\.|""|[^\\"])*)"|([^${escapedDelimiter}"\r\n]*))`, 'gi'), entries = [[]];
+        let matches = null;
+        while (matches = pattern.exec(text)) {
+            if (matches[1].length && matches[1] !== delimiter)
+                entries.push([]);
+            entries.at(-1).push(matches[2] ?
+                matches[2].replace(/[\\"](.)/g, '$1') :
+                (_a = matches[3]) !== null && _a !== void 0 ? _a : '');
+        }
+        if (!header || !entries.length)
+            return entries.map((value, i) => reviver ? reviver(i.toString(), value) : value);
+        const headerEntry = entries.shift().map(key => reviver ? reviver(null, key) : key);
+        return entries.map(entry => Object.fromEntries(entry.map((value, i) => [headerEntry[i], reviver ? reviver(headerEntry[i], value) : value])));
+    }
+    CSV.parse = parse;
+    function fromCammelCase(s) {
+        return s[0].toUpperCase() + s.slice(1).replace(/[A-Z]/, ' $&');
+    }
+    CSV.fromCammelCase = fromCammelCase;
+    function toCammelCase(s) {
+        return s[0].toLowerCase() + s.slice(1).replaceAll(' ', '');
+    }
+    CSV.toCammelCase = toCammelCase;
+})(CSV || (CSV = {}));
 var SLR1;
 (function (SLR1) {
     const MARKER = Symbol('SLR1.marker');
@@ -2684,8 +3555,9 @@ var ZLang;
         }
         Nodes.StatementNode = StatementNode;
         class DeclareStatement extends StatementNode {
+            // Each x=y=z=1 is an entry of the form [[x,y,z],1]
             constructor(pos, type, entries) {
-                super(pos, [type, ...entries.flat()]);
+                super(pos, [type, ...entries.map(([idents, expr]) => [...idents, ...(expr ? [expr] : [])]).flat()]);
                 this.type = type;
                 this.entries = entries;
             }
@@ -2693,15 +3565,22 @@ var ZLang;
                 return 'Declare';
             }
             get [Graphviz.children]() {
-                return [...Object.entries({ type: this.type }), ...this.entries.map(function (entry, i) {
-                        return entry.length === 1 ? ['', entry[0]] : ['', {
+                return [...Object.entries({ type: this.type }), ...this.entries.map(function ([...entry]) {
+                        var _a;
+                        let value = (_a = entry[1]) !== null && _a !== void 0 ? _a : entry[0].pop();
+                        while (entry[0].length) {
+                            const ident = entry[0].pop();
+                            const rhs = value;
+                            value = {
                                 get [Graphviz.label]() {
                                     return '=';
                                 },
                                 get [Graphviz.children]() {
-                                    return [['', entry[0]], ['', entry[1]]];
+                                    return [['id', ident], ['value', rhs]];
                                 }
-                            }];
+                            };
+                        }
+                        return ['', value];
                     })];
             }
         }
@@ -2920,12 +3799,18 @@ var ZLang;
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
             return new Nodes.DeclareStatement(node.pos, node.splice(0, 1)[0], node.splice(0, node.length).map(function (tree) {
-                if (tree instanceof Nodes.AssignmentStatement) {
-                    return tree.destroy();
+                const idents = [];
+                while (tree instanceof Nodes.AssignmentStatement) {
+                    const [lhs, rhs] = tree.destroy();
+                    idents.push(lhs);
+                    if (rhs instanceof Nodes.AssignmentStatement) {
+                        tree = rhs;
+                    }
+                    else {
+                        return [idents, rhs];
+                    }
                 }
-                else {
-                    return [tree];
-                }
+                return [[tree]];
             }));
         },
         DECLIDS(node) {
@@ -3169,16 +4054,19 @@ var ZLang;
             }
             else if (node instanceof Nodes.DeclareStatement) {
                 const scope = getEnclosingScope(node);
-                for (const [ident, value] of node.entries) {
-                    scope.declare(ident.name, node.type.ztype, ident.pos);
-                    if (value !== undefined) {
-                        scope.mark(ident.name, ident.pos, { initialized: true });
+                for (const [idents, value] of node.entries) {
+                    for (const ident of idents) {
+                        scope.declare(ident.name, node.type.ztype, ident.pos);
+                        if (value !== undefined) {
+                            scope.mark(ident.name, ident.pos, { initialized: true });
+                        }
+                        V.add(ident);
                     }
-                    V.add(ident);
                 }
             }
             else if (node instanceof Nodes.AssignmentStatement) {
                 const scope = getEnclosingScope(node);
+                console.log(node);
                 if (scope.get(node.ident.name, node.pos).type.const)
                     ZLang.raise(SemanticErrors.CONST, `Cannot assign to const variable '${node.ident.name}'`, node.pos);
                 scope.mark(node.ident.name, node.pos, { initialized: true });
@@ -3189,6 +4077,27 @@ var ZLang;
             }
         }, 'pre');
     }
+    console.log('Building Scanner...');
+    const SCANNER = Scanner.fromString(new BasicTextDecoder().decode(new Uint8Array([
+        0x78, 0x30, 0x61, 0x20, 0x78, 0x32, 0x30, 0x20, 0x78, 0x32, 0x31, 0x20, 0x78, 0x32, 0x32, 0x20, 0x20, 0x78, 0x32, 0x33, 0x20, 0x20, 0x78, 0x32, 0x34, 0x20, 0x20, 0x78, 0x32, 0x35, 0x20, 0x20, 0x78, 0x32, 0x36, 0x20, 0x20, 0x78, 0x32, 0x37, 0x20, 0x20, 0x78, 0x32, 0x38, 0x20, 0x20, 0x78, 0x32, 0x39, 0x20, 0x20, 0x78, 0x32, 0x61, 0x20, 0x78, 0x32, 0x62, 0x20, 0x78, 0x32, 0x63, 0x20, 0x78, 0x32, 0x64, 0x20, 0x78, 0x32, 0x65, 0x20, 0x78, 0x32, 0x66, 0x20, 0x30, 0x20, 0x31, 0x20, 0x32, 0x20, 0x33, 0x20, 0x34, 0x20, 0x35, 0x20, 0x36, 0x20, 0x37, 0x20, 0x38, 0x20, 0x39, 0x20, 0x78, 0x33, 0x61, 0x20, 0x78, 0x33, 0x62, 0x20, 0x78, 0x33, 0x63, 0x20, 0x78, 0x33, 0x64, 0x20, 0x78, 0x33, 0x65, 0x20, 0x78, 0x33, 0x66, 0x20, 0x78, 0x34, 0x30, 0x20, 0x20, 0x41, 0x20, 0x42, 0x20, 0x43, 0x20, 0x44, 0x20, 0x45, 0x20, 0x46, 0x20, 0x47, 0x20, 0x48, 0x20, 0x49, 0x20, 0x4a, 0x20, 0x4b, 0x20, 0x4c, 0x20, 0x4d, 0x20, 0x4e, 0x20, 0x4f, 0x20, 0x50, 0x20, 0x51, 0x20, 0x52, 0x20, 0x53, 0x20, 0x54, 0x20, 0x55, 0x20, 0x56, 0x20, 0x57, 0x20, 0x58, 0x20, 0x59, 0x20, 0x5a, 0x20, 0x78, 0x35, 0x62, 0x20, 0x78, 0x35, 0x64, 0x20, 0x78, 0x35, 0x65, 0x20, 0x78, 0x35, 0x66, 0x20, 0x78, 0x36, 0x30, 0x20, 0x20, 0x61, 0x20, 0x62, 0x20, 0x63, 0x20, 0x64, 0x20, 0x65, 0x20, 0x66, 0x20, 0x67, 0x20, 0x68, 0x20, 0x69, 0x20, 0x6a, 0x20, 0x6b, 0x20, 0x6c, 0x20, 0x6d, 0x20, 0x6e, 0x20, 0x6f, 0x20, 0x70, 0x20, 0x71, 0x20, 0x72, 0x20, 0x73, 0x20, 0x74, 0x20, 0x75, 0x20, 0x76, 0x20, 0x77, 0x20, 0x78, 0x37, 0x38, 0x20, 0x79, 0x20, 0x7a, 0x20, 0x78, 0x37, 0x62, 0x20, 0x78, 0x37, 0x63, 0x20, 0x78, 0x37, 0x64, 0x20, 0x78, 0x37, 0x65, 0x20, 0xd, 0xa, 0x28, 0x5c, 0x6e, 0x7c, 0x5c, 0x73, 0x29, 0x2a, 0x23, 0x28, 0x5c, 0x73, 0x7c, 0x21, 0x7c, 0x23, 0x7c, 0x24, 0x7c, 0x25, 0x7c, 0x26, 0x7c, 0x27, 0x7c, 0x5c, 0x28, 0x7c, 0x5c, 0x29, 0x7c, 0x5c, 0x2a, 0x7c, 0x5c, 0x2b, 0x7c, 0x2c, 0x7c, 0x5c, 0x2d, 0x7c, 0x5c, 0x2e, 0x7c, 0x2f, 0x7c, 0x30, 0x7c, 0x31, 0x7c, 0x32, 0x7c, 0x33, 0x7c, 0x34, 0x7c, 0x35, 0x7c, 0x36, 0x7c, 0x37, 0x7c, 0x38, 0x7c, 0x39, 0x7c, 0x3a, 0x7c, 0x3b, 0x7c, 0x3c, 0x7c, 0x3d, 0x7c, 0x3e, 0x7c, 0x3f, 0x7c, 0x40, 0x7c, 0x41, 0x7c, 0x42, 0x7c, 0x43, 0x7c, 0x44, 0x7c, 0x45, 0x7c, 0x46, 0x7c, 0x47, 0x7c, 0x48, 0x7c, 0x49, 0x7c, 0x4a, 0x7c, 0x4b, 0x7c, 0x4c, 0x7c, 0x4d, 0x7c, 0x4e, 0x7c, 0x4f, 0x7c, 0x50, 0x7c, 0x51, 0x7c, 0x52, 0x7c, 0x53, 0x7c, 0x54, 0x7c, 0x55, 0x7c, 0x56, 0x7c, 0x57, 0x7c, 0x58, 0x7c, 0x59, 0x7c, 0x5a, 0x7c, 0x5b, 0x7c, 0x5d, 0x7c, 0x5e, 0x7c, 0x5f, 0x7c, 0x60, 0x7c, 0x61, 0x7c, 0x62, 0x7c, 0x63, 0x7c, 0x64, 0x7c, 0x65, 0x7c, 0x66, 0x7c, 0x67, 0x7c, 0x68, 0x7c, 0x69, 0x7c, 0x6a, 0x7c, 0x6b, 0x7c, 0x6c, 0x7c, 0x6d, 0x7c, 0x6e, 0x7c, 0x6f, 0x7c, 0x70, 0x7c, 0x71, 0x7c, 0x72, 0x7c, 0x73, 0x7c, 0x74, 0x7c, 0x75, 0x7c, 0x76, 0x7c, 0x77, 0x7c, 0x78, 0x7c, 0x79, 0x7c, 0x7a, 0x7c, 0x7b, 0x7c, 0x5c, 0x7c, 0x7c, 0x7d, 0x7c, 0x7e, 0x29, 0x2a, 0x20, 0x20, 0x20, 0x45, 0x4f, 0x4c, 0x43, 0x4f, 0x4d, 0x4d, 0x45, 0x4e, 0x54, 0x20, 0x20, 0xd, 0xa, 0x2f, 0x5c, 0x2a, 0x28, 0x2f, 0x7c, 0x28, 0x5c, 0x73, 0x7c, 0x21, 0x7c, 0x23, 0x7c, 0x24, 0x7c, 0x25, 0x7c, 0x26, 0x7c, 0x27, 0x7c, 0x5c, 0x28, 0x7c, 0x5c, 0x29, 0x7c, 0x5c, 0x2b, 0x7c, 0x2c, 0x7c, 0x5c, 0x2d, 0x7c, 0x5c, 0x2e, 0x7c, 0x30, 0x7c, 0x31, 0x7c, 0x32, 0x7c, 0x33, 0x7c, 0x34, 0x7c, 0x35, 0x7c, 0x36, 0x7c, 0x37, 0x7c, 0x38, 0x7c, 0x39, 0x7c, 0x3a, 0x7c, 0x3b, 0x7c, 0x3c, 0x7c, 0x3d, 0x7c, 0x3e, 0x7c, 0x3f, 0x7c, 0x40, 0x7c, 0x41, 0x7c, 0x42, 0x7c, 0x43, 0x7c, 0x44, 0x7c, 0x45, 0x7c, 0x46, 0x7c, 0x47, 0x7c, 0x48, 0x7c, 0x49, 0x7c, 0x4a, 0x7c, 0x4b, 0x7c, 0x4c, 0x7c, 0x4d, 0x7c, 0x4e, 0x7c, 0x4f, 0x7c, 0x50, 0x7c, 0x51, 0x7c, 0x52, 0x7c, 0x53, 0x7c, 0x54, 0x7c, 0x55, 0x7c, 0x56, 0x7c, 0x57, 0x7c, 0x58, 0x7c, 0x59, 0x7c, 0x5a, 0x7c, 0x5b, 0x7c, 0x5d, 0x7c, 0x5e, 0x7c, 0x5f, 0x7c, 0x60, 0x7c, 0x61, 0x7c, 0x62, 0x7c, 0x63, 0x7c, 0x64, 0x7c, 0x65, 0x7c, 0x66, 0x7c, 0x67, 0x7c, 0x68, 0x7c, 0x69, 0x7c, 0x6a, 0x7c, 0x6b, 0x7c, 0x6c, 0x7c, 0x6d, 0x7c, 0x6e, 0x7c, 0x6f, 0x7c, 0x70, 0x7c, 0x71, 0x7c, 0x72, 0x7c, 0x73, 0x7c, 0x74, 0x7c, 0x75, 0x7c, 0x76, 0x7c, 0x77, 0x7c, 0x78, 0x7c, 0x79, 0x7c, 0x7a, 0x7c, 0x7b, 0x7c, 0x5c, 0x7c, 0x7c, 0x7d, 0x7c, 0x7e, 0x29, 0x7c, 0x5c, 0x2a, 0x2b, 0x5f, 0x5f, 0x50, 0x49, 0x5f, 0x5f, 0x29, 0x2a, 0x5c, 0x2a, 0x2b, 0x2f, 0x20, 0x20, 0x49, 0x4e, 0x4c, 0x49, 0x4e, 0x45, 0x43, 0x53, 0x54, 0x59, 0x4c, 0x45, 0x43, 0x4f, 0x4d, 0x4d, 0x45, 0x4e, 0x54, 0x20, 0xd, 0xa, 0x63, 0x6f, 0x6e, 0x73, 0x74, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x63, 0x6f, 0x6e, 0x73, 0x74, 0xd, 0xa, 0x62, 0x6f, 0x6f, 0x6c, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x62, 0x6f, 0x6f, 0x6c, 0xd, 0xa, 0x69, 0x6e, 0x74, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x69, 0x6e, 0x74, 0xd, 0xa, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0xd, 0xa, 0x66, 0x6c, 0x6f, 0x61, 0x74, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x66, 0x6c, 0x6f, 0x61, 0x74, 0xd, 0xa, 0x69, 0x66, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x69, 0x66, 0xd, 0xa, 0x65, 0x6c, 0x73, 0x65, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x65, 0x6c, 0x73, 0x65, 0xd, 0xa, 0x77, 0x68, 0x69, 0x6c, 0x65, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x77, 0x68, 0x69, 0x6c, 0x65, 0xd, 0xa, 0x65, 0x6d, 0x69, 0x74, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x65, 0x6d, 0x69, 0x74, 0xd, 0xa, 0x73, 0x79, 0x6d, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x73, 0x79, 0x6d, 0x74, 0x61, 0x62, 0x6c, 0x65, 0xd, 0xa, 0x72, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x73, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x72, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x73, 0xd, 0xa, 0x72, 0x61, 0x6e, 0x64, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x72, 0x61, 0x6e, 0x64, 0xd, 0xa, 0x28, 0x5f, 0x7c, 0x61, 0x2d, 0x7a, 0x7c, 0x41, 0x2d, 0x5a, 0x29, 0x28, 0x5f, 0x7c, 0x61, 0x2d, 0x7a, 0x7c, 0x41, 0x2d, 0x5a, 0x7c, 0x30, 0x2d, 0x39, 0x29, 0x2a, 0x20, 0x69, 0x64, 0xd, 0xa, 0x28, 0x28, 0x31, 0x2d, 0x39, 0x29, 0x28, 0x30, 0x2d, 0x39, 0x29, 0x2a, 0x29, 0x7c, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x69, 0x6e, 0x74, 0x76, 0x61, 0x6c, 0xd, 0xa, 0x28, 0x30, 0x2d, 0x39, 0x2b, 0x5c, 0x2e, 0x30, 0x2d, 0x39, 0x2b, 0x7c, 0x30, 0x2d, 0x39, 0x2b, 0x5c, 0x2e, 0x30, 0x2d, 0x39, 0x2a, 0x29, 0x20, 0x20, 0x20, 0x20, 0x66, 0x6c, 0x6f, 0x61, 0x74, 0x76, 0x61, 0x6c, 0xd, 0xa, 0x22, 0x28, 0x5c, 0x73, 0x7c, 0x21, 0x7c, 0x23, 0x7c, 0x24, 0x7c, 0x25, 0x7c, 0x26, 0x7c, 0x27, 0x7c, 0x5c, 0x28, 0x7c, 0x5c, 0x29, 0x7c, 0x5c, 0x2a, 0x7c, 0x5c, 0x2b, 0x7c, 0x2c, 0x7c, 0x5c, 0x2d, 0x7c, 0x5c, 0x2e, 0x7c, 0x2f, 0x7c, 0x30, 0x7c, 0x31, 0x7c, 0x32, 0x7c, 0x33, 0x7c, 0x34, 0x7c, 0x35, 0x7c, 0x36, 0x7c, 0x37, 0x7c, 0x38, 0x7c, 0x39, 0x7c, 0x3a, 0x7c, 0x3b, 0x7c, 0x3c, 0x7c, 0x3d, 0x7c, 0x3e, 0x7c, 0x3f, 0x7c, 0x40, 0x7c, 0x41, 0x7c, 0x42, 0x7c, 0x43, 0x7c, 0x44, 0x7c, 0x45, 0x7c, 0x46, 0x7c, 0x47, 0x7c, 0x48, 0x7c, 0x49, 0x7c, 0x4a, 0x7c, 0x4b, 0x7c, 0x4c, 0x7c, 0x4d, 0x7c, 0x4e, 0x7c, 0x4f, 0x7c, 0x50, 0x7c, 0x51, 0x7c, 0x52, 0x7c, 0x53, 0x7c, 0x54, 0x7c, 0x55, 0x7c, 0x56, 0x7c, 0x57, 0x7c, 0x58, 0x7c, 0x59, 0x7c, 0x5a, 0x7c, 0x5b, 0x7c, 0x5d, 0x7c, 0x5e, 0x7c, 0x5f, 0x7c, 0x60, 0x7c, 0x61, 0x7c, 0x62, 0x7c, 0x63, 0x7c, 0x64, 0x7c, 0x65, 0x7c, 0x66, 0x7c, 0x67, 0x7c, 0x68, 0x7c, 0x69, 0x7c, 0x6a, 0x7c, 0x6b, 0x7c, 0x6c, 0x7c, 0x6d, 0x7c, 0x6e, 0x7c, 0x6f, 0x7c, 0x70, 0x7c, 0x71, 0x7c, 0x72, 0x7c, 0x73, 0x7c, 0x74, 0x7c, 0x75, 0x7c, 0x76, 0x7c, 0x77, 0x7c, 0x78, 0x7c, 0x79, 0x7c, 0x7a, 0x7c, 0x7b, 0x7c, 0x5c, 0x7c, 0x7c, 0x7d, 0x7c, 0x7e, 0x29, 0x2b, 0x22, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x76, 0x61, 0x6c, 0xd, 0xa, 0x3c, 0x3d, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6c, 0x65, 0x71, 0xd, 0xa, 0x3d, 0x3d, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x65, 0x71, 0xd, 0xa, 0x3e, 0x3d, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x67, 0x65, 0x71, 0xd, 0xa, 0x3d, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x61, 0x73, 0x73, 0x69, 0x67, 0x6e, 0xd, 0xa, 0x3e, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x67, 0x74, 0xd, 0xa, 0x3c, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6c, 0x74, 0xd, 0xa, 0x5c, 0x2b, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x70, 0x6c, 0x75, 0x73, 0xd, 0xa, 0x5c, 0x2d, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6d, 0x69, 0x6e, 0x75, 0x73, 0xd, 0xa, 0x21, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6e, 0x6f, 0x74, 0xd, 0xa, 0x7e, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x6c, 0xd, 0xa, 0x5c, 0x2a, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6d, 0x75, 0x6c, 0x74, 0xd, 0xa, 0x2f, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x64, 0x69, 0x76, 0xd, 0xa, 0x25, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6d, 0x6f, 0x64, 0xd, 0xa, 0x3b, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x73, 0x63, 0xd, 0xa, 0x7b, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6c, 0x62, 0x72, 0x61, 0x63, 0x65, 0xd, 0xa, 0x7d, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x72, 0x62, 0x72, 0x61, 0x63, 0x65, 0xd, 0xa, 0x5c, 0x28, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x6c, 0x70, 0x61, 0x72, 0x65, 0x6e, 0xd, 0xa, 0x5c, 0x29, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x72, 0x70, 0x61, 0x72, 0x65, 0x6e, 0xd, 0xa, 0x2c, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0xd, 0xa, 0x28, 0x5c, 0x73, 0x7c, 0x5c, 0x6e, 0x29, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x49, 0x47, 0x4e, 0x4f, 0x52, 0x45, 0xd, 0xa
+    ])), 'zlex.json.lz');
+    console.log('Done!');
+    async function* tokenizeFile(file) {
+        const inStream = await system.createTextFileReadStream(file);
+        yield* SCANNER.tokenize((function* () {
+            while (true)
+                yield inStream.read(1);
+        })());
+    }
+    ZLang.tokenizeFile = tokenizeFile;
+    function tokenize(text) {
+        return SCANNER.tokenize(text.split('')[Symbol.iterator]());
+    }
+    ZLang.tokenize = tokenize;
+    function parse(text) {
+        return ZLang.parseTokens(ZLang.tokenize(text));
+    }
+    ZLang.parse = parse;
 })(ZLang || (ZLang = {}));
 async function dump(name, node, { format = 'png' } = {}) {
     //@ts-ignore
@@ -3237,8 +4146,15 @@ const ast = (function () {
     var _a, _b, _c, _d;
     try {
         return ZLang.parseTokens(tokens);
+        return ZLang.parse(`
+            int x = y = z = 3,r=2;
+            int j = 2, r = 3;
+            float k;
+            float m = n = k = 3.14; 
+        `);
     }
     catch (e) {
+        console.error(e);
         output('SYNTAX', (_b = (_a = e === null || e === void 0 ? void 0 : e.pos) === null || _a === void 0 ? void 0 : _a.line) !== null && _b !== void 0 ? _b : 0, (_d = (_c = e === null || e === void 0 ? void 0 : e.pos) === null || _c === void 0 ? void 0 : _c.col) !== null && _d !== void 0 ? _d : 0, 'SYNTAX');
         system.exit(1);
     }
@@ -3304,6 +4220,7 @@ ZLang.visit(ast, function (node) {
         system.writeTextFileSync(symbtableOutput, ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n, d.type, d.name].join(',')).join('\n'));
     }
 });
+/**/
 // TODO, dump ast
 dump('zlang', ast);
 console.debug('Done!');

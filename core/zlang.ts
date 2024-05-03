@@ -7,6 +7,7 @@
 ///#include <signature.ts>
 ///#include <encoding.ts>
 
+///#include "scanner.ts"
 ///#include "slr1.ts"
 ///#include "cfg.ts"
 
@@ -243,22 +244,29 @@ namespace ZLang {
         }
 
         export class DeclareStatement extends StatementNode {
-            constructor(pos: Position,public readonly type: TypeNode, public readonly entries: [IdentifierNode, ExpressionNode?][]) {
-                super(pos,[type,...entries.flat()]);
+            // Each x=y=z=1 is an entry of the form [[x,y,z],1]
+            constructor(pos: Position,public readonly type: TypeNode, public readonly entries: [IdentifierNode[], ExpressionNode?][]) {
+                super(pos,[type,...entries.map(([idents,expr])=>[...idents,...(expr?[expr]:[])]).flat()]);
             }
             get [Graphviz.label]() {
                 return 'Declare';
             }
             get [Graphviz.children]() {
-                return [...Object.entries({type:this.type}), ...this.entries.map(function(entry,i) {
-                    return entry.length === 1 ? ['',entry[0]] : ['',{
-                        get [Graphviz.label]() {
-                            return '=';
-                        },
-                        get [Graphviz.children]() {
-                            return [['',entry[0]], ['',entry[1]]];
+                return [...Object.entries({type:this.type}), ...this.entries.map(function([...entry]) {
+                    let value: object = entry[1]??entry[0].pop();
+                    while(entry[0].length) {
+                        const ident = entry[0].pop();
+                        const rhs = value;
+                        value = {
+                            get [Graphviz.label]() {
+                                return '=';
+                            },
+                            get [Graphviz.children]() {
+                                return [['id',ident],['value',rhs]];
+                            }
                         }
-                    }];
+                    }
+                    return ['',value]
                 })];
             }
         }
@@ -485,11 +493,18 @@ namespace ZLang {
                 node.pos,
                 node.splice(0,1)[0] as Nodes.TypeNode,
                 node.splice(0,node.length).map(function(tree) {
-                    if(tree instanceof Nodes.AssignmentStatement) {
-                        return tree.destroy() as [Nodes.IdentifierNode, ExpressionNode];
-                    } else {
-                        return [tree] as [Nodes.IdentifierNode];
+                    const idents: Nodes.IdentifierNode[] = [];
+                    while(tree instanceof Nodes.AssignmentStatement) {
+                        const [lhs,rhs] = tree.destroy();
+                        idents.push(lhs as Nodes.IdentifierNode);
+                        if(rhs instanceof Nodes.AssignmentStatement) {
+                            tree = rhs;
+                        } else {
+                            return [idents,rhs as Nodes.ExpressionNode];
+                        }
                     }
+                    
+                    return [[tree as Nodes.IdentifierNode]];
                 })
             ) as StrayTree<Nodes.DeclareStatement>;
         },
@@ -768,12 +783,14 @@ namespace ZLang {
 
             } else if(node instanceof Nodes.DeclareStatement) {
                 const scope = getEnclosingScope(node);
-                for(const [ident,value] of node.entries) {
-                    scope.declare(ident.name, node.type.ztype, ident.pos);
-                    if(value !== undefined) {
-                        scope.mark(ident.name,ident.pos,{initialized:true});
+                for(const [idents,value] of node.entries) {
+                    for(const ident of idents) {
+                        scope.declare(ident.name, node.type.ztype, ident.pos);
+                        if(value !== undefined) {
+                            scope.mark(ident.name,ident.pos,{initialized:true});
+                        }
+                        V.add(ident);
                     }
-                    V.add(ident);
                 }
             } else if(node instanceof Nodes.AssignmentStatement) {
                 const scope = getEnclosingScope(node);
@@ -784,6 +801,27 @@ namespace ZLang {
                 getEnclosingScope(node).mark(node.name,node.pos,{used: true});
             }
         },'pre');
+    }
+
+    console.debug('Building Scanner...');
+    const SCANNER = Scanner.fromString(new BasicTextDecoder().decode(new Uint8Array([
+        ///#embed "zlang.lut"
+    ])), 'zlex.json.lz');
+    console.debug('Done!');
+
+    export async function* tokenizeFile(file: string) {
+        const inStream = await system.createTextFileReadStream(file);
+        yield* SCANNER.tokenize((function*() {
+            while(true) yield inStream.read(1) as char;
+        })());
+    }
+
+    export function tokenize(text: string) {
+        return SCANNER.tokenize(text.split('')[Symbol.iterator]());
+    }
+
+    export function parse(text: string): Program {
+        return ZLang.parseTokens(ZLang.tokenize(text)) as Program;
     }
 }
 
@@ -924,6 +962,8 @@ ZLang.visit(ast,function(node) {
         system.writeTextFileSync(symbtableOutput,ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n,d.type,d.name].join(',')).join('\n'));
     }
 });
+
+/**/
 
 // TODO, dump ast
 dump('zlang', ast);
