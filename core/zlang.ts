@@ -658,7 +658,7 @@ namespace ZLang {
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
 
-        ///#warning Scope#get and Scope#has should respect position
+        ///#warning Scope#get and Scope#has should respect position or maybe take ident node
         public has(name: string): boolean {
             return this.data.has(name);
         }
@@ -857,7 +857,7 @@ ZLang.visit(ast, function(node) {
     // This is not the same as typechecking for assignment
     if(node instanceof ZLang.Nodes.BinaryOp) {
         if(
-            (node.name === 'mod' && (node.lhs.domain !== 'int' || node.rhs.domain !== 'int'))
+            (node.name === '%' && (node.lhs.domain !== 'int' || node.rhs.domain !== 'int'))
             || node.lhs.domain === 'bool' || node.lhs.domain === 'string'
             || node.rhs.domain === 'bool' || node.rhs.domain === 'string'
         ) {
@@ -867,9 +867,9 @@ ZLang.visit(ast, function(node) {
     }
     if(node instanceof ZLang.Nodes.UnaryOp) {
         if(
-            (node.name === 'compl' && node.val.domain !== 'int')
-            || (node.name === 'not' && node.val.domain !== 'bool')
-            || ((node.name === 'plus' || node.name === 'minus') && (node.val.domain === 'string' || node.val.domain === 'bool'))
+            (node.name === '~' && node.val.domain !== 'int')
+            || (node.name === '!' && node.val.domain !== 'bool')
+            || ((node.name === '+' || node.name === '-') && (node.val.domain === 'string' || node.val.domain === 'bool'))
         ) {
             ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos)
             return false;

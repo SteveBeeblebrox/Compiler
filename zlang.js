@@ -3244,7 +3244,7 @@ ZLang.visit(ast, function (node) {
     // Validate operator types
     // This is not the same as typechecking for assignment
     if (node instanceof ZLang.Nodes.BinaryOp) {
-        if ((node.name === 'mod' && (node.lhs.domain !== 'int' || node.rhs.domain !== 'int'))
+        if ((node.name === '%' && (node.lhs.domain !== 'int' || node.rhs.domain !== 'int'))
             || node.lhs.domain === 'bool' || node.lhs.domain === 'string'
             || node.rhs.domain === 'bool' || node.rhs.domain === 'string') {
             ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for types ${node.lhs.domain} and ${node.rhs.domain}`, node.pos);
@@ -3252,9 +3252,9 @@ ZLang.visit(ast, function (node) {
         }
     }
     if (node instanceof ZLang.Nodes.UnaryOp) {
-        if ((node.name === 'compl' && node.val.domain !== 'int')
-            || (node.name === 'not' && node.val.domain !== 'bool')
-            || ((node.name === 'plus' || node.name === 'minus') && (node.val.domain === 'string' || node.val.domain === 'bool'))) {
+        if ((node.name === '~' && node.val.domain !== 'int')
+            || (node.name === '!' && node.val.domain !== 'bool')
+            || ((node.name === '+' || node.name === '-') && (node.val.domain === 'string' || node.val.domain === 'bool'))) {
             ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`, node.pos);
             return false;
         }
