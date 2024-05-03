@@ -251,7 +251,7 @@ namespace SLR1 {
 
             while(D.length || ts.peek() || T.get(S.at(-1).state).has(undefined)) {
                 let t = D.at(0) ?? ts.peek();
-                pos = t.pos;
+                pos = t?.pos ?? pos;
                 const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
                 if(action === undefined) {
                     throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name??t??'EOF'}'`,pos);
