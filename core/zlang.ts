@@ -697,6 +697,10 @@ namespace ZLang {
         return null;
     }
 
+    export function applySemantics(program: Program) {
+        initSymbols(program);
+    }
+
     export function initSymbols(program: Program) {
         ZLang.visit(program,function(node,V: Set<Nodes.ZNode>) {
             // Set up scopes
@@ -831,8 +835,7 @@ ZLang.raise = function(errno,message,pos) {
     }
 }
 
-ZLang.initSymbols(ast);
-
+ZLang.applySemantics(ast);
 
 // TODO expr errors
 
