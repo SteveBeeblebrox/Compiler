@@ -39,6 +39,9 @@ namespace ZLang {
             destroy() {
                 return this[Tree.splice](0,this[Tree.treeLength]);
             }
+            get [Graphviz.exclude]() {
+                return ['pos'];
+            }
         }
         export interface ZNode {
             get parent() : ZNode;
@@ -318,7 +321,7 @@ namespace ZLang {
                 super(pos,(function() {
                     switch(data.type) {
                         case 'value': return [data.value];
-                        case 'string': return [data.index,data.length];
+                        case 'string': return [data.ident,data.index,data.length];
                         default: return [];
                     }
                 })());
@@ -352,7 +355,7 @@ namespace ZLang {
                 return 'Statements';
             }
             get[Graphviz.exclude]() {
-                return ['scope'];
+                return ['scope',...super[Graphviz.exclude]];
             }
         }
     }
@@ -363,7 +366,7 @@ namespace ZLang {
     import ZNode = Nodes.ZNode;
     export import Program = Nodes.Program;
 
-    export const sdt = new Parsing.SyntaxTransformer<Nodes.ZNode>({
+    const sdt = new Parsing.SyntaxTransformer<Nodes.ZNode>({
         '*'(node: Parsing.ParseTreeNode) {
             if(node.length === 1) {
                 if(node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
@@ -553,7 +556,7 @@ namespace ZLang {
         }
     });
 
-    export const tt = new Parsing.TokenTransformer<Nodes.LiteralNode<any> | Nodes.IdentifierNode>({
+    const tt = new Parsing.TokenTransformer<Nodes.LiteralNode<any> | Nodes.IdentifierNode>({
         floatval(node) {
             return new Nodes.FloatLiteral(node.pos,+node.value);
         },
@@ -569,7 +572,7 @@ namespace ZLang {
     });
     
     console.debug('Building Parser...');
-    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, ZLang.tt, 'zlang.json.lz');
+    const PARSER = new SLR1.SLR1Parser(GRAMMAR, sdt, tt, 'zlang.json.lz');
     console.debug('Done!');
 
     export function parseTokens(tokens: Iterable<Token>): Program {
@@ -577,7 +580,8 @@ namespace ZLang {
     }
 
     // For preorder traversal, returning false prevents visiting children
-    export function visit(program: Program, f: (node:Nodes.ZNode)=>void, order: 'post');
+    // For postorder traversal, returing false prevents visiting parents but not sibblings and parents' sibblings
+    export function visit(program: Program, f: (node:Nodes.ZNode)=>void|boolean, order: 'post');
     export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order?: 'pre');
     export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order: 'pre'|'post' = 'pre') {
         const V = new Set<Nodes.ZNode>;
@@ -585,21 +589,25 @@ namespace ZLang {
             if(V.has(node)) return;
             V.add(node);
 
-            let condition = true;
+            let precondition = true;
+            let postcondition = true;
 
             if(order === 'pre') {
-                condition = f(node,V) as undefined | boolean ?? condition;
+                precondition = f(node,V) as undefined | boolean ?? precondition;
             }
-
-            if(condition && node instanceof Nodes.ZNode) {
+            
+            if(precondition && node instanceof Nodes.ZNode) {
                 for(const child of node.children) {
-                    visit(child);
+                    postcondition = (visit(child) ?? postcondition) && postcondition; // &&= short circuits, and we don't want that
                 }
             }
 
-            if(order === 'post') {
-                f.bind(node)(node);
+
+            if(order === 'post' && postcondition) {
+                postcondition = f.bind(node)(node);
             }
+
+            return postcondition;
         }
         visit(program);
     }
@@ -812,7 +820,8 @@ const ast = (function() {
     try {
         return ZLang.parseTokens(tokens);
     } catch(e) {
-        output('SYNTAX',e?.pos?.line??0,e?.pos?.col,'SYNTAX');
+        console.log(e)
+        output('SYNTAX',e?.pos?.line??0,e?.pos?.col??0,'SYNTAX');
         system.exit(1);
     }
 })();
@@ -855,11 +864,14 @@ ZLang.visit(ast,function(node) {
 
 
 
-
+ZLang.visit(ast, function(node) {
+    console.log(node.name)
+    if(node.name === 'EmitStatement') return false
+},'post');
 
 // TODO, dump ast
 dump('zlang', ast);
 
 console.debug('Done!');
-system.exit(hasErrors ? 1 : 0);
+// system.exit(hasErrors ? 1 : 0); TODO enable after awaiting ast write
 ///#endif
