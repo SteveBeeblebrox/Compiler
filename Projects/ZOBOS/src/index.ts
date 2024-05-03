@@ -91,7 +91,7 @@ namespace ZOBOS {
             output('DOMAIN',node.pos.line,node.pos.col,node.domain);
             return;
         }
-    
+        
         // Validate operator types
         // This is not the same as typechecking for assignment
         if(node instanceof ZLang.Nodes.BinaryOp) {
@@ -114,10 +114,12 @@ namespace ZOBOS {
                 return false;
             }
         }
-    
+        
         // Validate function identifiers are not used as variables
         if(
             node instanceof ZLang.Nodes.IdentifierNode
+            // Ignore parameters in lone function prototype, they aren't declared
+            && ZLang.getEnclosingScope(node)!.has(node.name,node.pos)
             && ZLang.getEnclosingScope(node)!.get(node.name,node.pos)!.type instanceof ZLang.ZFunctionType
         ) {
             const parent = node.parent;
