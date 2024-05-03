@@ -78,6 +78,7 @@ namespace Parsing {
         }
     }
 
+    ///#warning fix up parse tree types
     type ParseTreeLeaf = Tree & Omit<ParseTreeLambdaNode | ParseTreeEOFNode | ParseTreeTokenNode, typeof Graphviz.label>;
     export type InnerParseTree = ParseTreeNode;//NestedTree<ParseTreeNode, ParseTreeNode | ParseTreeLeaf, false> & {parent?: ParseTree};
     export type ParseTree = ParseTreeNode;//InnerParseTree | ParseTreeLeaf; 

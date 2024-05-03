@@ -185,7 +185,6 @@ namespace ZLang {
                 super(pos,[ident,...args]);
             }
             get domain() {
-                ///#warning limit emit to those before emit and overwrite shadows
                 return ZLang.getEnclosingScope(this).get(this.ident.name).type.domain;
             }
             get [Graphviz.label]() {

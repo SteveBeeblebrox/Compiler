@@ -2380,7 +2380,6 @@ var SLR1;
                             else if (child != null) {
                                 node.unshift(child);
                             }
-                            // node.unshift(t);
                         }
                         else {
                             throw new Parsing.SyntaxError(`Expected '${expected !== null && expected !== void 0 ? expected : 'EOF'}' got '${(_b = (_a = t === null || t === void 0 ? void 0 : t.name) !== null && _a !== void 0 ? _a : t) !== null && _b !== void 0 ? _b : 'EOF'}'`);

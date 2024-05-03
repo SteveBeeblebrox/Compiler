@@ -231,7 +231,6 @@ namespace SLR1 {
                         } else if(CFG.isTerminal(expected) && t instanceof Token) {
                             node.unshift(tt.transform(new ParseTreeTokenNode(t.name as Terminal, t.value, t.pos)));
                         } else if (CFG.isNonTerminal(expected) && t instanceof Tree) {
-                            ///#warning test slr1 sdt
                             const child = sdt.transform(t as StrayTree<ParseTreeNode>);                    
 
                             if(Array.isArray(child)) {
@@ -239,8 +238,6 @@ namespace SLR1 {
                             } else if(child != null) {
                                 node.unshift(child as InnerParseTree);
                             }
-
-                            // node.unshift(t);
                         } else {
                             throw new Parsing.SyntaxError(`Expected '${expected??'EOF'}' got '${t?.name??t??'EOF'}'`)
                         }
