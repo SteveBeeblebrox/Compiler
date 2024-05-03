@@ -1,6 +1,6 @@
 string string 0 0
 id str 0 0
 assign assign 0 0
-not not 12 12
+not ! 12 12
 stringval hello 0 0
 sc sc 0 0
