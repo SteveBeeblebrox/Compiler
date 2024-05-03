@@ -12,3 +12,15 @@ class Token {
         return this.constructor.name;
     }
 }
+
+namespace Position {
+    /**
+     * 0 => a==b;
+     * + => a < b
+     * - => a > b
+     */
+    export function offset(from: Position, to: Position) {
+        if(to.line !== from.line) return to.line-from.line;
+        else return to.col-from.col;
+    }
+}
