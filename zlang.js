@@ -3046,14 +3046,14 @@ var ZLang;
     }
     ZLang.ZType = ZType;
     class ZFunctionType {
-        constructor(rType, pTypes = []) {
+        constructor(rType, pTypes = [], pconst = false) {
             this.rType = rType;
             this.pTypes = pTypes;
-            this.const = true;
+            this.const = pconst;
         }
         toString() {
             // implicit const is omitted on parameters
-            return `const ${this.rType}//${this.pTypes.map(x => x.domain).join('/')}`;
+            return `${this.const ? 'const ' : ''}${this.rType.domain}//${this.pTypes.map(x => x.domain).join('/')}`;
         }
         get domain() {
             return this.rType.domain;
@@ -3095,6 +3095,11 @@ var ZLang;
         mark(name, pos, dtls) {
             if (this.hasLocal(name, pos)) {
                 this.data.set(name, Object.assign(this.data.get(name), dtls));
+                const t = this.get(name).type;
+                // When implementing function, change it to be const
+                if (dtls.initialized && t instanceof ZFunctionType) {
+                    t.const = true;
+                }
             }
             else if (this.parent) {
                 this.parent.mark(name, pos, dtls);

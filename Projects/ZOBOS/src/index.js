@@ -2852,13 +2852,13 @@ var ZLang;
             if (node.length === 2) {
                 const pos = { ...node.pos };
                 const [type, ident] = node.splice(0, node.length);
-                // (type as Nodes.TypeNode).meta.const = true;
+                type.meta.const = true;
                 return new Nodes.ParameterNode(pos, type, ident);
             }
             else {
                 const pos = { ...node.pos };
                 const [type, ident, _comma, ...rest] = node.splice(0, node.length);
-                // (type as Nodes.TypeNode).meta.const = true;
+                type.meta.const = true;
                 return [new Nodes.ParameterNode(pos, type, ident), ...rest];
             }
         },
@@ -3052,7 +3052,8 @@ var ZLang;
             this.const = true;
         }
         toString() {
-            return `const ${this.rType}//${this.pTypes.join('/')}`;
+            // implicit const is omitted on parameters
+            return `const ${this.rType}//${this.pTypes.map(x => x.domain).join('/')}`;
         }
         get domain() {
             return this.rType.domain;

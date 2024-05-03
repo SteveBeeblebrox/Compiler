@@ -633,11 +633,14 @@ namespace ZLang {
     }
 
     export class ZFunctionType {
-        public readonly const = true;
-        public constructor(public readonly rType: ZType, public readonly pTypes: ZType[] = []) {}
+        public const: boolean;
+        public constructor(public readonly rType: ZType, public readonly pTypes: ZType[] = [], pconst: boolean = false) {
+            this.const = pconst;
+        }
+        
         public toString() {
             // implicit const is omitted on parameters
-            return `const ${this.rType}//${this.pTypes.map(x=>x.domain).join('/')}`;
+            return `${this.const ? 'const ' : ''}${this.rType.domain}//${this.pTypes.map(x=>x.domain).join('/')}`;
         }
         public get domain() {
             return this.rType.domain;
@@ -681,6 +684,12 @@ namespace ZLang {
         public mark(name: string, pos: Position | undefined, dtls: Partial<DeclarationDetails>) {
             if(this.hasLocal(name,pos)) {
                 this.data.set(name,Object.assign(this.data.get(name), dtls));
+
+                const t = this.get(name).type;
+                // When implementing function, change it to be const
+                if(dtls.initialized && t instanceof ZFunctionType) {
+                    t.const = true;
+                }
             } else if(this.parent) {
                 this.parent.mark(name,pos,dtls);
             }
@@ -746,6 +755,7 @@ namespace ZLang {
                 if(!scope.has(node.header.ident.name)) {
                     declareFunction(node.header);
                 }
+
                 scope.mark(node.header.ident.name,node.header.ident.pos,{initialized:true});
                 V.add(node.header);
                 V.add(node.rvar);

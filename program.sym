@@ -1,4 +1,4 @@
-0,const int//float,an_undefined_function
+0,int//float,an_undefined_function
 0,const float//int/bool,aFunction
 1,const int,q
 1,const bool,k
