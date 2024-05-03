@@ -212,6 +212,8 @@ namespace SLR1 {
             const ts = createPeekableIterator(tokens);
             const D: Queue<Token | ParseTree | undefined> = [];
             
+            let pos: Position | undefined = undefined;
+
             type StackT = {state: number, tree?: ParseTree | Token | undefined};
             const S: Stack<StackT> = [];
             S.push({state:0});
@@ -239,7 +241,7 @@ namespace SLR1 {
                                 node.unshift(child as InnerParseTree);
                             }
                         } else {
-                            throw new Parsing.SyntaxError(`Expected '${expected??'EOF'}' got '${t?.name??t??'EOF'}'`)
+                            throw new Parsing.SyntaxError(`Expected '${expected??'EOF'}' got '${t?.name??t??'EOF'}'`,pos);
                         }
                     }
                 }
@@ -249,9 +251,10 @@ namespace SLR1 {
 
             while(D.length || ts.peek() || T.get(S.at(-1).state).has(undefined)) {
                 let t = D.at(0) ?? ts.peek();
+                pos = t.pos;
                 const [action,v] = T.get(S.at(-1).state).get(t?.name as CFG.GrammarSymbol)?.split('-') ?? [];
                 if(action === undefined) {
-                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name??t??'EOF'}'`);
+                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x=>`'${x??'EOF'}'`).toArray().join(', ')} got '${t?.name??t??'EOF'}'`,pos);
                 }
                 
                 const n = +v;
@@ -264,7 +267,7 @@ namespace SLR1 {
                     return this.sdt.transform(reduce(n) as StrayTree<ParseTreeNode>) as ParseResult<ASTNodeType>;
                 }
             }
-            throw new Parsing.SyntaxError(`Unexpected token 'EOF'`);
+            throw new Parsing.SyntaxError(`Unexpected token 'EOF'`,pos);
         }
     }
 

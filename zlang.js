@@ -2353,6 +2353,7 @@ var SLR1;
             const tt = this.tt;
             const ts = createPeekableIterator(tokens);
             const D = [];
+            let pos = undefined;
             const S = [];
             S.push({ state: 0 });
             const ruleList = cfg.getRuleList();
@@ -2382,7 +2383,7 @@ var SLR1;
                             }
                         }
                         else {
-                            throw new Parsing.SyntaxError(`Expected '${expected !== null && expected !== void 0 ? expected : 'EOF'}' got '${(_b = (_a = t === null || t === void 0 ? void 0 : t.name) !== null && _a !== void 0 ? _a : t) !== null && _b !== void 0 ? _b : 'EOF'}'`);
+                            throw new Parsing.SyntaxError(`Expected '${expected !== null && expected !== void 0 ? expected : 'EOF'}' got '${(_b = (_a = t === null || t === void 0 ? void 0 : t.name) !== null && _a !== void 0 ? _a : t) !== null && _b !== void 0 ? _b : 'EOF'}'`, pos);
                         }
                     }
                 }
@@ -2390,9 +2391,10 @@ var SLR1;
             }
             while (D.length || ts.peek() || T.get(S.at(-1).state).has(undefined)) {
                 let t = (_a = D.at(0)) !== null && _a !== void 0 ? _a : ts.peek();
+                pos = t.pos;
                 const [action, v] = (_c = (_b = T.get(S.at(-1).state).get(t === null || t === void 0 ? void 0 : t.name)) === null || _b === void 0 ? void 0 : _b.split('-')) !== null && _c !== void 0 ? _c : [];
                 if (action === undefined) {
-                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x => `'${x !== null && x !== void 0 ? x : 'EOF'}'`).toArray().join(', ')} got '${(_e = (_d = t === null || t === void 0 ? void 0 : t.name) !== null && _d !== void 0 ? _d : t) !== null && _e !== void 0 ? _e : 'EOF'}'`);
+                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x => `'${x !== null && x !== void 0 ? x : 'EOF'}'`).toArray().join(', ')} got '${(_e = (_d = t === null || t === void 0 ? void 0 : t.name) !== null && _d !== void 0 ? _d : t) !== null && _e !== void 0 ? _e : 'EOF'}'`, pos);
                 }
                 const n = +v;
                 if (action === 'sh') {
@@ -2406,7 +2408,7 @@ var SLR1;
                     return this.sdt.transform(reduce(n));
                 }
             }
-            throw new Parsing.SyntaxError(`Unexpected token 'EOF'`);
+            throw new Parsing.SyntaxError(`Unexpected token 'EOF'`, pos);
         }
     }
     SLR1.SLR1Parser = SLR1Parser;
@@ -2817,12 +2819,12 @@ var ZLang;
         'SUM|PRODUCT|BEXPR'(node) {
             if (node.length === 1)
                 return;
-            return new Nodes.BinaryOp(node.pos, node.at(1).value, node.shift(), node.pop());
+            return new Nodes.BinaryOp(node.at(1).pos, node.at(1).value, node.shift(), node.pop());
         },
         UNARY(node) {
             if (node.length === 1)
                 return;
-            return new Nodes.UnaryOp(node.pos, node.at(0).value, node.pop());
+            return new Nodes.UnaryOp(node.at(0).pos, node.at(0).value, node.pop());
         },
         CAST(node) {
             return new Nodes.CastNode(node.pos, new Nodes.TypeNode(node.at(0).pos, node.at(0).value), node.splice(2, 1)[0]);
@@ -3190,31 +3192,24 @@ function readTokenStream(path) {
         .map(x => x.trim().split(' '))
         .map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
 }
-/*
-try {
-    
-    
-} catch(e) {
-    
-    if(e instanceof Parsing.SyntaxError) {
-        output('SYNTAX',0,0,'SYNTAX');
-        system.exit(7);
-    }
-
-    else {
-        console.error('IO ERROR');
-        system.exit(1);
-    }
-}
-*/
-// todo catch syntax errors and pos
-// todo semantic checks
 const [tokenSrc, astOutput, symbtableOutput = 'program.sym'] = system.args.slice(1);
 console.debug('Parsing...');
 // Read tokens
 const tokens = readTokenStream(tokenSrc);
 // Parse
-const ast = ZLang.parseTokens(tokens);
+const ast = (function () {
+    var _a, _b, _c;
+    try {
+        return ZLang.parseTokens(tokens);
+    }
+    catch (e) {
+        // TODO error pos
+        output('SYNTAX', (_b = (_a = e === null || e === void 0 ? void 0 : e.pos) === null || _a === void 0 ? void 0 : _a.line) !== null && _b !== void 0 ? _b : 0, (_c = e === null || e === void 0 ? void 0 : e.pos) === null || _c === void 0 ? void 0 : _c.col, 'SYNTAX');
+        system.exit(1);
+    }
+})();
+// Semantic error handeling
+let hasErrors = false;
 var SemanticErrors = ZLang.SemanticErrors;
 ZLang.onError = function (errno, message, pos) {
     switch (errno) {
@@ -3222,9 +3217,15 @@ ZLang.onError = function (errno, message, pos) {
             output('WARN', pos.line, pos.col, SemanticErrors[SemanticErrors.REIDENT]);
             return;
         }
+        case SemanticErrors.EXPR: {
+            hasErrors = true;
+            output('ERROR', pos.line, pos.col, SemanticErrors[SemanticErrors.EXPR]);
+            return;
+        }
     }
 };
 ZLang.initSymbols(ast);
+// TODO expr errors
 // Emit Domain Statements
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
@@ -3237,5 +3238,7 @@ ZLang.visit(ast, function (node) {
         system.writeTextFileSync(symbtableOutput, ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n, d.type, d.name].join(',')).join('\n'));
     }
 });
-console.debug('Done!');
+// TODO, dump ast
 dump('zlang', ast);
+console.debug('Done!');
+system.exit(hasErrors ? 1 : 0);

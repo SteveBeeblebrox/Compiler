@@ -382,11 +382,11 @@ namespace ZLang {
         // Expressions
         'SUM|PRODUCT|BEXPR'(node) {
             if(node.length === 1) return;
-            return new Nodes.BinaryOp(node.pos,(node.at(1) as ParseTreeTokenNode).value,node.shift() as ExpressionNode,node.pop() as ExpressionNode) as StrayTree<Nodes.BinaryOp>;
+            return new Nodes.BinaryOp((node.at(1) as ZNode).pos,(node.at(1) as ParseTreeTokenNode).value,node.shift() as ExpressionNode,node.pop() as ExpressionNode) as StrayTree<Nodes.BinaryOp>;
         },
         UNARY(node) {
             if(node.length === 1) return;
-            return new Nodes.UnaryOp(node.pos,(node.at(0) as ParseTreeTokenNode).value,node.pop() as ExpressionNode) as StrayTree<Nodes.UnaryOp>;
+            return new Nodes.UnaryOp((node.at(0) as ZNode).pos,(node.at(0) as ParseTreeTokenNode).value,node.pop() as ExpressionNode) as StrayTree<Nodes.UnaryOp>;
         },
         CAST(node) {
             return new Nodes.CastNode(node.pos,
@@ -807,8 +807,7 @@ const ast = (function() {
     try {
         return ZLang.parseTokens(tokens);
     } catch(e) {
-        // TODO error pos
-        output('SYNTAX',0,0,'SYNTAX');
+        output('SYNTAX',e?.pos?.line??0,e?.pos?.col,'SYNTAX');
         system.exit(1);
     }
 })();

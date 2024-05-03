@@ -220,7 +220,7 @@ namespace LL1 {
             }
         
             if(T.length !== 1) {
-                throw new Parsing.SyntaxError(undefined,pos);
+                throw new Parsing.SyntaxError('Parse returned multiple disjoint trees',pos);
             }
         
             return T.pop()! as ParseResult<ASTNodeType>;
