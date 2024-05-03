@@ -793,13 +793,12 @@ ZLang.initSymbols(ast);
 // todo semantic checks
 
 
-// Emit Symtables
-const symbtableOutput: string | undefined = 'program.sym';
-ZLang.visit(ast,function(node) {
-    if(symbtableOutput && node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
-        system.writeTextFileSync(symbtableOutput,ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n,d.type,d.name].join(',')).join('\n'));
-    }
-});
+
+
+
+
+
+const [tokenSrc,astOutput,symbtableOutput = 'program.sym'] = system.args.slice(1);
 
 // Emit Domain Statements
 ZLang.visit(ast, function(node) {
@@ -807,6 +806,13 @@ ZLang.visit(ast, function(node) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
 },'post');
+
+// Emit Symtables
+ZLang.visit(ast,function(node) {
+    if(symbtableOutput && node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
+        system.writeTextFileSync(symbtableOutput,ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n,d.type,d.name].join(',')).join('\n'));
+    }
+});
 
 dump('zlang', ast);
 ///#endif
