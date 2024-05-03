@@ -2353,7 +2353,7 @@ var SLR1;
             const tt = this.tt;
             const ts = createPeekableIterator(tokens);
             const D = [];
-            let pos = undefined;
+            let pos = { line: 0, col: 0 };
             const S = [];
             S.push({ state: 0 });
             const ruleList = cfg.getRuleList();
