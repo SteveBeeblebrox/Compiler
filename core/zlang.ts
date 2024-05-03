@@ -407,19 +407,22 @@ namespace ZLang {
         PARAMLIST(node) {
             if(node.length === 1) return;
             if(node.length === 2) {
+                const pos = {...node.pos};
                 const [type, ident] = node.splice(0,node.length);
                 // (type as Nodes.TypeNode).meta.const = true;
-                return new Nodes.ParameterNode(node.pos,type as Nodes.TypeNode, ident as Nodes.IdentifierNode) as StrayTree<Nodes.ParameterNode>;
+                return new Nodes.ParameterNode(pos,type as Nodes.TypeNode, ident as Nodes.IdentifierNode) as StrayTree<Nodes.ParameterNode>;
             } else {
+                const pos = {...node.pos};
                 const [type, ident, _comma,...rest] = node.splice(0,node.length);
                 // (type as Nodes.TypeNode).meta.const = true;
-                return [new Nodes.ParameterNode(node.pos,type as Nodes.TypeNode, ident as Nodes.IdentifierNode), ...rest] as StrayTree<Nodes.ParameterNode>[];
+                return [new Nodes.ParameterNode(pos,type as Nodes.TypeNode, ident as Nodes.IdentifierNode), ...rest] as StrayTree<Nodes.ParameterNode>[];
             }
         },
         FUNCALL(node) {
+            const pos = {...node.pos};
             const [ident,_lparen,...args] = node.splice(0,node.length);
             const _rparen = args.pop();
-            return new Nodes.FunctionCallNode(node.pos,ident as Nodes.IdentifierNode, args as ExpressionNode[]) as StrayTree<Nodes.FunctionCallNode>;
+            return new Nodes.FunctionCallNode(pos,ident as Nodes.IdentifierNode, args as ExpressionNode[]) as StrayTree<Nodes.FunctionCallNode>;
         },
         ARGLIST(node) {
             if(node.length === 1) return;
@@ -453,8 +456,8 @@ namespace ZLang {
             if(node.length === 3) {
                 return node.splice(1,1) as StrayTree<ZNode>[];
             } else if(node.length === 4) {
-                const pos = {...(node.at(0) as ParseTreeTokenNode).pos};
-                return new Nodes.DomainNode(node.pos,node.splice(2,1)[0] as ExpressionNode) as StrayTree<Nodes.DomainNode>;
+                const pos = {...node.pos};
+                return new Nodes.DomainNode(pos,node.splice(2,1)[0] as ExpressionNode) as StrayTree<Nodes.DomainNode>;
             }
         },
         BSTMT(node) {
@@ -473,8 +476,9 @@ namespace ZLang {
 
         // Assignment and declaration
         ASSIGN(node) {
+            const pos = {...node.pos};
             const [ident,_assign,value] = node.splice(0,node.length);
-            return new Nodes.AssignmentStatement(node.pos,ident as Nodes.IdentifierNode, value as ExpressionNode | Nodes.AssignmentStatement) as StrayTree<Nodes.AssignmentStatement>;
+            return new Nodes.AssignmentStatement(pos,ident as Nodes.IdentifierNode, value as ExpressionNode | Nodes.AssignmentStatement) as StrayTree<Nodes.AssignmentStatement>;
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
             return new Nodes.DeclareStatement(
@@ -495,12 +499,14 @@ namespace ZLang {
 
         // Control Statements
         WHILE(node) {
+            const pos = {...node.pos};
             const [_while,_lparen,predicate,_rparen,body] = node.splice(0,node.length);
-            return new Nodes.WhileStatement(node.pos,predicate as ExpressionNode,body as StatementGroup) as StrayTree<Nodes.WhileStatement>;
+            return new Nodes.WhileStatement(pos,predicate as ExpressionNode,body as StatementGroup) as StrayTree<Nodes.WhileStatement>;
         },
         DOWHILE(node) {
+            const pos = {...node.pos};
             const [_do,body,_while,_lparen,predicate,_rparen,_sc] = node.splice(0,node.length);
-            return new Nodes.DoWhileStatement(node.pos,body as StatementGroup, predicate as ExpressionNode) as StrayTree<Nodes.WhileStatement>;
+            return new Nodes.DoWhileStatement(pos,body as StatementGroup, predicate as ExpressionNode) as StrayTree<Nodes.WhileStatement>;
         },
         IF(node) {
             const [_if,_rparen,predicate,_lparen,btrue] = node.splice(0,node.length);
@@ -522,19 +528,20 @@ namespace ZLang {
 
         // Special Statements
         EMIT(node) {
+            const pos = {...node.pos};
             switch(node.length) {
                 case 2:
-                    return new Nodes.EmitStatement(node.pos,{
+                    return new Nodes.EmitStatement(pos,{
                         type: 'symbtable'
                     }) as StrayTree<Nodes.EmitStatement>;
                 case 4:
-                    return new Nodes.EmitStatement(node.pos,{
+                    return new Nodes.EmitStatement(pos,{
                         type: 'value',
                         value: node.splice(2,1)[0] as ExpressionNode
                     }) as StrayTree<Nodes.EmitStatement>;
                 case 6:
                     const [_emit,ident,_comma,index,__comma,length] = node.splice(0,node.length);
-                    return new Nodes.EmitStatement(node.pos,{
+                    return new Nodes.EmitStatement(pos,{
                         type: 'string',
                         ident: ident as Nodes.IdentifierNode,
                         index: index as ExpressionNode,
@@ -545,12 +552,14 @@ namespace ZLang {
         RAND(node) {
             switch(node.length) {
                 case 2: {
+                    const pos = {...node.pos};
                     const [_rand,ident] = node.splice(0,node.length);
-                    return new Nodes.RandStatement(node.pos,ident as Nodes.IdentifierNode) as StrayTree<Nodes.RandStatement>;
+                    return new Nodes.RandStatement(pos,ident as Nodes.IdentifierNode) as StrayTree<Nodes.RandStatement>;
                 }
                 case 6: {
+                    const pos = {...node.pos};
                     const [_rand,intIdent,_comma,min,__comma,max] = node.splice(0,node.length);
-                    return new Nodes.RandStatement(node.pos,intIdent as Nodes.IdentifierNode,min as ExpressionNode,max as ExpressionNode) as StrayTree<Nodes.RandStatement>;
+                    return new Nodes.RandStatement(pos,intIdent as Nodes.IdentifierNode,min as ExpressionNode,max as ExpressionNode) as StrayTree<Nodes.RandStatement>;
                 }
             }
         }
@@ -654,7 +663,7 @@ namespace ZLang {
             return this.parent ? this.parent.n + 1 : 0;
         }
         public declare(name: string, type: ZType | ZFunctionType, pos: Position, dtls?: Partial<DeclarationDetails>) {
-            if(this.has(name)) ZLang.raise(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
+            if(this.has(name,pos)) ZLang.raise(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
 
@@ -739,6 +748,7 @@ namespace ZLang {
                 for(const p of node.header.parameters) {
                     node.scope.declare(p.ident.name,p.type.ztype,p.pos,{initialized: true});
                 }
+
                 node.scope.declare(node.rvar.name,node.header.rtype.ztype,node.rvar.pos,{initialized: true});
 
             } else if(node instanceof Nodes.DeclareStatement) {
