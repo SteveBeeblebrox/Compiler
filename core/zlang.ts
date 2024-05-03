@@ -83,7 +83,7 @@ namespace ZLang {
         export class IdentifierNode extends ExpressionNode {
             constructor(pos: Position,public override readonly name: string) {super(pos)}
             get domain() {
-                return ZLang.getEnclosingScope(this).get(this.name).type.domain;
+                return ZLang.getEnclosingScope(this).get(this.name,this.pos).type.domain;
             }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
@@ -188,7 +188,7 @@ namespace ZLang {
                 super(pos,[ident,...args]);
             }
             get domain() {
-                return ZLang.getEnclosingScope(this).get(this.ident.name).type.domain;
+                return ZLang.getEnclosingScope(this).get(this.ident.name, this.pos).type.domain;
             }
             get [Graphviz.label]() {
                 return `${this.ident.name}(...)`;
@@ -658,18 +658,17 @@ namespace ZLang {
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
 
-        ///#warning Scope#get and Scope#has should respect position or maybe take ident node
-        public has(name: string): boolean {
-            return this.data.has(name);
+        public has(name: string, pos?: Position): boolean {
+            return this.data.has(name) && (pos === undefined || Position.offset(pos,this.data.get(name).pos) <= 0);
         }
-        public get(name: string): Declaration | null {
-            return this.data.has(name) ? {...this.data.get(name)} : this.parent ? this.parent.get(name) : null;
+        public get(name: string ,pos?: Position): Declaration | null {
+            return this.has(name,pos) ? {...this.data.get(name)} : this.parent ? this.parent.get(name,pos) : null;
         }
-        public mark(name: string, dtls: Partial<DeclarationDetails>) {
-            if(this.has(name)) {
+        public mark(name: string, pos: Position | undefined, dtls: Partial<DeclarationDetails>) {
+            if(this.has(name,pos)) {
                 this.data.set(name,Object.assign(this.data.get(name), dtls));
             } else if(this.parent) {
-                this.parent.mark(name,dtls);
+                this.parent.mark(name,pos,dtls);
             }
         }
 
@@ -733,7 +732,7 @@ namespace ZLang {
                 if(!scope.has(node.header.ident.name)) {
                     declareFunction(node.header);
                 }
-                scope.mark(node.header.ident.name,{initialized:true});
+                scope.mark(node.header.ident.name,node.header.ident.pos,{initialized:true});
                 V.add(node.header);
                 V.add(node.rvar);
 
@@ -747,17 +746,17 @@ namespace ZLang {
                 for(const [ident,value] of node.entries) {
                     scope.declare(ident.name, node.type.ztype, ident.pos);
                     if(value !== undefined) {
-                        scope.mark(ident.name,{initialized:true});
+                        scope.mark(ident.name,ident.pos,{initialized:true});
                     }
                     V.add(ident);
                 }
             } else if(node instanceof Nodes.AssignmentStatement) {
                 const scope = getEnclosingScope(node);
-                if(scope.get(node.ident.name).type.const) ZLang.raise(SemanticErrors.CONST,`Cannot assign to const variable '${node.ident.name}'`,node.pos);
-                scope.mark(node.ident.name,{initialized:true});
+                if(scope.get(node.ident.name,node.pos).type.const) ZLang.raise(SemanticErrors.CONST,`Cannot assign to const variable '${node.ident.name}'`,node.pos);
+                scope.mark(node.ident.name,node.pos,{initialized:true});
                 V.add(node.ident);
             } else if(node instanceof Nodes.IdentifierNode) {
-                getEnclosingScope(node).mark(node.name,{used: true});
+                getEnclosingScope(node).mark(node.name,node.pos,{used: true});
             }
         },'pre');
     }
@@ -879,7 +878,7 @@ ZLang.visit(ast, function(node) {
     // Validate function identifiers are not used as variables
     if(
         node instanceof ZLang.Nodes.IdentifierNode
-        && ZLang.getEnclosingScope(node).get(node.name).type instanceof ZLang.ZFunctionType
+        && ZLang.getEnclosingScope(node).get(node.name,node.pos).type instanceof ZLang.ZFunctionType
     ) {
         const parent = node.parent;
         if(!(

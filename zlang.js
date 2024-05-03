@@ -2496,7 +2496,7 @@ var ZLang;
                 this.name = name;
             }
             get domain() {
-                return ZLang.getEnclosingScope(this).get(this.name).type.domain;
+                return ZLang.getEnclosingScope(this).get(this.name, this.pos).type.domain;
             }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
@@ -2615,7 +2615,7 @@ var ZLang;
                 this.args = args;
             }
             get domain() {
-                return ZLang.getEnclosingScope(this).get(this.ident.name).type.domain;
+                return ZLang.getEnclosingScope(this).get(this.ident.name, this.pos).type.domain;
             }
             get [Graphviz.label]() {
                 return `${this.ident.name}(...)`;
@@ -3065,18 +3065,18 @@ var ZLang;
                 ZLang.raise(SemanticErrors.REIDENT, `Cannot redeclare '${name}'`, pos);
             this.data.set(name, { n: this.n, name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
-        has(name) {
-            return this.data.has(name);
+        has(name, pos) {
+            return this.data.has(name) && (pos === undefined || Position.offset(pos, this.data.get(name).pos) <= 0);
         }
-        get(name) {
-            return this.data.has(name) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name) : null;
+        get(name, pos) {
+            return this.has(name, pos) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name, pos) : null;
         }
-        mark(name, dtls) {
-            if (this.has(name)) {
+        mark(name, pos, dtls) {
+            if (this.has(name, pos)) {
                 this.data.set(name, Object.assign(this.data.get(name), dtls));
             }
             else if (this.parent) {
-                this.parent.mark(name, dtls);
+                this.parent.mark(name, pos, dtls);
             }
         }
         entries() {
@@ -3133,7 +3133,7 @@ var ZLang;
                 if (!scope.has(node.header.ident.name)) {
                     declareFunction(node.header);
                 }
-                scope.mark(node.header.ident.name, { initialized: true });
+                scope.mark(node.header.ident.name, node.header.ident.pos, { initialized: true });
                 V.add(node.header);
                 V.add(node.rvar);
                 for (const p of node.header.parameters) {
@@ -3146,20 +3146,20 @@ var ZLang;
                 for (const [ident, value] of node.entries) {
                     scope.declare(ident.name, node.type.ztype, ident.pos);
                     if (value !== undefined) {
-                        scope.mark(ident.name, { initialized: true });
+                        scope.mark(ident.name, ident.pos, { initialized: true });
                     }
                     V.add(ident);
                 }
             }
             else if (node instanceof Nodes.AssignmentStatement) {
                 const scope = getEnclosingScope(node);
-                if (scope.get(node.ident.name).type.const)
+                if (scope.get(node.ident.name, node.pos).type.const)
                     ZLang.raise(SemanticErrors.CONST, `Cannot assign to const variable '${node.ident.name}'`, node.pos);
-                scope.mark(node.ident.name, { initialized: true });
+                scope.mark(node.ident.name, node.pos, { initialized: true });
                 V.add(node.ident);
             }
             else if (node instanceof Nodes.IdentifierNode) {
-                getEnclosingScope(node).mark(node.name, { used: true });
+                getEnclosingScope(node).mark(node.name, node.pos, { used: true });
             }
         }, 'pre');
     }
@@ -3261,7 +3261,7 @@ ZLang.visit(ast, function (node) {
     }
     // Validate function identifiers are not used as variables
     if (node instanceof ZLang.Nodes.IdentifierNode
-        && ZLang.getEnclosingScope(node).get(node.name).type instanceof ZLang.ZFunctionType) {
+        && ZLang.getEnclosingScope(node).get(node.name, node.pos).type instanceof ZLang.ZFunctionType) {
         const parent = node.parent;
         if (!((parent instanceof ZLang.Nodes.FunctionCallNode && parent.ident === node)
             || (parent instanceof ZLang.Nodes.FunctionHeaderNode && parent.ident === node))) {
