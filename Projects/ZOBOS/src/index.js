@@ -2850,20 +2850,23 @@ var ZLang;
             if (node.length === 1)
                 return;
             if (node.length === 2) {
+                const pos = { ...node.pos };
                 const [type, ident] = node.splice(0, node.length);
                 // (type as Nodes.TypeNode).meta.const = true;
-                return new Nodes.ParameterNode(node.pos, type, ident);
+                return new Nodes.ParameterNode(pos, type, ident);
             }
             else {
+                const pos = { ...node.pos };
                 const [type, ident, _comma, ...rest] = node.splice(0, node.length);
                 // (type as Nodes.TypeNode).meta.const = true;
-                return [new Nodes.ParameterNode(node.pos, type, ident), ...rest];
+                return [new Nodes.ParameterNode(pos, type, ident), ...rest];
             }
         },
         FUNCALL(node) {
+            const pos = { ...node.pos };
             const [ident, _lparen, ...args] = node.splice(0, node.length);
             const _rparen = args.pop();
-            return new Nodes.FunctionCallNode(node.pos, ident, args);
+            return new Nodes.FunctionCallNode(pos, ident, args);
         },
         ARGLIST(node) {
             if (node.length === 1)
@@ -2891,8 +2894,8 @@ var ZLang;
                 return node.splice(1, 1);
             }
             else if (node.length === 4) {
-                const pos = { ...node.at(0).pos };
-                return new Nodes.DomainNode(node.pos, node.splice(2, 1)[0]);
+                const pos = { ...node.pos };
+                return new Nodes.DomainNode(pos, node.splice(2, 1)[0]);
             }
         },
         BSTMT(node) {
@@ -2911,8 +2914,9 @@ var ZLang;
         },
         // Assignment and declaration
         ASSIGN(node) {
+            const pos = { ...node.pos };
             const [ident, _assign, value] = node.splice(0, node.length);
-            return new Nodes.AssignmentStatement(node.pos, ident, value);
+            return new Nodes.AssignmentStatement(pos, ident, value);
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
             return new Nodes.DeclareStatement(node.pos, node.splice(0, 1)[0], node.splice(0, node.length).map(function (tree) {
@@ -2929,12 +2933,14 @@ var ZLang;
         },
         // Control Statements
         WHILE(node) {
+            const pos = { ...node.pos };
             const [_while, _lparen, predicate, _rparen, body] = node.splice(0, node.length);
-            return new Nodes.WhileStatement(node.pos, predicate, body);
+            return new Nodes.WhileStatement(pos, predicate, body);
         },
         DOWHILE(node) {
+            const pos = { ...node.pos };
             const [_do, body, _while, _lparen, predicate, _rparen, _sc] = node.splice(0, node.length);
-            return new Nodes.DoWhileStatement(node.pos, body, predicate);
+            return new Nodes.DoWhileStatement(pos, body, predicate);
         },
         IF(node) {
             const [_if, _rparen, predicate, _lparen, btrue] = node.splice(0, node.length);
@@ -2946,19 +2952,20 @@ var ZLang;
         },
         // Special Statements
         EMIT(node) {
+            const pos = { ...node.pos };
             switch (node.length) {
                 case 2:
-                    return new Nodes.EmitStatement(node.pos, {
+                    return new Nodes.EmitStatement(pos, {
                         type: 'symbtable'
                     });
                 case 4:
-                    return new Nodes.EmitStatement(node.pos, {
+                    return new Nodes.EmitStatement(pos, {
                         type: 'value',
                         value: node.splice(2, 1)[0]
                     });
                 case 6:
                     const [_emit, ident, _comma, index, __comma, length] = node.splice(0, node.length);
-                    return new Nodes.EmitStatement(node.pos, {
+                    return new Nodes.EmitStatement(pos, {
                         type: 'string',
                         ident: ident,
                         index: index,
@@ -2969,12 +2976,14 @@ var ZLang;
         RAND(node) {
             switch (node.length) {
                 case 2: {
+                    const pos = { ...node.pos };
                     const [_rand, ident] = node.splice(0, node.length);
-                    return new Nodes.RandStatement(node.pos, ident);
+                    return new Nodes.RandStatement(pos, ident);
                 }
                 case 6: {
+                    const pos = { ...node.pos };
                     const [_rand, intIdent, _comma, min, __comma, max] = node.splice(0, node.length);
-                    return new Nodes.RandStatement(node.pos, intIdent, min, max);
+                    return new Nodes.RandStatement(pos, intIdent, min, max);
                 }
             }
         }
@@ -3069,18 +3078,21 @@ var ZLang;
             return this.parent ? this.parent.n + 1 : 0;
         }
         declare(name, type, pos, dtls) {
-            if (this.has(name))
+            if (this.hasLocal(name, pos))
                 ZLang.raise(SemanticErrors.REIDENT, `Cannot redeclare '${name}'`, pos);
             this.data.set(name, { n: this.n, name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
         has(name, pos) {
+            return this.hasLocal(name, pos) || (this.parent && this.parent.has(name, pos));
+        }
+        hasLocal(name, pos) {
             return this.data.has(name) && (pos === undefined || Position.offset(pos, this.data.get(name).pos) <= 0);
         }
         get(name, pos) {
-            return this.has(name, pos) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name, pos) : null;
+            return this.hasLocal(name, pos) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name, pos) : null;
         }
         mark(name, pos, dtls) {
-            if (this.has(name, pos)) {
+            if (this.hasLocal(name, pos)) {
                 this.data.set(name, Object.assign(this.data.get(name), dtls));
             }
             else if (this.parent) {
@@ -3267,6 +3279,8 @@ var ZOBOS;
         }
         // Validate function identifiers are not used as variables
         if (node instanceof ZLang.Nodes.IdentifierNode
+            // Ignore parameters in lone function prototype, they aren't declared
+            && ZLang.getEnclosingScope(node).has(node.name, node.pos)
             && ZLang.getEnclosingScope(node).get(node.name, node.pos).type instanceof ZLang.ZFunctionType) {
             const parent = node.parent;
             if (!((parent instanceof ZLang.Nodes.FunctionCallNode && parent.ident === node)

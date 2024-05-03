@@ -1,9 +1,5 @@
-0,const string,m
-0,const float,pi
-0,const bool,b
-0,const int//,main
-1,int,r
-2,const string,p
-2,int,f
-2,const string,i
-4,bool,c
+0,const int//float,an_undefined_function
+0,const float//int/bool,aFunction
+1,const int,q
+1,const bool,k
+1,float,r
