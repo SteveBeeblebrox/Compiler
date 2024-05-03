@@ -2832,7 +2832,7 @@ var ZLang;
         FUNSIG(node) {
             const [type, ident, _lraren, ...parameters] = node.splice(0, node.length);
             const _rparen = parameters.pop();
-            return new Nodes.FunctionHeaderNode(type.pos, ident, type, parameters);
+            return new Nodes.FunctionHeaderNode(ident.pos, ident, type, parameters);
         },
         PARAMLIST(node) {
             if (node.length === 1)
@@ -2861,7 +2861,7 @@ var ZLang;
         },
         FUNCTION(node) {
             const [header, _returns, ident, _assign, expr, body] = node.splice(0, node.length);
-            return new Nodes.FunctionNode(node.pos, header, ident, expr, body);
+            return new Nodes.FunctionNode(ident.pos, header, ident, expr, body);
         },
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
@@ -3183,20 +3183,19 @@ function output(...args) {
     console.log(text.join(' '));
 }
 // todo catch syntax errors and pos
-// todo finish symtables
 ZLang.initSymbols(ast);
 // todo semantic checks
-// emit symtables
-ZLang.visit(ast, function (node) {
-    if (node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
-        console.debug('=== Symtable ===');
-        console.debug(ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n, d.type, d.name].join(',')).join('\n') || '<empty>');
-    }
-});
-// emit domain statements
+const [tokenSrc, astOutput, symbtableOutput = 'program.sym'] = system.args.slice(1);
+// Emit Domain Statements
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN', node.pos.line, node.pos.col, node.domain);
     }
 }, 'post');
+// Emit Symtables
+ZLang.visit(ast, function (node) {
+    if (symbtableOutput && node instanceof ZLang.Nodes.EmitStatement && node.data.type === 'symbtable') {
+        system.writeTextFileSync(symbtableOutput, ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n, d.type, d.name].join(',')).join('\n'));
+    }
+});
 dump('zlang', ast);

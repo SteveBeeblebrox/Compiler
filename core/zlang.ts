@@ -400,7 +400,7 @@ namespace ZLang {
         FUNSIG(node) {
             const [type,ident,_lraren,...parameters] = node.splice(0,node.length);
             const _rparen = parameters.pop();
-            return new Nodes.FunctionHeaderNode((type as Nodes.TypeNode).pos,ident as Nodes.IdentifierNode, type as Nodes.TypeNode, parameters as Nodes.ParameterNode[]) as StrayTree<Nodes.FunctionHeaderNode>
+            return new Nodes.FunctionHeaderNode((ident as Nodes.TypeNode).pos,ident as Nodes.IdentifierNode, type as Nodes.TypeNode, parameters as Nodes.ParameterNode[]) as StrayTree<Nodes.FunctionHeaderNode>
         },
         PARAMLIST(node) {
             if(node.length === 1) return;
@@ -427,7 +427,7 @@ namespace ZLang {
         FUNCTION(node) {
             const [header,_returns,ident,_assign,expr,body] = node.splice(0,node.length);
             return new Nodes.FunctionNode(
-                node.pos,
+                (ident as Nodes.IdentifierNode).pos,
                 header as Nodes.FunctionHeaderNode,
                 ident as Nodes.IdentifierNode,
                 expr as ExpressionNode,
@@ -644,7 +644,7 @@ namespace ZLang {
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
 
-        ///#waring Scope#get and Scope#has should respect position
+        ///#warning Scope#get and Scope#has should respect position
         public has(name: string): boolean {
             return this.data.has(name);
         }
