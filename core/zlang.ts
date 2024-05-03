@@ -632,7 +632,7 @@ namespace ZLang {
         EXPR
     }
 
-    export let onError = function onError(errno: number, message: string, pos?: Position): void | never {
+    export let onError = function onError(errno: SemanticErrors, message: string, pos?: Position): void | never {
         throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
     }
 
@@ -795,29 +795,6 @@ function readTokenStream(path: string) {
     ;
 }
 
-/*
-try {
-    
-    
-} catch(e) {
-    
-    if(e instanceof Parsing.SyntaxError) {
-        output('SYNTAX',0,0,'SYNTAX');
-        system.exit(7);
-    }
-
-    else {
-        console.error('IO ERROR');
-        system.exit(1);
-    }
-}
-*/
-
-
-// todo catch syntax errors and pos
-// todo semantic checks
-
-
 
 const [tokenSrc,astOutput,symbtableOutput = 'program.sym'] = system.args.slice(1);
 console.debug('Parsing...');
@@ -826,9 +803,19 @@ console.debug('Parsing...');
 const tokens = readTokenStream(tokenSrc);
 
 // Parse
-const ast = ZLang.parseTokens(tokens);
+const ast = (function() {
+    try {
+        return ZLang.parseTokens(tokens);
+    } catch(e) {
+        // TODO error pos
+        output('SYNTAX',0,0,'SYNTAX');
+        system.exit(1);
+    }
+})();
 
 
+// Semantic error handeling
+let hasErrors = false;
 import SemanticErrors = ZLang.SemanticErrors;
 ZLang.onError = function(errno,message,pos) {
     switch(errno) {
@@ -836,10 +823,18 @@ ZLang.onError = function(errno,message,pos) {
             output('WARN', pos.line, pos.col, SemanticErrors[SemanticErrors.REIDENT]);
             return;
         }
+        case SemanticErrors.EXPR: {
+            hasErrors = true;
+            output('ERROR',pos.line,pos.col,SemanticErrors[SemanticErrors.EXPR]);
+            return;
+        }
     }
 }
 
 ZLang.initSymbols(ast);
+
+
+// TODO expr errors
 
 // Emit Domain Statements
 ZLang.visit(ast, function(node) {
@@ -847,8 +842,6 @@ ZLang.visit(ast, function(node) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
 },'post');
-
-
 
 // Emit Symtables
 ZLang.visit(ast,function(node) {
@@ -858,9 +851,12 @@ ZLang.visit(ast,function(node) {
 });
 
 
-console.debug('Done!');
 
 
 
+// TODO, dump ast
 dump('zlang', ast);
+
+console.debug('Done!');
+system.exit(hasErrors ? 1 : 0);
 ///#endif
