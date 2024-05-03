@@ -629,10 +629,11 @@ namespace ZLang {
     export enum SemanticErrors {
         UNKNOWN,
         REIDENT,
-        EXPR
+        EXPR,
+        CONST
     }
 
-    export let onError = function onError(errno: SemanticErrors, message: string, pos?: Position): void | never {
+    export let raise = function onError(errno: SemanticErrors, message: string, pos?: Position): void | never {
         throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
     }
 
@@ -645,7 +646,7 @@ namespace ZLang {
             return this.parent ? this.parent.n + 1 : 0;
         }
         public declare(name: string, type: ZType | ZFunctionType, pos: Position, dtls?: Partial<DeclarationDetails>) {
-            if(this.has(name)) ZLang.onError(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
+            if(this.has(name)) ZLang.raise(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
 
@@ -740,8 +741,8 @@ namespace ZLang {
                 }
             } else if(node instanceof Nodes.AssignmentStatement) {
                 const scope = getEnclosingScope(node);
+                if(scope.get(node.ident.name).type.const) ZLang.raise(SemanticErrors.CONST,`Cannot assign to const variable '${node.ident.name}'`,node.pos);
                 scope.mark(node.ident.name,{initialized:true});
-                // throw error when assigning to const
                 V.add(node.ident);
             } else if(node instanceof Nodes.IdentifierNode) {
                 getEnclosingScope(node).mark(node.name,{used: true});
@@ -816,7 +817,7 @@ const ast = (function() {
 // Semantic error handeling
 let hasErrors = false;
 import SemanticErrors = ZLang.SemanticErrors;
-ZLang.onError = function(errno,message,pos) {
+ZLang.raise = function(errno,message,pos) {
     switch(errno) {
         case SemanticErrors.REIDENT: {
             output('WARN', pos.line, pos.col, SemanticErrors[SemanticErrors.REIDENT]);

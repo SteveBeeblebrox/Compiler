@@ -3042,8 +3042,9 @@ var ZLang;
         SemanticErrors[SemanticErrors["UNKNOWN"] = 0] = "UNKNOWN";
         SemanticErrors[SemanticErrors["REIDENT"] = 1] = "REIDENT";
         SemanticErrors[SemanticErrors["EXPR"] = 2] = "EXPR";
+        SemanticErrors[SemanticErrors["CONST"] = 3] = "CONST";
     })(SemanticErrors = ZLang.SemanticErrors || (ZLang.SemanticErrors = {}));
-    ZLang.onError = function onError(errno, message, pos) {
+    ZLang.raise = function onError(errno, message, pos) {
         throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
     };
     class Scope {
@@ -3056,7 +3057,7 @@ var ZLang;
         }
         declare(name, type, pos, dtls) {
             if (this.has(name))
-                ZLang.onError(SemanticErrors.REIDENT, `Cannot redeclare '${name}'`, pos);
+                ZLang.raise(SemanticErrors.REIDENT, `Cannot redeclare '${name}'`, pos);
             this.data.set(name, { n: this.n, name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
         has(name) {
@@ -3143,8 +3144,9 @@ var ZLang;
             }
             else if (node instanceof Nodes.AssignmentStatement) {
                 const scope = getEnclosingScope(node);
+                if (scope.get(node.ident.name).type.const)
+                    ZLang.raise(SemanticErrors.CONST, `Cannot assign to const variable '${node.ident.name}'`, node.pos);
                 scope.mark(node.ident.name, { initialized: true });
-                // throw error when assigning to const
                 V.add(node.ident);
             }
             else if (node instanceof Nodes.IdentifierNode) {
@@ -3203,7 +3205,6 @@ const ast = (function () {
         return ZLang.parseTokens(tokens);
     }
     catch (e) {
-        // TODO error pos
         output('SYNTAX', (_b = (_a = e === null || e === void 0 ? void 0 : e.pos) === null || _a === void 0 ? void 0 : _a.line) !== null && _b !== void 0 ? _b : 0, (_c = e === null || e === void 0 ? void 0 : e.pos) === null || _c === void 0 ? void 0 : _c.col, 'SYNTAX');
         system.exit(1);
     }
@@ -3211,7 +3212,7 @@ const ast = (function () {
 // Semantic error handeling
 let hasErrors = false;
 var SemanticErrors = ZLang.SemanticErrors;
-ZLang.onError = function (errno, message, pos) {
+ZLang.raise = function (errno, message, pos) {
     switch (errno) {
         case SemanticErrors.REIDENT: {
             output('WARN', pos.line, pos.col, SemanticErrors[SemanticErrors.REIDENT]);
