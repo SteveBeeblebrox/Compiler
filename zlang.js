@@ -3104,6 +3104,10 @@ var ZLang;
         return null;
     }
     ZLang.getEnclosingScope = getEnclosingScope;
+    function applySemantics(program) {
+        initSymbols(program);
+    }
+    ZLang.applySemantics = applySemantics;
     function initSymbols(program) {
         ZLang.visit(program, function (node, V) {
             // Set up scopes
@@ -3154,7 +3158,6 @@ var ZLang;
             }
         }, 'pre');
     }
-    ZLang.initSymbols = initSymbols;
 })(ZLang || (ZLang = {}));
 async function dump(name, node, { format = 'png' } = {}) {
     //@ts-ignore
@@ -3225,7 +3228,7 @@ ZLang.raise = function (errno, message, pos) {
         }
     }
 };
-ZLang.initSymbols(ast);
+ZLang.applySemantics(ast);
 // TODO expr errors
 // Emit Domain Statements
 ZLang.visit(ast, function (node) {

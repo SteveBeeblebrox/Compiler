@@ -701,7 +701,7 @@ namespace ZLang {
         initSymbols(program);
     }
 
-    export function initSymbols(program: Program) {
+    function initSymbols(program: Program) {
         ZLang.visit(program,function(node,V: Set<Nodes.ZNode>) {
             // Set up scopes
             if((node instanceof StatementGroup || node instanceof Nodes.FunctionNode) && !node.scope.parent) {
