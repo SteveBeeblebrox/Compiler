@@ -626,8 +626,14 @@ namespace ZLang {
         }
     }
 
-    export const enum SemanticErrorType {
-        // TODO, error codes
+    export enum SemanticErrors {
+        UNKNOWN,
+        REIDENT,
+        EXPR
+    }
+
+    export let onError = function onError(errno: number, message: string, pos?: Position): void | never {
+        throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
     }
 
     type Declaration = {n: number, name: string, type: ZType | ZFunctionType, pos: Position} & DeclarationDetails
@@ -639,7 +645,7 @@ namespace ZLang {
             return this.parent ? this.parent.n + 1 : 0;
         }
         public declare(name: string, type: ZType | ZFunctionType, pos: Position, dtls?: Partial<DeclarationDetails>) {
-            if(this.has(name)) throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
+            if(this.has(name)) ZLang.onError(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
         }
 
@@ -822,10 +828,18 @@ const tokens = readTokenStream(tokenSrc);
 // Parse
 const ast = ZLang.parseTokens(tokens);
 
+
+import SemanticErrors = ZLang.SemanticErrors;
+ZLang.onError = function(errno,message,pos) {
+    switch(errno) {
+        case SemanticErrors.REIDENT: {
+            output('WARN', pos.line, pos.col, SemanticErrors[SemanticErrors.REIDENT]);
+            return;
+        }
+    }
+}
+
 ZLang.initSymbols(ast);
-
-
-
 
 // Emit Domain Statements
 ZLang.visit(ast, function(node) {
@@ -833,7 +847,6 @@ ZLang.visit(ast, function(node) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
     }
 },'post');
-
 
 
 

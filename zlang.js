@@ -3035,10 +3035,15 @@ var ZLang;
         }
     }
     ZLang.ZFunctionType = ZFunctionType;
-    let SemanticErrorType;
-    (function (SemanticErrorType) {
-        // TODO, error codes
-    })(SemanticErrorType = ZLang.SemanticErrorType || (ZLang.SemanticErrorType = {}));
+    let SemanticErrors;
+    (function (SemanticErrors) {
+        SemanticErrors[SemanticErrors["UNKNOWN"] = 0] = "UNKNOWN";
+        SemanticErrors[SemanticErrors["REIDENT"] = 1] = "REIDENT";
+        SemanticErrors[SemanticErrors["EXPR"] = 2] = "EXPR";
+    })(SemanticErrors = ZLang.SemanticErrors || (ZLang.SemanticErrors = {}));
+    ZLang.onError = function onError(errno, message, pos) {
+        throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
+    };
     class Scope {
         constructor(parent) {
             this.parent = parent;
@@ -3049,7 +3054,7 @@ var ZLang;
         }
         declare(name, type, pos, dtls) {
             if (this.has(name))
-                throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
+                ZLang.onError(SemanticErrors.REIDENT, `Cannot redeclare '${name}'`, pos);
             this.data.set(name, { n: this.n, name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
         has(name) {
@@ -3160,10 +3165,6 @@ async function dump(name, node, { format = 'png' } = {}) {
     await writer.ready;
     await writer.close();
 }
-console.debug('Parsing...');
-const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x => x.trim()).map(x => x.trim().split(' ')).map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
-const ast = ZLang.parseTokens(tokens);
-console.debug('Done!');
 function output(...args) {
     const text = ['OUTPUT'];
     for (const arg of args) {
@@ -3181,10 +3182,49 @@ function output(...args) {
     text.push(' ');
     console.log(text.join(' '));
 }
+function readTokenStream(path) {
+    return system.readTextFileSync(path)
+        .trim()
+        .split('\n')
+        .filter(x => x.trim())
+        .map(x => x.trim().split(' '))
+        .map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
+}
+/*
+try {
+    
+    
+} catch(e) {
+    
+    if(e instanceof Parsing.SyntaxError) {
+        output('SYNTAX',0,0,'SYNTAX');
+        system.exit(7);
+    }
+
+    else {
+        console.error('IO ERROR');
+        system.exit(1);
+    }
+}
+*/
 // todo catch syntax errors and pos
-ZLang.initSymbols(ast);
 // todo semantic checks
 const [tokenSrc, astOutput, symbtableOutput = 'program.sym'] = system.args.slice(1);
+console.debug('Parsing...');
+// Read tokens
+const tokens = readTokenStream(tokenSrc);
+// Parse
+const ast = ZLang.parseTokens(tokens);
+var SemanticErrors = ZLang.SemanticErrors;
+ZLang.onError = function (errno, message, pos) {
+    switch (errno) {
+        case SemanticErrors.REIDENT: {
+            output('WARN', pos.line, pos.col, SemanticErrors[SemanticErrors.REIDENT]);
+            return;
+        }
+    }
+};
+ZLang.initSymbols(ast);
 // Emit Domain Statements
 ZLang.visit(ast, function (node) {
     if (node instanceof ZLang.Nodes.DomainNode) {
@@ -3197,4 +3237,5 @@ ZLang.visit(ast, function (node) {
         system.writeTextFileSync(symbtableOutput, ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n, d.type, d.name].join(',')).join('\n'));
     }
 });
+console.debug('Done!');
 dump('zlang', ast);
