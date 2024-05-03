@@ -1,0 +1,16 @@
+string string 0 0
+id str 0 0
+assign assign 0 0
+stringval hello 0 0
+sc sc 0 0
+
+
+int int 0 0
+id foo 0 0
+assign assign 0 0
+intval 1 0 0
+plus plus 10 4
+
+id str 0 0
+
+sc sc 0 0

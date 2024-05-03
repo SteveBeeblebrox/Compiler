@@ -641,7 +641,7 @@ namespace ZLang {
         CONST
     }
 
-    export let raise = function onError(errno: SemanticErrors, message: string, pos?: Position): void | never {
+    export let raise = function raise(errno: SemanticErrors, message: string, pos?: Position): void | never {
         throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
     }
 
@@ -820,7 +820,6 @@ const ast = (function() {
     try {
         return ZLang.parseTokens(tokens);
     } catch(e) {
-        console.log(e)
         output('SYNTAX',e?.pos?.line??0,e?.pos?.col??0,'SYNTAX');
         system.exit(1);
     }
@@ -838,6 +837,7 @@ ZLang.raise = function(errno,message,pos) {
         }
         case SemanticErrors.EXPR: {
             hasErrors = true;
+            console.error(message)
             output('ERROR',pos.line,pos.col,SemanticErrors[SemanticErrors.EXPR]);
             return;
         }
@@ -846,12 +846,63 @@ ZLang.raise = function(errno,message,pos) {
 
 ZLang.applySemantics(ast);
 
-// TODO expr errors
-
 // Emit Domain Statements
 ZLang.visit(ast, function(node) {
     if(node instanceof ZLang.Nodes.DomainNode) {
         output('DOMAIN',node.pos.line,node.pos.col,node.domain);
+        return;
+    }
+
+    // Validate operator types
+    // This is not the same as typechecking for assignment
+    if(node instanceof ZLang.Nodes.BinaryOp) {
+        const invalid = ['string','bool'];
+        for(const domain of invalid) {
+            if(node.lhs.domain === domain || node.rhs.domain === domain) {
+                ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for types ${node.lhs.domain} and ${node.rhs.domain}`,node.pos);                
+                return false;
+            }
+        }
+    }
+    if(node instanceof ZLang.Nodes.UnaryOp) {
+        switch(node.name) {
+            case 'compl': {
+                if(node.val.domain !== 'int') {
+                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos)
+                    return false;
+                }
+            }
+            case 'not': {
+                if(node.val.domain !== 'bool') {
+                    ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos)
+                    return false;
+                }
+            }
+            case 'plus': {
+                const invalid = ['string','bool'];
+                for(const domain of invalid) {
+                    if(node.val.domain === domain) {
+                        ZLang.raise(SemanticErrors.EXPR, `Operator '${node.name}' is not valid for type ${node.val.domain}`,node.pos);                
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    // Validate function identifiers are not used as variables
+    if(
+        node instanceof ZLang.Nodes.IdentifierNode
+        && ZLang.getEnclosingScope(node).get(node.name).type instanceof ZLang.ZFunctionType
+    ) {
+        const parent = node.parent;
+        if(!(
+            (parent instanceof ZLang.Nodes.FunctionCallNode && parent.ident === node)
+            || (parent instanceof ZLang.Nodes.FunctionHeaderNode && parent.ident === node)
+        )) {
+            ZLang.raise(SemanticErrors.EXPR, `Function '${node.name}' cannot be treated like a variable!`, parent.pos); // node.pos for ident location, parent.pos for what expects a var
+            return false;
+        }
     }
 },'post');
 
@@ -861,13 +912,6 @@ ZLang.visit(ast,function(node) {
         system.writeTextFileSync(symbtableOutput,ZLang.getEnclosingScope(node).dir(node.pos).map(d => [d.n,d.type,d.name].join(',')).join('\n'));
     }
 });
-
-
-
-ZLang.visit(ast, function(node) {
-    console.log(node.name)
-    if(node.name === 'EmitStatement') return false
-},'post');
 
 // TODO, dump ast
 dump('zlang', ast);
