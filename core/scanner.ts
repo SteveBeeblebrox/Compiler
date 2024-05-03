@@ -1,6 +1,7 @@
 ///#pragma once
 
 ///#include <compat.ts>
+///#include <tape.ts>
 
 ///#include "regex.ts"
 

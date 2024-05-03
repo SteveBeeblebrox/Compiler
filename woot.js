@@ -462,6 +462,14 @@ var ObjectConstructorPolyfill;
         return Object.prototype.hasOwnProperty.call(o, v);
     }
     ObjectConstructorPolyfill.hasOwn = hasOwn;
+    function fromEntries(entries) {
+        const obj = {};
+        for (const [key, value] of entries) {
+            obj[key] = value;
+        }
+        return obj;
+    }
+    ObjectConstructorPolyfill.fromEntries = fromEntries;
 })(ObjectConstructorPolyfill || (ObjectConstructorPolyfill = {}));
 installPolyfill({ prototype: Object }, ObjectConstructorPolyfill);
 // Set Polyfill based off of work by
@@ -725,6 +733,22 @@ class Token {
         return this.constructor.name;
     }
 }
+var Position;
+(function (Position) {
+    /**
+     * offset(a,b):
+     * 0 => a == b (a is the same as b)
+     * + => a < b  (a is before b)
+     * - => a > b  (a is after b)
+     */
+    function offset(from, to) {
+        if (to.line !== from.line)
+            return to.line - from.line;
+        else
+            return to.col - from.col;
+    }
+    Position.offset = offset;
+})(Position || (Position = {}));
 class CFG {
     constructor(startingSymbol, rules, terminals) {
         this.startingSymbol = startingSymbol;
@@ -1989,6 +2013,7 @@ var Graphviz;
     // Note label overrides attributes.label which overrides using Symbol.toStringTag
     Graphviz.label = Symbol('Graphviz.label');
     Graphviz.children = Symbol('Graphviz.children');
+    Graphviz.exclude = Symbol('Graphviz.exclude');
     Graphviz.attributes = Symbol('Graphviz.attributes');
     function text(text, attributes = {}) {
         return { ...attributes, [Graphviz.label]: text };
@@ -2007,23 +2032,27 @@ var Graphviz;
         const data = [];
         data.push('digraph {');
         function recurse(parent, edge, obj) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             if (typeof obj !== 'object' || obj === null)
                 return;
             if (!nodes.has(obj)) {
                 nodes.set(obj, `Node${iter.shift()}`);
             }
             const name = nodes.get(obj);
-            const attributes = (_a = obj[Graphviz.attributes]) !== null && _a !== void 0 ? _a : {};
+            const excluded = new Set((_a = obj[Graphviz.exclude]) !== null && _a !== void 0 ? _a : []);
+            const attributes = (_b = obj[Graphviz.attributes]) !== null && _b !== void 0 ? _b : {};
             if (Graphviz.label in obj)
                 attributes.label = obj[Graphviz.label];
-            (_b = attributes.label) !== null && _b !== void 0 ? _b : (attributes.label = Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj));
+            (_c = attributes.label) !== null && _c !== void 0 ? _c : (attributes.label = Symbol.toStringTag in obj ? obj[Symbol.toStringTag] : Object.prototype.toString.apply(obj));
             data.push(`\t${name}${stringifyAttributes(attributes)}`);
             if (parent != null) {
                 data.push(`${parent}->${name}${stringifyAttributes({ label: edge })}`);
             }
-            const keys = (_c = obj[Graphviz.children]) !== null && _c !== void 0 ? _c : Object.keys(obj);
+            const keys = (_d = obj[Graphviz.children]) !== null && _d !== void 0 ? _d : Object.keys(obj);
             for (const [key, child] of Array.isArray(keys) && Array.isArray(keys[0]) ? keys : Object.entries(Array.isArray(keys) ? obj : keys)) {
+                if (excluded.has(key)) {
+                    continue;
+                }
                 if (!Array.isArray(keys) || keys.includes(key) || Array.isArray(keys[0])) {
                     if (Array.isArray(child)) {
                         for (const [i, arrayChild] of Array.entries(child)) {
@@ -2071,6 +2100,10 @@ var Parsing;
                     this.shift = super[Tree.shift];
                     this.splice = super[Tree.splice];
                     this[_d] = super[Tree.iterator];
+                }
+                get pos() {
+                    var _a;
+                    return (_a = this.at(0)) === null || _a === void 0 ? void 0 : _a.pos;
                 }
                 get parent() {
                     return super.parent;
@@ -2333,7 +2366,7 @@ var SLR1;
                 // Save to cache
                 try {
                     if (cache !== undefined) {
-                        system.writeFileSync(cache, LZCompression.compressToUint8Array(JSON.stringify({ signature: Signature.create(cfg), table: this.serializeTableToCSV() })));
+                        system.writeFileSync(cache, LZCompression.compressToUint8Array(JSON.stringify({ signature: Signature.create(cfg), table: this.toCSV() })));
                     }
                 }
                 catch (e) { }
@@ -2346,12 +2379,14 @@ var SLR1;
                 const R = new Map();
                 T.set(+row.shift(), R);
                 for (const i of range(row.length)) {
-                    R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i], row[i]);
+                    if (row[i]) {
+                        R.set(header[i] === CFG.EOF_CHARACTER ? CFG.EOF : header[i], row[i]);
+                    }
                 }
             }
             return T;
         }
-        serializeTableToCSV() {
+        toCSV() {
             const T = this.getParseTable();
             const data = [['.', ...this.cfg.getGrammarSymbols().map(s => s !== null && s !== void 0 ? s : CFG.EOF_CHARACTER)].join(',')];
             for (const [i, R] of T.entries()) {
@@ -2370,13 +2405,14 @@ var SLR1;
             return this.parseTable;
         }
         parse(tokens) {
-            var _a, _b, _c, _d, _e, _f;
+            var _a, _b, _c, _d, _e, _f, _g;
             const T = this.parseTable;
             const cfg = this.cfg;
             const sdt = this.sdt;
             const tt = this.tt;
             const ts = createPeekableIterator(tokens);
             const D = [];
+            let pos = { line: 0, col: 0 };
             const S = [];
             S.push({ state: 0 });
             const ruleList = cfg.getRuleList();
@@ -2404,24 +2440,24 @@ var SLR1;
                             else if (child != null) {
                                 node.unshift(child);
                             }
-                            // node.unshift(t);
                         }
                         else {
-                            throw new Parsing.SyntaxError(`Expected '${expected !== null && expected !== void 0 ? expected : 'EOF'}' got '${(_b = (_a = t === null || t === void 0 ? void 0 : t.name) !== null && _a !== void 0 ? _a : t) !== null && _b !== void 0 ? _b : 'EOF'}'`);
+                            throw new Parsing.SyntaxError(`Expected '${expected !== null && expected !== void 0 ? expected : 'EOF'}' got '${(_b = (_a = t === null || t === void 0 ? void 0 : t.name) !== null && _a !== void 0 ? _a : t) !== null && _b !== void 0 ? _b : 'EOF'}'`, pos);
                         }
                     }
                 }
                 return node;
             }
-            while (true) { //todo not in 0
+            while (D.length || ts.peek() || T.get(S.at(-1).state).has(undefined)) {
                 let t = (_a = D.at(0)) !== null && _a !== void 0 ? _a : ts.peek();
-                const [action, v] = (_c = (_b = T.get(S.at(-1).state).get(t === null || t === void 0 ? void 0 : t.name)) === null || _b === void 0 ? void 0 : _b.split('-')) !== null && _c !== void 0 ? _c : [];
+                pos = (_b = t === null || t === void 0 ? void 0 : t.pos) !== null && _b !== void 0 ? _b : pos;
+                const [action, v] = (_d = (_c = T.get(S.at(-1).state).get(t === null || t === void 0 ? void 0 : t.name)) === null || _c === void 0 ? void 0 : _c.split('-')) !== null && _d !== void 0 ? _d : [];
                 if (action === undefined) {
-                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x => `'${x !== null && x !== void 0 ? x : 'EOF'}'`).toArray().join(', ')} got '${(_e = (_d = t === null || t === void 0 ? void 0 : t.name) !== null && _d !== void 0 ? _d : t) !== null && _e !== void 0 ? _e : 'EOF'}'`);
+                    throw new Parsing.SyntaxError(`Expected one of ${T.get(S.at(-1).state).keys().map(x => `'${x !== null && x !== void 0 ? x : 'EOF'}'`).toArray().join(', ')} got '${(_f = (_e = t === null || t === void 0 ? void 0 : t.name) !== null && _e !== void 0 ? _e : t) !== null && _f !== void 0 ? _f : 'EOF'}'`, pos);
                 }
                 const n = +v;
                 if (action === 'sh') {
-                    const t = (_f = D.shift()) !== null && _f !== void 0 ? _f : ts.shift();
+                    const t = (_g = D.shift()) !== null && _g !== void 0 ? _g : ts.shift();
                     S.push({ state: n, tree: t });
                 }
                 else if (action === 'r') {
@@ -2431,6 +2467,7 @@ var SLR1;
                     return this.sdt.transform(reduce(n));
                 }
             }
+            throw new Parsing.SyntaxError(`Unexpected token 'EOF'`, pos);
         }
     }
     SLR1.SLR1Parser = SLR1Parser;
@@ -2450,12 +2487,23 @@ var ZLang;
     let Nodes;
     (function (Nodes) {
         class ZNode extends Tree {
-            constructor() {
-                super(...arguments);
+            constructor(pos, children = []) {
+                super();
+                this.pos = pos;
                 this.name = this.constructor.name;
+                this[Tree.push](...children);
             }
             get [Graphviz.label]() {
                 return this.name;
+            }
+            get children() {
+                return [...super[Tree.iterator]()];
+            }
+            destroy() {
+                return this[Tree.splice](0, this[Tree.treeLength]);
+            }
+            get [Graphviz.exclude]() {
+                return ['pos'];
             }
         }
         Nodes.ZNode = ZNode;
@@ -2463,23 +2511,20 @@ var ZLang;
         }
         Nodes.ExpressionNode = ExpressionNode;
         class LiteralNode extends ExpressionNode {
-            constructor(type, value) {
-                super();
+            constructor(pos, type, value) {
+                super(pos);
                 this.type = type;
                 this.value = value;
             }
             ;
-            get children() {
-                return [];
-            }
             get domain() {
                 return this.type;
             }
         }
         Nodes.LiteralNode = LiteralNode;
         class IntLiteral extends LiteralNode {
-            constructor(value) {
-                super('int', value);
+            constructor(pos, value) {
+                super(pos, 'int', value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
@@ -2487,8 +2532,8 @@ var ZLang;
         }
         Nodes.IntLiteral = IntLiteral;
         class FloatLiteral extends LiteralNode {
-            constructor(value) {
-                super('float', value);
+            constructor(pos, value) {
+                super(pos, 'float', value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
@@ -2496,8 +2541,8 @@ var ZLang;
         }
         Nodes.FloatLiteral = FloatLiteral;
         class StringLiteral extends LiteralNode {
-            constructor(value) {
-                super('string', value);
+            constructor(pos, value) {
+                super(pos, 'string', value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${escapeString(this.value)}`;
@@ -2505,15 +2550,12 @@ var ZLang;
         }
         Nodes.StringLiteral = StringLiteral;
         class IdentifierNode extends ExpressionNode {
-            constructor(name) {
-                super();
+            constructor(pos, name) {
+                super(pos);
                 this.name = name;
             }
             get domain() {
-                return 'any';
-            }
-            get children() {
-                return [];
+                return ZLang.getEnclosingScope(this).get(this.name, this.pos).type.domain;
             }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
@@ -2521,14 +2563,11 @@ var ZLang;
         }
         Nodes.IdentifierNode = IdentifierNode;
         class BinaryOp extends ExpressionNode {
-            constructor(name, lhs, rhs) {
-                super();
+            constructor(pos, name, lhs, rhs) {
+                super(pos, [lhs, rhs]);
                 this.name = name;
                 this.lhs = lhs;
                 this.rhs = rhs;
-            }
-            get children() {
-                return [this.lhs, this.rhs];
             }
             get domain() {
                 return (() => {
@@ -2554,13 +2593,10 @@ var ZLang;
         }
         Nodes.BinaryOp = BinaryOp;
         class UnaryOp extends ExpressionNode {
-            constructor(name, val) {
-                super();
+            constructor(pos, name, val) {
+                super(pos, [val]);
                 this.name = name;
                 this.val = val;
-            }
-            get children() {
-                return [this.val];
             }
             get domain() {
                 return this.val.domain; // +-~! all leave the type as is
@@ -2568,13 +2604,10 @@ var ZLang;
         }
         Nodes.UnaryOp = UnaryOp;
         class CastNode extends ExpressionNode {
-            constructor(type, val) {
-                super();
+            constructor(pos, type, val) {
+                super(pos, [type, val]);
                 this.type = type;
                 this.val = val;
-            }
-            get children() {
-                return [this.type, this.val];
             }
             get domain() {
                 return this.type.domain;
@@ -2588,16 +2621,13 @@ var ZLang;
         }
         Nodes.CastNode = CastNode;
         class ParameterNode extends ZNode {
-            constructor(type, name) {
-                super();
+            constructor(pos, type, ident) {
+                super(pos, [type, ident]);
                 this.type = type;
-                this.name = name;
-            }
-            get children() {
-                return [this.type];
+                this.ident = ident;
             }
             get [Graphviz.label]() {
-                return `${this.type[Graphviz.label]} ${this.name}`;
+                return `${this.type[Graphviz.label]} ${this.ident.name}`;
             }
             get [Graphviz.children]() {
                 return [];
@@ -2605,28 +2635,23 @@ var ZLang;
         }
         Nodes.ParameterNode = ParameterNode;
         class FunctionHeaderNode extends ZNode {
-            constructor(name, rtype, parameters) {
-                super();
-                this.name = name;
+            constructor(pos, ident, rtype, parameters) {
+                super(pos, [rtype, ident, ...parameters]);
+                this.ident = ident;
                 this.rtype = rtype;
                 this.parameters = parameters;
-            }
-            get children() {
-                return [this.rtype, ...this.parameters, this];
+                this.name = this.ident.name;
             }
             get [Graphviz.label]() {
-                return `fn ${this.name}(...)`;
+                return `fn ${this.ident.name}(...)`;
             }
         }
         Nodes.FunctionHeaderNode = FunctionHeaderNode;
         class TypeNode extends ZNode {
-            constructor(type, meta) {
-                super();
+            constructor(pos, type, meta = { const: false }) {
+                super(pos);
                 this.type = type;
                 this.meta = meta;
-            }
-            get children() {
-                return [];
             }
             get domain() {
                 return this.type;
@@ -2637,48 +2662,47 @@ var ZLang;
             get [Graphviz.children]() {
                 return [];
             }
+            get ztype() {
+                return new ZType(this.type, this.meta.const);
+            }
         }
         Nodes.TypeNode = TypeNode;
         class FunctionCallNode extends ExpressionNode {
-            constructor(name, args) {
-                super();
-                this.name = name;
+            constructor(pos, ident, args) {
+                super(pos, [ident, ...args]);
+                this.ident = ident;
                 this.args = args;
             }
-            get children() {
-                return [...this.args];
-            }
             get domain() {
-                return 'any';
+                return ZLang.getEnclosingScope(this).get(this.ident.name, this.pos).type.domain;
             }
             get [Graphviz.label]() {
-                return `${this.name}(...)`;
+                return `${this.ident.name}(...)`;
             }
         }
         Nodes.FunctionCallNode = FunctionCallNode;
         class FunctionNode extends ZNode {
-            constructor(header, rvar, rvalue, body) {
-                super();
+            constructor(pos, header, rvar, rvalue, body) {
+                super(pos, [header, rvar, rvalue, body]);
                 this.header = header;
                 this.rvar = rvar;
                 this.rvalue = rvalue;
                 this.body = body;
-            }
-            get children() {
-                return [this.header, this.rvalue, this.body];
+                this.scope = new Scope();
             }
             get [Graphviz.label]() {
                 return `${this.header[Graphviz.label]} {...}`;
             }
             get [Graphviz.children]() {
-                return [['header', this.header], ['var', new ParseTreeTokenNode('id', this.rvar)], ['rvalue', this.rvalue], ['body', this.body]];
+                return [['header', this.header], ['var', this.rvar], ['rvalue', this.rvalue], ['body', this.body]];
             }
         }
         Nodes.FunctionNode = FunctionNode;
         class Program extends ZNode {
-            constructor(children) {
-                super();
-                this.children = children;
+            constructor(pos, steps) {
+                super(pos, [...steps]);
+                this.steps = steps;
+                this.scope = new Scope();
             }
             get [Graphviz.label]() {
                 return 'Program.z';
@@ -2689,13 +2713,9 @@ var ZLang;
         }
         Nodes.Program = Program;
         class DomainNode extends ExpressionNode {
-            constructor(value, pos) {
-                super();
+            constructor(pos, value) {
+                super(pos, [value]);
                 this.value = value;
-                this.pos = pos;
-            }
-            get children() {
-                return [this.value];
             }
             get domain() {
                 return this.value.domain;
@@ -2709,34 +2729,28 @@ var ZLang;
         }
         Nodes.DomainNode = DomainNode;
         class StatementNode extends ZNode {
-            constructor() {
-                super();
-            }
             get [Graphviz.label]() {
                 return 'Statement';
             }
         }
         Nodes.StatementNode = StatementNode;
         class DeclareStatement extends StatementNode {
-            constructor(type, entries) {
-                super();
+            constructor(pos, type, entries) {
+                super(pos, [type, ...entries.flat()]);
                 this.type = type;
                 this.entries = entries;
-            }
-            get children() {
-                return [this.type, ...this.entries.flatMap(x => x.length > 1 ? x[1] : [])];
             }
             get [Graphviz.label]() {
                 return 'Declare';
             }
             get [Graphviz.children]() {
                 return [...Object.entries({ type: this.type }), ...this.entries.map(function (entry, i) {
-                        return entry.length === 1 ? ['', new ParseTreeTokenNode('id', entry[0])] : ['', {
+                        return entry.length === 1 ? ['', entry[0]] : ['', {
                                 get [Graphviz.label]() {
                                     return '=';
                                 },
                                 get [Graphviz.children]() {
-                                    return [['', new ParseTreeTokenNode('id', entry[0])], ['', entry[1]]];
+                                    return [['', entry[0]], ['', entry[1]]];
                                 }
                             }];
                     })];
@@ -2744,31 +2758,28 @@ var ZLang;
         }
         Nodes.DeclareStatement = DeclareStatement;
         class AssignmentStatement extends StatementNode {
-            constructor(id, value) {
-                super();
-                this.id = id;
+            constructor(pos, ident, value) {
+                super(pos, [ident, value]);
+                this.ident = ident;
                 this.value = value;
-            }
-            get children() {
-                return [this.value];
             }
             get [Graphviz.label]() {
                 return '=';
             }
             get [Graphviz.children]() {
-                return [['id', new ParseTreeTokenNode('id', this.id)], ...Object.entries({ value: this.value })];
+                return [['id', this.ident], ...Object.entries({ value: this.value })];
+            }
+            get domain() {
+                return this.value.domain;
             }
         }
         Nodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
-            constructor(predicate, btrue, bfalse) {
-                super();
+            constructor(pos, predicate, btrue, bfalse) {
+                super(pos, [predicate, btrue, ...(bfalse !== undefined ? [bfalse] : [])]);
                 this.predicate = predicate;
                 this.btrue = btrue;
                 this.bfalse = bfalse;
-            }
-            get children() {
-                return [this.predicate, this.btrue, ...(this.bfalse !== undefined ? [this.bfalse] : [])];
             }
             get [Graphviz.label]() {
                 return this.bfalse !== undefined ? 'If-Else' : 'If';
@@ -2776,13 +2787,10 @@ var ZLang;
         }
         Nodes.IfStatement = IfStatement;
         class DoWhileStatement extends StatementNode {
-            constructor(body, predicate) {
-                super();
+            constructor(pos, body, predicate) {
+                super(pos, [body, predicate]);
                 this.body = body;
                 this.predicate = predicate;
-            }
-            get children() {
-                return [this.body, this.predicate];
             }
             get [Graphviz.label]() {
                 return 'Do While';
@@ -2790,13 +2798,10 @@ var ZLang;
         }
         Nodes.DoWhileStatement = DoWhileStatement;
         class WhileStatement extends StatementNode {
-            constructor(predicate, body) {
-                super();
+            constructor(pos, predicate, body) {
+                super(pos, [predicate, body]);
                 this.predicate = predicate;
                 this.body = body;
-            }
-            get children() {
-                return [this.predicate, this.body];
             }
             get [Graphviz.label]() {
                 return 'While';
@@ -2804,59 +2809,58 @@ var ZLang;
         }
         Nodes.WhileStatement = WhileStatement;
         class EmitStatement extends StatementNode {
-            constructor(data) {
-                super();
+            constructor(pos, data) {
+                super(pos, (function () {
+                    switch (data.type) {
+                        case 'value': return [data.value];
+                        case 'string': return [data.ident, data.index, data.length];
+                        default: return [];
+                    }
+                })());
                 this.data = data;
-            }
-            get children() {
-                switch (this.data.type) {
-                    case 'value': return [this.data.value];
-                    case 'string': return [this.data.index, this.data.length];
-                }
             }
             get [Graphviz.label]() {
                 return 'Emit';
             }
             get [Graphviz.children]() {
-                return [...(this.data.type === 'string' ? [['id', new ParseTreeTokenNode('id', this.data.id)]] : []), ...Object.entries(this.data)];
+                return [...(this.data.type === 'string' ? [['id', this.data.ident]] : []), ...Object.entries(this.data)];
             }
         }
         Nodes.EmitStatement = EmitStatement;
         class RandStatement extends StatementNode {
-            constructor(id, min, max) {
-                super();
-                this.id = id;
+            constructor(pos, ident, min, max) {
+                super(pos, [...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
+                this.ident = ident;
                 this.min = min;
                 this.max = max;
-            }
-            get children() {
-                return [...(this.min !== undefined ? [this.min] : []), ...(this.max !== undefined ? [this.max] : [])];
             }
             get [Graphviz.label]() {
                 return 'Rand';
             }
             get [Graphviz.children]() {
-                return [['id', new ParseTreeTokenNode('id', this.id)], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
+                return [['id', this.ident], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
             }
         }
         Nodes.RandStatement = RandStatement;
         class StatementGroup extends StatementNode {
-            constructor(statements) {
-                super();
+            constructor(pos, statements) {
+                super(pos, [...statements]);
                 this.statements = statements;
-            }
-            get children() {
-                return [...this.statements];
+                this.scope = new Scope();
             }
             get [Graphviz.label]() {
                 return 'Statements';
+            }
+            get [Graphviz.exclude]() {
+                return ['scope', ...super[Graphviz.exclude]];
             }
         }
         Nodes.StatementGroup = StatementGroup;
     })(Nodes = ZLang.Nodes || (ZLang.Nodes = {}));
     var ParseTreeTokenNode = Parsing.ParseTreeTokenNode;
+    var StatementGroup = Nodes.StatementGroup;
     ZLang.Program = Nodes.Program;
-    ZLang.sdt = new Parsing.SyntaxTransformer({
+    const sdt = new Parsing.SyntaxTransformer({
         '*'(node) {
             if (node.length === 1) {
                 if (node.at(0) instanceof Parsing.ParseTreeLambdaNode) {
@@ -2877,32 +2881,43 @@ var ZLang;
         'SUM|PRODUCT|BEXPR'(node) {
             if (node.length === 1)
                 return;
-            return new Nodes.BinaryOp(node.at(1).value, node.shift(), node.pop());
+            return new Nodes.BinaryOp(node.at(1).pos, node.at(1).value, node.shift(), node.pop());
         },
         UNARY(node) {
             if (node.length === 1)
                 return;
-            return new Nodes.UnaryOp(node.at(0).value, node.pop());
+            return new Nodes.UnaryOp(node.at(0).pos, node.at(0).value, node.pop());
         },
         CAST(node) {
-            return new Nodes.CastNode(node.at(0), node.at(2));
+            return new Nodes.CastNode(node.pos, new Nodes.TypeNode(node.at(0).pos, node.at(0).value), node.splice(2, 1)[0]);
         },
         // Functions
         FUNSIG(node) {
-            return new Nodes.FunctionHeaderNode(node.at(1).value, node.at(0), node.children.splice(3, node.length - 4));
+            const [type, ident, _lraren, ...parameters] = node.splice(0, node.length);
+            const _rparen = parameters.pop();
+            return new Nodes.FunctionHeaderNode(ident.pos, ident, type, parameters);
         },
         PARAMLIST(node) {
             if (node.length === 1)
                 return;
             if (node.length === 2) {
-                return new Nodes.ParameterNode(node.at(0), node.at(1).value);
+                const pos = { ...node.pos };
+                const [type, ident] = node.splice(0, node.length);
+                type.meta.const = true;
+                return new Nodes.ParameterNode(pos, type, ident);
             }
             else {
-                return [new Nodes.ParameterNode(node.at(0), node.at(1).value), ...node.splice(3, node.length)];
+                const pos = { ...node.pos };
+                const [type, ident, _comma, ...rest] = node.splice(0, node.length);
+                type.meta.const = true;
+                return [new Nodes.ParameterNode(pos, type, ident), ...rest];
             }
         },
         FUNCALL(node) {
-            return new Nodes.FunctionCallNode(node.at(0).value, node.splice(2, node.length - 3));
+            const pos = { ...node.pos };
+            const [ident, _lparen, ...args] = node.splice(0, node.length);
+            const _rparen = args.pop();
+            return new Nodes.FunctionCallNode(pos, ident, args);
         },
         ARGLIST(node) {
             if (node.length === 1)
@@ -2911,15 +2926,16 @@ var ZLang;
             return node.splice(0, node.length);
         },
         FUNCTION(node) {
-            return new Nodes.FunctionNode(node.splice(0, 1)[0], node.at(1).value, node.splice(-2, 1)[0], node.splice(-1, 1)[0]);
+            const [header, _returns, ident, _assign, expr, body] = node.splice(0, node.length);
+            return new Nodes.FunctionNode(ident.pos, header, ident, expr, body);
         },
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
-            return new Nodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' });
+            return new Nodes.TypeNode(node.pos, node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' || node.at(-1).value === 'string' });
         },
         // General simplification
         MODULE(node) {
-            return new Nodes.Program(node.splice(0, node.length - 1));
+            return new Nodes.Program(node.pos, node.splice(0, node.length - 1));
         },
         MODPARTS(node) {
             return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
@@ -2929,8 +2945,8 @@ var ZLang;
                 return node.splice(1, 1);
             }
             else if (node.length === 4) {
-                const pos = { ...node.at(0).pos };
-                return new Nodes.DomainNode(node.splice(2, 1)[0], pos);
+                const pos = { ...node.pos };
+                return new Nodes.DomainNode(pos, node.splice(2, 1)[0]);
             }
         },
         BSTMT(node) {
@@ -2942,80 +2958,103 @@ var ZLang;
             return node.splice(0, node.length);
         },
         BRACESTMTS(node) {
-            return new Nodes.StatementGroup(node.splice(1, node.length - 2));
+            return new Nodes.StatementGroup(node.pos, node.splice(1, node.length - 2));
         },
         SOLOSTMT(node) {
-            return new Nodes.StatementGroup(node.splice(0, 1));
+            return new Nodes.StatementGroup(node.pos, node.splice(0, 1));
         },
         // Assignment and declaration
         ASSIGN(node) {
-            return new Nodes.AssignmentStatement(node.at(0).value, node.splice(-1, 1)[0]);
+            const pos = { ...node.pos };
+            const [ident, _assign, value] = node.splice(0, node.length);
+            return new Nodes.AssignmentStatement(pos, ident, value);
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
-            return new Nodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(x => x instanceof Nodes.AssignmentStatement ? [x.id, x.value] : [x.value]));
+            return new Nodes.DeclareStatement(node.pos, node.splice(0, 1)[0], node.splice(0, node.length).map(function (tree) {
+                if (tree instanceof Nodes.AssignmentStatement) {
+                    return tree.destroy();
+                }
+                else {
+                    return [tree];
+                }
+            }));
         },
         DECLIDS(node) {
             return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'comma' : true);
         },
         // Control Statements
         WHILE(node) {
-            return new Nodes.WhileStatement(node.splice(2, 1)[0], node.splice(-1, 1)[0]);
+            const pos = { ...node.pos };
+            const [_while, _lparen, predicate, _rparen, body] = node.splice(0, node.length);
+            return new Nodes.WhileStatement(pos, predicate, body);
         },
         DOWHILE(node) {
-            return new Nodes.DoWhileStatement(node.splice(1, 1)[0], node.splice(-3, 1)[0]);
+            const pos = { ...node.pos };
+            const [_do, body, _while, _lparen, predicate, _rparen, _sc] = node.splice(0, node.length);
+            return new Nodes.DoWhileStatement(pos, body, predicate);
         },
         IF(node) {
-            return new Nodes.IfStatement(node.splice(2, 1)[0], node.splice(-1, 1)[0]);
+            const [_if, _rparen, predicate, _lparen, btrue] = node.splice(0, node.length);
+            return new Nodes.IfStatement(node.pos, predicate, btrue);
         },
         IFELSE(node) {
-            return new Nodes.IfStatement(node.splice(2, 1)[0], node.splice(-3, 1)[0], node.splice(-1, 1)[0]);
+            const [_if, _lparen, predicate, _rparen, btrue, _else, bfalse] = node.splice(0, node.length);
+            return new Nodes.IfStatement(node.pos, predicate, btrue, bfalse);
         },
         // Special Statements
         EMIT(node) {
+            const pos = { ...node.pos };
             switch (node.length) {
                 case 2:
-                    return new Nodes.EmitStatement({
-                        type: node.at(-1).value
+                    return new Nodes.EmitStatement(pos, {
+                        type: 'symbtable'
                     });
                 case 4:
-                    return new Nodes.EmitStatement({
+                    return new Nodes.EmitStatement(pos, {
                         type: 'value',
                         value: node.splice(2, 1)[0]
                     });
                 case 6:
-                    return new Nodes.EmitStatement({
+                    const [_emit, ident, _comma, index, __comma, length] = node.splice(0, node.length);
+                    return new Nodes.EmitStatement(pos, {
                         type: 'string',
-                        id: node.at(1).value,
-                        index: node.splice(3, 1)[0],
-                        length: node.splice(-1, 1)[0]
+                        ident: ident,
+                        index: index,
+                        length: length
                     });
             }
         },
         RAND(node) {
             switch (node.length) {
-                case 2:
-                    return new Nodes.RandStatement(node.at(1).value);
-                case 6:
-                    return new Nodes.RandStatement(node.at(1).value, node.splice(3, 1)[0], node.splice(-1, 1)[0]);
+                case 2: {
+                    const pos = { ...node.pos };
+                    const [_rand, ident] = node.splice(0, node.length);
+                    return new Nodes.RandStatement(pos, ident);
+                }
+                case 6: {
+                    const pos = { ...node.pos };
+                    const [_rand, intIdent, _comma, min, __comma, max] = node.splice(0, node.length);
+                    return new Nodes.RandStatement(pos, intIdent, min, max);
+                }
             }
         }
     });
-    ZLang.tt = new Parsing.TokenTransformer({
+    const tt = new Parsing.TokenTransformer({
         floatval(node) {
-            return new Nodes.FloatLiteral(+node.value);
+            return new Nodes.FloatLiteral(node.pos, +node.value);
         },
         intval(node) {
-            return new Nodes.IntLiteral(+node.value);
+            return new Nodes.IntLiteral(node.pos, +node.value);
         },
         stringval(node) {
-            return new Nodes.StringLiteral(node.value);
+            return new Nodes.StringLiteral(node.pos, node.value);
         },
         id(node) {
-            return new Nodes.IdentifierNode(node.value);
+            return new Nodes.IdentifierNode(node.pos, node.value);
         }
     });
     console.debug('Building Parser...');
-    const PARSER = new SLR1.SLR1Parser(GRAMMAR, ZLang.sdt, ZLang.tt, 'zlang.json.lz');
+    const PARSER = new SLR1.SLR1Parser(GRAMMAR, sdt, tt, 'zlang.json.lz');
     console.debug('Done!');
     function parseTokens(tokens) {
         return PARSER.parse(tokens);
@@ -3023,23 +3062,25 @@ var ZLang;
     ZLang.parseTokens = parseTokens;
     function visit(program, f, order = 'pre') {
         const V = new Set;
-        function visit(ast) {
-            var _a;
-            if (V.has(ast))
+        function visit(node) {
+            var _a, _b;
+            if (V.has(node))
                 return;
-            V.add(ast);
-            let condition = true;
+            V.add(node);
+            let precondition = true;
+            let postcondition = true;
             if (order === 'pre') {
-                condition = (_a = f(ast)) !== null && _a !== void 0 ? _a : condition;
+                precondition = (_a = f(node, V)) !== null && _a !== void 0 ? _a : precondition;
             }
-            if (condition && ast instanceof Nodes.ZNode) {
-                for (const child of ast.children) {
-                    visit(child);
+            if (precondition && node instanceof Nodes.ZNode) {
+                for (const child of node.children) {
+                    postcondition = ((_b = visit(child)) !== null && _b !== void 0 ? _b : postcondition) && postcondition; // &&= short circuits, and we don't want that
                 }
             }
-            if (order === 'post') {
-                f(ast);
+            if (order === 'post' && postcondition) {
+                postcondition = f.bind(node)(node);
             }
+            return postcondition;
         }
         visit(program);
     }
@@ -3056,46 +3097,150 @@ var ZLang;
     }
     ZLang.ZType = ZType;
     class ZFunctionType {
-        constructor(rType, pTypes = []) {
+        constructor(rType, pTypes = [], pconst = false) {
             this.rType = rType;
             this.pTypes = pTypes;
-            this.const = true;
+            this.const = pconst;
         }
         toString() {
-            return `const ${this.rType}//${this.pTypes.join('/')}`;
+            // implicit const is omitted on parameters
+            return `${this.const ? 'const ' : ''}${this.rType.domain}//${this.pTypes.map(x => x.domain).join('/')}`;
+        }
+        get domain() {
+            return this.rType.domain;
         }
     }
     ZLang.ZFunctionType = ZFunctionType;
+    let SemanticErrors;
+    (function (SemanticErrors) {
+        SemanticErrors[SemanticErrors["UNKNOWN"] = 0] = "UNKNOWN";
+        SemanticErrors[SemanticErrors["REIDENT"] = 1] = "REIDENT";
+        SemanticErrors[SemanticErrors["EXPR"] = 2] = "EXPR";
+        SemanticErrors[SemanticErrors["CONST"] = 3] = "CONST";
+    })(SemanticErrors = ZLang.SemanticErrors || (ZLang.SemanticErrors = {}));
+    ZLang.raise = function raise(errno, message, pos) {
+        throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
+    };
     class Scope {
         constructor(parent) {
             this.parent = parent;
             this.data = new Map;
-            this.n = this.parent ? this.parent.n + 1 : 0;
         }
-        declare(name, type) {
-            if (this.has(name))
-                throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
-            this.data.set(name, { name, type, used: false, initialized: false });
+        get n() {
+            return this.parent ? this.parent.n + 1 : 0;
         }
-        has(name) {
-            return this.data.has(name);
+        declare(name, type, pos, dtls) {
+            if (this.hasLocal(name, pos))
+                ZLang.raise(SemanticErrors.REIDENT, `Cannot redeclare '${name}'`, pos);
+            this.data.set(name, { n: this.n, name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
-        get(name) {
-            return this.data.has(name) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name) : null;
+        has(name, pos) {
+            return this.hasLocal(name, pos) || (this.parent && this.parent.has(name, pos));
         }
-        mark(name, dtls) {
-            if (this.has(name)) {
+        hasLocal(name, pos) {
+            return this.data.has(name) && (pos === undefined || Position.offset(pos, this.data.get(name).pos) <= 0);
+        }
+        get(name, pos) {
+            return this.hasLocal(name, pos) ? { ...this.data.get(name) } : this.parent ? this.parent.get(name, pos) : null;
+        }
+        mark(name, pos, dtls) {
+            if (this.hasLocal(name, pos)) {
                 this.data.set(name, Object.assign(this.data.get(name), dtls));
+                const t = this.get(name).type;
+                // When implementing function, change it to be const
+                if (dtls.initialized && t instanceof ZFunctionType) {
+                    t.const = true;
+                }
             }
             else if (this.parent) {
-                this.parent.mark(name, dtls);
+                this.parent.mark(name, pos, dtls);
             }
         }
-        toString() {
-            return (this.parent ? this.parent.toString() + '\n' : '') + this.data.values().map(d => [this.n, d.type, d.name].join(',')).toArray().join('\n');
+        entries() {
+            return [
+                ...(this.parent ? this.parent.entries() : []),
+                ...this.data.entries()
+            ];
+        }
+        dir(pos) {
+            const data = new Map();
+            for (const [k, v] of this.entries()) {
+                if (pos === undefined || Position.offset(pos, v.pos) <= 0) {
+                    if (data.has(k)) {
+                        data.delete(k);
+                    }
+                    data.set(k, v);
+                }
+            }
+            return [...data.values()];
         }
     }
     ZLang.Scope = Scope;
+    function getEnclosingScope(node) {
+        let p = node;
+        while (p = p.parent) {
+            if (p instanceof StatementGroup || p instanceof Nodes.FunctionNode || p instanceof ZLang.Program) {
+                return p.scope;
+            }
+        }
+        return null;
+    }
+    ZLang.getEnclosingScope = getEnclosingScope;
+    function applySemantics(program) {
+        initSymbols(program);
+    }
+    ZLang.applySemantics = applySemantics;
+    function initSymbols(program) {
+        ZLang.visit(program, function (node, V) {
+            // Set up scopes
+            if ((node instanceof StatementGroup || node instanceof Nodes.FunctionNode) && !node.scope.parent) {
+                const scope = getEnclosingScope(node);
+                if (scope) {
+                    node.scope.parent = scope;
+                }
+            }
+            function declareFunction(header) {
+                getEnclosingScope(node).declare(header.name, new ZFunctionType(header.rtype.ztype, header.parameters.map(p => p.type.ztype)), header.pos);
+            }
+            if (node instanceof Nodes.FunctionHeaderNode) {
+                declareFunction(node);
+            }
+            else if (node instanceof Nodes.FunctionNode) {
+                const scope = getEnclosingScope(node);
+                if (!scope.has(node.header.ident.name)) {
+                    declareFunction(node.header);
+                }
+                scope.mark(node.header.ident.name, node.header.ident.pos, { initialized: true });
+                V.add(node.header);
+                V.add(node.rvar);
+                for (const p of node.header.parameters) {
+                    node.scope.declare(p.ident.name, p.type.ztype, p.pos, { initialized: true });
+                }
+                node.scope.declare(node.rvar.name, node.header.rtype.ztype, node.rvar.pos, { initialized: true });
+            }
+            else if (node instanceof Nodes.DeclareStatement) {
+                const scope = getEnclosingScope(node);
+                for (const [ident, value] of node.entries) {
+                    scope.declare(ident.name, node.type.ztype, ident.pos);
+                    if (value !== undefined) {
+                        scope.mark(ident.name, ident.pos, { initialized: true });
+                    }
+                    V.add(ident);
+                }
+            }
+            else if (node instanceof Nodes.AssignmentStatement) {
+                const scope = getEnclosingScope(node);
+                console.log(node);
+                if (scope.get(node.ident.name, node.pos).type.const)
+                    ZLang.raise(SemanticErrors.CONST, `Cannot assign to const variable '${node.ident.name}'`, node.pos);
+                scope.mark(node.ident.name, node.pos, { initialized: true });
+                V.add(node.ident);
+            }
+            else if (node instanceof Nodes.IdentifierNode) {
+                getEnclosingScope(node).mark(node.name, node.pos, { used: true });
+            }
+        }, 'pre');
+    }
 })(ZLang || (ZLang = {}));
 //`which sjs` <(mtsc -po- -tes2018 -Ilib "$0") "$@"; exit $?
 var LL1;
@@ -3280,7 +3425,7 @@ var LL1;
                 }
             }
             if (T.length !== 1) {
-                throw new Parsing.SyntaxError(undefined, pos);
+                throw new Parsing.SyntaxError('Parse returned multiple disjoint trees', pos);
             }
             return T.pop();
         }
@@ -3943,5 +4088,8 @@ class Scanner {
 })(ZLang || (ZLang = {}));
 console.log('Tokens:');
 console.log(ZLang.tokenize(`
-int x=1+1;
+int x = y = z = 3;
+float k;
+float m = n = k = 3.14;
+
 `).map(x => JSON.stringify(x)).toArray().join('\n'));

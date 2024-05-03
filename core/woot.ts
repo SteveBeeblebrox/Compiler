@@ -10,7 +10,7 @@
 ///#include "zlang.ts"
 ///#include "scanner.ts"
 
-namespace ZLang {
+namespace zZLang {
     console.log('Building Scanner...');
     const SCANNER = Scanner.fromString(new BasicTextDecoder().decode(new Uint8Array([
         ///#embed "zlang.lut"
@@ -28,14 +28,17 @@ namespace ZLang {
         return SCANNER.tokenize(text.split('')[Symbol.iterator]());
     }
 
-    export function parse(text: string): Program {
-        return ZLang.parseTokens(ZLang.tokenize(text)) as Program;
+    export function parse(text: string): ZLang.Program {
+        return ZLang.parseTokens(ZLang.tokenize(text)) as ZLang.Program;
     }
 }
 
 ///#if __MAIN__
 console.log('Tokens:')
 console.log(ZLang.tokenize(`
-int x=1+1;
+int x = y = z = 3;
+float k;
+float m = n = k = 3.14;
+
 `).map(x=>JSON.stringify(x)).toArray().join('\n'))
 ///#endif
