@@ -220,7 +220,7 @@ namespace SLR1 {
             function reduce(n: number): StrayTree<InnerParseTree> {                
                 const [lhs,rhs] = ruleList[n];
                 const node = new ParseTreeNode(lhs);
-
+                
                 if(rhs.length === 0) {
                     node.push(new ParseTreeLambdaNode());
                 } else {

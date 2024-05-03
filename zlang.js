@@ -1801,6 +1801,10 @@ var Parsing;
                     this.splice = super[Tree.splice];
                     this[_d] = super[Tree.iterator];
                 }
+                get pos() {
+                    var _a;
+                    return (_a = this.at(0)) === null || _a === void 0 ? void 0 : _a.pos;
+                }
                 get parent() {
                     return super.parent;
                 }
@@ -2407,8 +2411,9 @@ var ZLang;
     let Nodes;
     (function (Nodes) {
         class ZNode extends Tree {
-            constructor(children = []) {
+            constructor(pos, children = []) {
                 super();
+                this.pos = pos;
                 this.name = this.constructor.name;
                 this[Tree.push](...children);
             }
@@ -2427,8 +2432,8 @@ var ZLang;
         }
         Nodes.ExpressionNode = ExpressionNode;
         class LiteralNode extends ExpressionNode {
-            constructor(type, value) {
-                super();
+            constructor(pos, type, value) {
+                super(pos);
                 this.type = type;
                 this.value = value;
             }
@@ -2439,8 +2444,8 @@ var ZLang;
         }
         Nodes.LiteralNode = LiteralNode;
         class IntLiteral extends LiteralNode {
-            constructor(value) {
-                super('int', value);
+            constructor(pos, value) {
+                super(pos, 'int', value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
@@ -2448,8 +2453,8 @@ var ZLang;
         }
         Nodes.IntLiteral = IntLiteral;
         class FloatLiteral extends LiteralNode {
-            constructor(value) {
-                super('float', value);
+            constructor(pos, value) {
+                super(pos, 'float', value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
@@ -2457,8 +2462,8 @@ var ZLang;
         }
         Nodes.FloatLiteral = FloatLiteral;
         class StringLiteral extends LiteralNode {
-            constructor(value) {
-                super('string', value);
+            constructor(pos, value) {
+                super(pos, 'string', value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${escapeString(this.value)}`;
@@ -2466,8 +2471,8 @@ var ZLang;
         }
         Nodes.StringLiteral = StringLiteral;
         class IdentifierNode extends ExpressionNode {
-            constructor(name) {
-                super();
+            constructor(pos, name) {
+                super(pos);
                 this.name = name;
             }
             get domain() {
@@ -2479,8 +2484,8 @@ var ZLang;
         }
         Nodes.IdentifierNode = IdentifierNode;
         class BinaryOp extends ExpressionNode {
-            constructor(name, lhs, rhs) {
-                super([lhs, rhs]);
+            constructor(pos, name, lhs, rhs) {
+                super(pos, [lhs, rhs]);
                 this.name = name;
                 this.lhs = lhs;
                 this.rhs = rhs;
@@ -2509,8 +2514,8 @@ var ZLang;
         }
         Nodes.BinaryOp = BinaryOp;
         class UnaryOp extends ExpressionNode {
-            constructor(name, val) {
-                super([val]);
+            constructor(pos, name, val) {
+                super(pos, [val]);
                 this.name = name;
                 this.val = val;
             }
@@ -2520,8 +2525,8 @@ var ZLang;
         }
         Nodes.UnaryOp = UnaryOp;
         class CastNode extends ExpressionNode {
-            constructor(type, val) {
-                super([type, val]);
+            constructor(pos, type, val) {
+                super(pos, [type, val]);
                 this.type = type;
                 this.val = val;
             }
@@ -2537,8 +2542,8 @@ var ZLang;
         }
         Nodes.CastNode = CastNode;
         class ParameterNode extends ZNode {
-            constructor(type, ident) {
-                super([type, ident]);
+            constructor(pos, type, ident) {
+                super(pos, [type, ident]);
                 this.type = type;
                 this.ident = ident;
             }
@@ -2551,8 +2556,8 @@ var ZLang;
         }
         Nodes.ParameterNode = ParameterNode;
         class FunctionHeaderNode extends ZNode {
-            constructor(ident, rtype, parameters) {
-                super([rtype, ident, ...parameters]);
+            constructor(pos, ident, rtype, parameters) {
+                super(pos, [rtype, ident, ...parameters]);
                 this.ident = ident;
                 this.rtype = rtype;
                 this.parameters = parameters;
@@ -2564,8 +2569,8 @@ var ZLang;
         }
         Nodes.FunctionHeaderNode = FunctionHeaderNode;
         class TypeNode extends ZNode {
-            constructor(type, meta = { const: false }) {
-                super();
+            constructor(pos, type, meta = { const: false }) {
+                super(pos);
                 this.type = type;
                 this.meta = meta;
             }
@@ -2584,8 +2589,8 @@ var ZLang;
         }
         Nodes.TypeNode = TypeNode;
         class FunctionCallNode extends ExpressionNode {
-            constructor(ident, args) {
-                super([ident, ...args]);
+            constructor(pos, ident, args) {
+                super(pos, [ident, ...args]);
                 this.ident = ident;
                 this.args = args;
             }
@@ -2598,8 +2603,8 @@ var ZLang;
         }
         Nodes.FunctionCallNode = FunctionCallNode;
         class FunctionNode extends ZNode {
-            constructor(header, rvar, rvalue, body) {
-                super([header, rvar, rvalue, body]);
+            constructor(pos, header, rvar, rvalue, body) {
+                super(pos, [header, rvar, rvalue, body]);
                 this.header = header;
                 this.rvar = rvar;
                 this.rvalue = rvalue;
@@ -2615,8 +2620,8 @@ var ZLang;
         }
         Nodes.FunctionNode = FunctionNode;
         class Program extends ZNode {
-            constructor(steps) {
-                super([...steps]);
+            constructor(pos, steps) {
+                super(pos, [...steps]);
                 this.steps = steps;
                 this.scope = new Scope();
             }
@@ -2629,10 +2634,9 @@ var ZLang;
         }
         Nodes.Program = Program;
         class DomainNode extends ExpressionNode {
-            constructor(value, pos) {
-                super([value]);
+            constructor(pos, value) {
+                super(pos, [value]);
                 this.value = value;
-                this.pos = pos;
             }
             get domain() {
                 return this.value.domain;
@@ -2652,8 +2656,8 @@ var ZLang;
         }
         Nodes.StatementNode = StatementNode;
         class DeclareStatement extends StatementNode {
-            constructor(type, entries) {
-                super([type, ...entries.flat()]);
+            constructor(pos, type, entries) {
+                super(pos, [type, ...entries.flat()]);
                 this.type = type;
                 this.entries = entries;
             }
@@ -2675,8 +2679,8 @@ var ZLang;
         }
         Nodes.DeclareStatement = DeclareStatement;
         class AssignmentStatement extends StatementNode {
-            constructor(ident, value) {
-                super([ident, value]);
+            constructor(pos, ident, value) {
+                super(pos, [ident, value]);
                 this.ident = ident;
                 this.value = value;
             }
@@ -2692,8 +2696,8 @@ var ZLang;
         }
         Nodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
-            constructor(predicate, btrue, bfalse) {
-                super([predicate, btrue, ...(bfalse !== undefined ? [bfalse] : [])]);
+            constructor(pos, predicate, btrue, bfalse) {
+                super(pos, [predicate, btrue, ...(bfalse !== undefined ? [bfalse] : [])]);
                 this.predicate = predicate;
                 this.btrue = btrue;
                 this.bfalse = bfalse;
@@ -2704,8 +2708,8 @@ var ZLang;
         }
         Nodes.IfStatement = IfStatement;
         class DoWhileStatement extends StatementNode {
-            constructor(body, predicate) {
-                super([body, predicate]);
+            constructor(pos, body, predicate) {
+                super(pos, [body, predicate]);
                 this.body = body;
                 this.predicate = predicate;
             }
@@ -2715,8 +2719,8 @@ var ZLang;
         }
         Nodes.DoWhileStatement = DoWhileStatement;
         class WhileStatement extends StatementNode {
-            constructor(predicate, body) {
-                super([predicate, body]);
+            constructor(pos, predicate, body) {
+                super(pos, [predicate, body]);
                 this.predicate = predicate;
                 this.body = body;
             }
@@ -2726,8 +2730,8 @@ var ZLang;
         }
         Nodes.WhileStatement = WhileStatement;
         class EmitStatement extends StatementNode {
-            constructor(data) {
-                super((function () {
+            constructor(pos, data) {
+                super(pos, (function () {
                     switch (data.type) {
                         case 'value': return [data.value];
                         case 'string': return [data.index, data.length];
@@ -2745,8 +2749,8 @@ var ZLang;
         }
         Nodes.EmitStatement = EmitStatement;
         class RandStatement extends StatementNode {
-            constructor(ident, min, max) {
-                super([...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
+            constructor(pos, ident, min, max) {
+                super(pos, [...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
                 this.ident = ident;
                 this.min = min;
                 this.max = max;
@@ -2760,8 +2764,8 @@ var ZLang;
         }
         Nodes.RandStatement = RandStatement;
         class StatementGroup extends StatementNode {
-            constructor(statements) {
-                super([...statements]);
+            constructor(pos, statements) {
+                super(pos, [...statements]);
                 this.statements = statements;
                 this.scope = new Scope();
             }
@@ -2798,21 +2802,21 @@ var ZLang;
         'SUM|PRODUCT|BEXPR'(node) {
             if (node.length === 1)
                 return;
-            return new Nodes.BinaryOp(node.at(1).value, node.shift(), node.pop());
+            return new Nodes.BinaryOp(node.pos, node.at(1).value, node.shift(), node.pop());
         },
         UNARY(node) {
             if (node.length === 1)
                 return;
-            return new Nodes.UnaryOp(node.at(0).value, node.pop());
+            return new Nodes.UnaryOp(node.pos, node.at(0).value, node.pop());
         },
         CAST(node) {
-            return new Nodes.CastNode(new Nodes.TypeNode(node.at(0).value), node.splice(2, 1)[0]);
+            return new Nodes.CastNode(node.pos, new Nodes.TypeNode(node.at(0).pos, node.at(0).value), node.splice(2, 1)[0]);
         },
         // Functions
         FUNSIG(node) {
             const [type, ident, _lraren, ...parameters] = node.splice(0, node.length);
             const _rparen = parameters.pop();
-            return new Nodes.FunctionHeaderNode(ident, type, parameters);
+            return new Nodes.FunctionHeaderNode(type.pos, ident, type, parameters);
         },
         PARAMLIST(node) {
             if (node.length === 1)
@@ -2820,18 +2824,18 @@ var ZLang;
             if (node.length === 2) {
                 const [type, ident] = node.splice(0, node.length);
                 // (type as Nodes.TypeNode).meta.const = true;
-                return new Nodes.ParameterNode(type, ident);
+                return new Nodes.ParameterNode(node.pos, type, ident);
             }
             else {
                 const [type, ident, _comma, ...rest] = node.splice(0, node.length);
                 // (type as Nodes.TypeNode).meta.const = true;
-                return [new Nodes.ParameterNode(type, ident), ...rest];
+                return [new Nodes.ParameterNode(node.pos, type, ident), ...rest];
             }
         },
         FUNCALL(node) {
             const [ident, _lparen, ...args] = node.splice(0, node.length);
             const _rparen = args.pop();
-            return new Nodes.FunctionCallNode(ident, args);
+            return new Nodes.FunctionCallNode(node.pos, ident, args);
         },
         ARGLIST(node) {
             if (node.length === 1)
@@ -2841,15 +2845,15 @@ var ZLang;
         },
         FUNCTION(node) {
             const [header, _returns, ident, _assign, expr, body] = node.splice(0, node.length);
-            return new Nodes.FunctionNode(header, ident, expr, body);
+            return new Nodes.FunctionNode(node.pos, header, ident, expr, body);
         },
         // Types
         'OTHERTYPE|FUNTYPE'(node) {
-            return new Nodes.TypeNode(node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' || node.at(-1).value === 'string' });
+            return new Nodes.TypeNode(node.pos, node.at(-1).value, { const: node.length > 1 && node.at(0).value === 'const' || node.at(-1).value === 'string' });
         },
         // General simplification
         MODULE(node) {
-            return new Nodes.Program(node.splice(0, node.length - 1));
+            return new Nodes.Program(node.pos, node.splice(0, node.length - 1));
         },
         MODPARTS(node) {
             return node.splice(0, node.length).filter(n => n instanceof ParseTreeTokenNode ? n.name !== 'sc' : true);
@@ -2860,7 +2864,7 @@ var ZLang;
             }
             else if (node.length === 4) {
                 const pos = { ...node.at(0).pos };
-                return new Nodes.DomainNode(node.splice(2, 1)[0], pos);
+                return new Nodes.DomainNode(node.pos, node.splice(2, 1)[0], pos);
             }
         },
         BSTMT(node) {
@@ -2872,18 +2876,18 @@ var ZLang;
             return node.splice(0, node.length);
         },
         BRACESTMTS(node) {
-            return new Nodes.StatementGroup(node.splice(1, node.length - 2));
+            return new Nodes.StatementGroup(node.pos, node.splice(1, node.length - 2));
         },
         SOLOSTMT(node) {
-            return new Nodes.StatementGroup(node.splice(0, 1));
+            return new Nodes.StatementGroup(node.pos, node.splice(0, 1));
         },
         // Assignment and declaration
         ASSIGN(node) {
             const [ident, _assign, value] = node.splice(0, node.length);
-            return new Nodes.AssignmentStatement(ident, value);
+            return new Nodes.AssignmentStatement(node.pos, ident, value);
         },
         'GFTDECLLIST|GOTDECLLIST|DECLLIST'(node) {
-            return new Nodes.DeclareStatement(node.splice(0, 1)[0], node.splice(0, node.length).map(function (tree) {
+            return new Nodes.DeclareStatement(node.pos, node.splice(0, 1)[0], node.splice(0, node.length).map(function (tree) {
                 if (tree instanceof Nodes.AssignmentStatement) {
                     return tree.destroy();
                 }
@@ -2898,35 +2902,35 @@ var ZLang;
         // Control Statements
         WHILE(node) {
             const [_while, _lparen, predicate, _rparen, body] = node.splice(0, node.length);
-            return new Nodes.WhileStatement(predicate, body);
+            return new Nodes.WhileStatement(node.pos, predicate, body);
         },
         DOWHILE(node) {
             const [_do, body, _while, _lparen, predicate, _rparen, _sc] = node.splice(0, node.length);
-            return new Nodes.DoWhileStatement(body, predicate);
+            return new Nodes.DoWhileStatement(node.pos, body, predicate);
         },
         IF(node) {
             const [_if, _rparen, predicate, _lparen, btrue] = node.splice(0, node.length);
-            return new Nodes.IfStatement(predicate, btrue);
+            return new Nodes.IfStatement(node.pos, predicate, btrue);
         },
         IFELSE(node) {
             const [_if, _lparen, predicate, _rparen, btrue, _else, bfalse] = node.splice(0, node.length);
-            return new Nodes.IfStatement(predicate, btrue, bfalse);
+            return new Nodes.IfStatement(node.pos, predicate, btrue, bfalse);
         },
         // Special Statements
         EMIT(node) {
             switch (node.length) {
                 case 2:
-                    return new Nodes.EmitStatement({
+                    return new Nodes.EmitStatement(node.pos, {
                         type: 'symbtable'
                     });
                 case 4:
-                    return new Nodes.EmitStatement({
+                    return new Nodes.EmitStatement(node.pos, {
                         type: 'value',
                         value: node.splice(2, 1)[0]
                     });
                 case 6:
                     const [_emit, ident, _comma, index, __comma, length] = node.splice(0, node.length);
-                    return new Nodes.EmitStatement({
+                    return new Nodes.EmitStatement(node.pos, {
                         type: 'string',
                         ident: ident,
                         index: index,
@@ -2938,27 +2942,27 @@ var ZLang;
             switch (node.length) {
                 case 2: {
                     const [_rand, ident] = node.splice(0, node.length);
-                    return new Nodes.RandStatement(ident);
+                    return new Nodes.RandStatement(node.pos, ident);
                 }
                 case 6: {
                     const [_rand, intIdent, _comma, min, __comma, max] = node.splice(0, node.length);
-                    return new Nodes.RandStatement(intIdent, min, max);
+                    return new Nodes.RandStatement(node.pos, intIdent, min, max);
                 }
             }
         }
     });
     ZLang.tt = new Parsing.TokenTransformer({
         floatval(node) {
-            return new Nodes.FloatLiteral(+node.value);
+            return new Nodes.FloatLiteral(node.pos, +node.value);
         },
         intval(node) {
-            return new Nodes.IntLiteral(+node.value);
+            return new Nodes.IntLiteral(node.pos, +node.value);
         },
         stringval(node) {
-            return new Nodes.StringLiteral(node.value);
+            return new Nodes.StringLiteral(node.pos, node.value);
         },
         id(node) {
-            return new Nodes.IdentifierNode(node.value);
+            return new Nodes.IdentifierNode(node.pos, node.value);
         }
     });
     console.debug('Building Parser...');
@@ -3028,10 +3032,10 @@ var ZLang;
         get n() {
             return this.parent ? this.parent.n + 1 : 0;
         }
-        declare(name, type, dtls) {
+        declare(name, type, pos, dtls) {
             if (this.has(name))
                 throw new Parsing.SemanticError(`Cannot redeclare '${name}'`);
-            this.data.set(name, { name, type, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
+            this.data.set(name, { name, type, pos, used: false, initialized: false, ...(dtls !== null && dtls !== void 0 ? dtls : {}) });
         }
         has(name) {
             return this.data.has(name);
@@ -3050,7 +3054,7 @@ var ZLang;
         entries() {
             return [
                 ...(this.parent ? this.parent.entries() : []),
-                ...this.data.values().map(d => [this.n, d.type, d.name].join(','))
+                ...this.data.values().map(d => { var _a, _b; return [this.n, d.type, d.name, (_a = d.pos) === null || _a === void 0 ? void 0 : _a.line, (_b = d.pos) === null || _b === void 0 ? void 0 : _b.col].join(','); })
             ];
         }
         toString() {
@@ -3078,7 +3082,7 @@ var ZLang;
                 }
             }
             function declareFunction(header) {
-                getEnclosingScope(node).declare(header.name, new ZFunctionType(header.rtype.ztype, header.parameters.map(p => p.type.ztype)));
+                getEnclosingScope(node).declare(header.name, new ZFunctionType(header.rtype.ztype, header.parameters.map(p => p.type.ztype)), header.pos);
             }
             if (node instanceof Nodes.FunctionHeaderNode) {
                 declareFunction(node);
@@ -3091,15 +3095,15 @@ var ZLang;
                 scope.mark(node.header.ident.name, { initialized: true });
                 V.add(node.header);
                 V.add(node.rvar);
-                for (const { ident: { name }, type: { ztype } } of node.header.parameters) {
-                    node.scope.declare(name, ztype, { initialized: true });
+                for (const p of node.header.parameters) {
+                    node.scope.declare(name, p.type.ztype, p.pos, { initialized: true });
                 }
-                node.scope.declare(node.rvar.name, node.header.rtype.ztype, { initialized: true });
+                node.scope.declare(node.rvar.name, node.header.rtype.ztype, node.rvar.pos, { initialized: true });
             }
             else if (node instanceof Nodes.DeclareStatement) {
                 const scope = getEnclosingScope(node);
                 for (const [ident, value] of node.entries) {
-                    scope.declare(ident.name, node.type.ztype);
+                    scope.declare(ident.name, node.type.ztype, ident.pos);
                     if (value !== undefined) {
                         scope.mark(ident.name, { initialized: true });
                     }
@@ -3134,8 +3138,8 @@ async function dump(name, node, { format = 'png' } = {}) {
 }
 console.debug('Parsing...');
 const tokens = system.readTextFileSync(system.args[1]).trim().split('\n').filter(x => x.trim()).map(x => x.trim().split(' ')).map(([name, value, line, col]) => new Token(name, alphaDecode(value), { line: +line, col: +col }));
-console.debug('Done!');
 const ast = ZLang.parseTokens(tokens);
+console.debug('Done!');
 function output(...args) {
     const text = ['OUTPUT'];
     for (const arg of args) {

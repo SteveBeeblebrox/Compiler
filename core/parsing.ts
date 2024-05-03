@@ -6,10 +6,18 @@
 namespace Parsing {
     abstract class AbstractParseTree<NameType extends string = string> extends Tree {
         constructor(public readonly name?: NameType) {super();}
+        abstract get pos(): Position | undefined;
     }
 
     export class ParseTreeNode extends AbstractParseTree<NonTerminal> implements ArrayTreeMethods {
-        constructor(name?: NonTerminal) {super(name);}
+        constructor(name?: NonTerminal) {
+            super(name);
+        }
+
+        public get pos() {
+            return (this.at(0) as AbstractParseTree)?.pos;
+        }
+
         public override get parent() {
             return super.parent as ParseTree;
         }
@@ -41,17 +49,27 @@ namespace Parsing {
     }
 
     export class ParseTreeLambdaNode extends AbstractParseTree<typeof CFG.LAMBDA_CHARACTER> {
-        constructor() {super(CFG.LAMBDA_CHARACTER);}
+        public readonly pos: undefined;
+        constructor() {
+            super(CFG.LAMBDA_CHARACTER);
+        }
         readonly [Graphviz.label] = CFG.LAMBDA_CHARACTER;
     }
 
     export class ParseTreeEOFNode extends AbstractParseTree<typeof CFG.EOF_CHARACTER> {
-        constructor() {super(CFG.EOF_CHARACTER);}
+        public readonly pos: undefined;
+        constructor() {
+            super(CFG.EOF_CHARACTER);
+        }
         readonly [Graphviz.label] = CFG.EOF_CHARACTER;
     }
 
     export class ParseTreeTokenNode extends AbstractParseTree<Terminal> {
-        constructor(name: Terminal, public value?: string, public pos?: Position) {super(name);}
+        public readonly pos: Position | undefined;
+        constructor(name: Terminal, public value?: string, pos?: Position) {
+            super(name);
+            this.pos = pos;
+        }
         get [Graphviz.label]() {
             return this.name === this.value ? this.name : `${this.name}:${this.value}`;
         }
@@ -61,8 +79,8 @@ namespace Parsing {
     }
 
     type ParseTreeLeaf = Tree & Omit<ParseTreeLambdaNode | ParseTreeEOFNode | ParseTreeTokenNode, typeof Graphviz.label>;
-    export type InnerParseTree = NestedTree<ParseTreeNode, ParseTreeNode | ParseTreeLeaf, false> & {parent?: ParseTree};
-    export type ParseTree = InnerParseTree | ParseTreeLeaf; 
+    export type InnerParseTree = ParseTreeNode;//NestedTree<ParseTreeNode, ParseTreeNode | ParseTreeLeaf, false> & {parent?: ParseTree};
+    export type ParseTree = ParseTreeNode;//InnerParseTree | ParseTreeLeaf; 
 
     export type ParseResult<ASTNodeType extends Tree = never> = ASTNodeType | StrayTree<ParseTree>;
 
