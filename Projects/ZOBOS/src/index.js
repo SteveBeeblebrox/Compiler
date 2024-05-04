@@ -3650,7 +3650,7 @@ var ZLang;
                 return this.data.type === 'symbtable' ? 'Emit Symtable' : 'Emit';
             }
             get [Graphviz.children]() {
-                return [...(this.data.type === 'string' ? [['id', this.data.ident]] : []), ...Object.entries(this.data)];
+                return [...Object.entries(this.data)];
             }
         }
         Nodes.EmitStatement = EmitStatement;
