@@ -20,14 +20,13 @@ namespace Signature {
         includeFunctions: boolean,
         preserveReferences: boolean
     }>;
-    export type SignableObject<T=any> = {[toSignable]: (this: T, options: SignatureOptions)=>SignableValue};
+    export type SignableObject<T=any> = {[toSignable]: (this: T, options: SignatureOptions, transform: (SignableValue)=>JSONValue)=>SignableValue};
     export type SignableValue = number | boolean | string | null | bigint | undefined | symbol | ((args: any[])=>any) | SignableValue[] | {[key: string]: SignableValue} | SignableObject;
 
     export const toSignable = Symbol('Signature.toSignable');
 
     export function create(value: SignableValue, options: SignatureOptions = {}): string {
         function createSignature(value: SignableValue, options: SignatureOptions = {}): string {
-            type JSONValue = number | boolean | string | null | JSONValue[] | {[key: string]: JSONValue};
             const references = new Map<object| Function,PropertyKey[]>();
             function getSymbolEntries<T extends {[key: PropertyKey]: any}>(obj: T): [symbol, T[symbol]][] {
                 return Object.getOwnPropertySymbols(obj).map(sym => [sym,obj[sym]])
@@ -45,7 +44,7 @@ namespace Signature {
                     if(Array.isArray(value)) {
                         return value.filter(value => typeof value !== 'function' || options.includeFunctions).map((value,index) => transform(value,[...path,`${index}`],options));
                     } else if(typeof value === 'object' && value !== null) {
-                        if(toSignable in value) return `@${Object.getPrototypeOf(value).constructor.name}:${createSignature(value[toSignable](options),{...options,space:0})}`;
+                        if(toSignable in value) return `@${Object.getPrototypeOf(value).constructor.name}:${createSignature(value[toSignable](options,value=>transform(value,[...path],{...options,space:0})),{...options,space:0})}`;
                         const entries = [...getSymbolEntries(value),...Object.entries(value)].map(([key,value])=>[transform(key, [...path,key], options),transform(value, [...path,key], options)]);
                         return Object.fromEntries(options?.sortKeys ? entries.sort() : entries);
                     } else if(typeof value === 'bigint') {
@@ -67,7 +66,7 @@ namespace Signature {
                     } else if(typeof value === 'function') {
                         return options.includeFunctions ? `@function:${value}` : void(0) as any;
                     } else {
-                        return value;
+                        return value as JSONValue;
                     }
                 } finally {
                     if(typeof value === 'object' && value !== null && !options.preserveReferences) {
@@ -129,12 +128,11 @@ namespace Signature {
         get [Symbol.toStringTag](): string {
             return 'SignatureMap';
         }
-        [Signature.toSignable](options: Partial<{ sortKeys: boolean; space: string|number; includeFunctions: boolean; }>) {
-            return (options.sortKeys ? [...this.entries()].sort() : [...this.entries()]) as Signature.SignableValue[][];
+        [Signature.toSignable](options: Partial<{ sortKeys: boolean; space: string|number; includeFunctions: boolean;}>, transform: (SignableValue)=>JSONValue) {
+            return (options.sortKeys ? [...this.entries()].map(transform).sort() : [...this.entries()]) as Signature.SignableValue[][];
         }
     }
 
-    // Note, does not yet have utility methods like union, etc...
     export class SignatureSet<T extends Signature.SignableValue> implements Set<T>, Signature.SignableObject {
         private readonly base = new Map<ReturnType<typeof Signature.create>,T>();
         constructor(iterable?: Iterable<T> | null | undefined) {
@@ -152,7 +150,9 @@ namespace Signature {
         delete(value: T): boolean {
             return this.base.delete(Signature.create(value));
         }
-        forEach(callbackfn: (value: T,value2: T,set: Set<T>) => void,thisArg?: any): void {
+        // Different callback than pollyfill
+        // @ts-expect-error
+        forEach(callbackfn: (value: T,value2: T,set: SignatureSet<T>) => void,thisArg?: any): void {
             if (thisArg !== undefined) {
                 callbackfn = callbackfn.bind(thisArg);
             }
@@ -179,21 +179,23 @@ namespace Signature {
         get [Symbol.toStringTag](): string {
             return 'SignatureSet';
         }
-        [Signature.toSignable](options: Partial<{ sortKeys: boolean; space: string|number; includeFunctions: boolean; }>) {
-            return (options.sortKeys ? [...this.values()].sort() : [...this.values()]);
+        [Signature.toSignable](options: Partial<{ sortKeys: boolean; space: string|number; includeFunctions: boolean; }>, transform: (SignableValue)=>JSONValue) {
+            return (options.sortKeys ? [...this.values()].map(transform).sort() : [...this.values()]);
         }
     }
 }
-const {SignatureMap,SignatureSet} = Signature;
+
+import SignatureSet = Signature.SignatureSet;
+import SignatureMap = Signature.SignatureMap;
 
 declare interface Set<T> extends Signature.SignableObject<Set<T>> {}
-Set.prototype[Signature.toSignable] = function(this: Set<any>, options: Signature.SignatureOptions) {
-    return (options.sortKeys ? [...this.values()].sort() : [...this.values()]);
+Set.prototype[Signature.toSignable] = function(this: Set<any>, options: Signature.SignatureOptions, transform: (SignableValue)=>JSONValue) {
+    return (options.sortKeys ? [...this.values()].map(transform).sort() : [...this.values()]);
 }
 
 declare interface Map<K,V> extends Signature.SignableObject<Map<K,V>> {}
-Map.prototype[Signature.toSignable] = function(this: Map<any,any>, options: Signature.SignatureOptions) {
-    return (options.sortKeys ? [...this.entries()].sort() : [...this.entries()]);
+Map.prototype[Signature.toSignable] = function(this: Map<any,any>, options: Signature.SignatureOptions, transform: (SignableValue)=>JSONValue) {
+    return (options.sortKeys ? [...this.entries()].map(transform).sort() : [...this.entries()]);
 }
 
 declare interface Date extends Signature.SignableObject<Date> {}
@@ -223,19 +225,20 @@ RegExp.prototype[Signature.toSignable] = function(this: RegExp) {
 
 ///#include <compat.ts>
 namespace Signature {
-    export declare interface SignatureSet<T> {
-        union: typeof SetPolyfill.union<T>;
-        intersection: typeof SetPolyfill.intersection<T>;
-        difference: typeof SetPolyfill.difference<T>;
-        symmetricDifference: typeof SetPolyfill.symmetricDifference<T>;
-        isSubsetOf: typeof SetPolyfill.isSubsetOf<T>;
-        isSupersetOf: typeof SetPolyfill.isSupersetOf<T>;
-        isDisjointFrom: typeof SetPolyfill.isDisjointFrom<T>;
+    type WithReturnAdjustment<T extends SignableValue,F> = F extends (...args: infer Args) => Set<T> ? (...args: Args) => SignatureSet<T> : F
+    export declare interface SignatureSet<T extends Signature.SignableValue> {
+        union: WithReturnAdjustment<T,typeof SetPolyfill.union<T>>;
+        intersection: WithReturnAdjustment<T,typeof SetPolyfill.intersection<T>>;
+        difference: WithReturnAdjustment<T,typeof SetPolyfill.difference<T>>;
+        symmetricDifference: WithReturnAdjustment<T,typeof SetPolyfill.symmetricDifference<T>>;
+        isSubsetOf: WithReturnAdjustment<T,typeof SetPolyfill.isSubsetOf<T>>;
+        isSupersetOf: WithReturnAdjustment<T,typeof SetPolyfill.isSupersetOf<T>>;
+        isDisjointFrom: WithReturnAdjustment<T,typeof SetPolyfill.isDisjointFrom<T>>;
 
-        takeUnion: typeof InPlaceSetPolyfill.takeUnion<T>;
-        takeIntersection: typeof InPlaceSetPolyfill.takeIntersection<T>;
-        takeDifference: typeof InPlaceSetPolyfill.takeDifference<T>;
-        takeSymmetricDifference: typeof InPlaceSetPolyfill.takeSymmetricDifference<T>;
+        takeUnion: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeUnion<T>>;
+        takeIntersection: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeIntersection<T>>;
+        takeDifference: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeDifference<T>>;
+        takeSymmetricDifference: WithReturnAdjustment<T,typeof InPlaceSetPolyfill.takeSymmetricDifference<T>>;
     }
 }
 // The pollyfill is typed with this: Set<T> but will also work for this: SignatureSet<T>

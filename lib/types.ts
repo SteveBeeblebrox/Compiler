@@ -17,9 +17,18 @@ declare namespace OpaqueTypes {
 }
 type Opaque<T,Ident> = OpaqueTypes.Opaque<T,Ident>;
 
-type Stack<T> = {
+type Stack<T=any> = {
+    at(n: -1): T;
     push: Array<T>['push'],
     pop: Array<T>['pop'],
+    length: Array<T>['length'],
+    [Symbol.iterator]: Array<T>[typeof Symbol.iterator]
+}
+
+type Queue<T> = {
+    at(n: 0): T;
+    unshift: Array<T>['unshift'],
+    shift: Array<T>['shift'],
     length: Array<T>['length'],
     [Symbol.iterator]: Array<T>[typeof Symbol.iterator]
 }
@@ -30,3 +39,6 @@ type JSONArrray = JSONValue[];
 type JSONValue = JSONPrimitive | JSONArrray | JSONObject
 
 type Constructor<ParameterTypes extends any[],ThisType>=new(...args: ParameterTypes)=>ThisType;
+
+type MapKey<T> = T extends Map<infer K, any> ? K : never;
+type MapValue<T> = T extends Map<any, infer V> ? V : never;

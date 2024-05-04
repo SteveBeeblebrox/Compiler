@@ -138,7 +138,7 @@ declare interface Set<T> {
 installPolyfill(Set,SetPolyfill);
 
 // Nonstandard in-place set methods
-
+// Don't use these while iterating the set
 namespace InPlaceSetPolyfill {
     function takeInPlace(f: typeof SetPolyfill.union): typeof SetPolyfill.union {
         return function<T>(this: Set<T>, other: SetPolyfill.SetLike<T>) {

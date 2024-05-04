@@ -14,7 +14,7 @@ class CFG {
     public static readonly LAMBDA_CHARACTER = '\u03bb';
     constructor(
         public readonly startingSymbol: NonTerminal,
-        private readonly rules: Map<NonTerminal,CFGRuleBody[]>,
+        private readonly rules: Map<NonTerminal,CFG.CFGRuleBody[]>,
         private readonly terminals: Set<Terminal>
     ) {}
 
@@ -30,7 +30,11 @@ class CFG {
         return [...new Set(this.rules.keys())];
     }
 
-    public isStartingRule(rule: NonTerminal | CFGRule) {
+    public getGrammarSymbols(): [typeof CFG.EOF, ...(NonTerminal | Terminal)[]] {
+        return [CFG.EOF, ...this.getTerminals(), ...this.getNonTerminals()];
+    }
+
+    public isStartingRule(rule: NonTerminal | CFG.CFGRule) {
         if(typeof rule !== 'string') return this.isStartingRule(rule[0]);
         return rule === this.startingSymbol;
     }
@@ -51,11 +55,11 @@ class CFG {
         return string === CFG.LAMBDA_CHARACTER;
     }
 
-    public static isNonTerminal(string: string): string is NonTerminal {
-        return !this.isEOF(string) && !this.isLambda(string) && string.toLowerCase() !== string && string.length >= 1;
+    public static isNonTerminal(arg: any): arg is NonTerminal {
+        return typeof arg === 'string' && !this.isEOF(arg) && !this.isLambda(arg) && arg.toLowerCase() !== arg && arg.length >= 1;
     }
 
-    public derivesToLambda(L: NonTerminal | Terminal, T: Stack<CFGRuleBody> = []): boolean {
+    public derivesToLambda(L: NonTerminal | Terminal, T: Stack<CFG.CFGRuleBody> = []): boolean {
         const P = this.rules;
         for(const p of (P.get(L as NonTerminal) ?? [])) {
             if([...T].includes(p)) {
@@ -96,7 +100,7 @@ class CFG {
         const F = new Set<Terminal>();
         if(!T.has(X)) {
             T.add(X);
-            for(const p of (P.get(X) ?? [] as CFGRuleBody[][]).map(x=>[X,x])) {
+            for(const p of (P.get(X) ?? [] as CFG.CFGRuleBody[][]).map(x=>[X,x])) {
                 const [lhs,rhs] = p;
                 const [G,I] = this.firstSet(this.startingSymbol === X ? [...rhs, CFG.EOF] : rhs,T);
                 F.takeUnion(G);
@@ -111,55 +115,59 @@ class CFG {
         return [F,T];
     }
     
-    public followSet(A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
-        const P = this.rules;
-    
-        if(T.has(A)) {
-            return [new Set(), T];
-        }
-    
-        T.add(A);
+    public followSet(A: NonTerminal, T: Set<NonTerminal> = new Set()): Set<Terminal> {
+        const followSet = (function(A: NonTerminal, T: Set<NonTerminal> = new Set()): [Set<Terminal>,Set<NonTerminal>] {
+            const P = this.rules;
         
-        const F = new Set<Terminal>();
+            if(T.has(A)) {
+                return [new Set(), T];
+            }
         
-        for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [NonTerminal, CFGRuleBody]] : []))) {
-            const [lhs,rhs] = p;
-            for(const [i,gamma] of [...rhs.entries()].filter(([_,x])=>x===A)) {
-                const pi = rhs.slice(i+1);
-    
-                if(pi.length) {
-                    const [G,I] = this.firstSet(pi, new Set());
-                    F.takeUnion(G);
-                }
-    
-                if(!pi.length || (
-                    pi.every(x=>CFG.isNonTerminal(x) && this.derivesToLambda(x))
-                )) {
-                    if(this.isStartingRule(lhs)) {
-                        F.add(CFG.EOF);
+            T.add(A);
+            
+            const F = new Set<Terminal>();
+            
+            for(const p of [...P.entries()].flatMap(([sym,rs])=>rs.flatMap(rule=>rule.includes(A) ? [[sym,rule] as [NonTerminal, CFG.CFGRuleBody]] : []))) {
+                const [lhs,rhs] = p;
+                for(const [i,gamma] of [...rhs.entries()].filter(([_,x])=>x===A)) {
+                    const pi = rhs.slice(i+1);
+        
+                    if(pi.length) {
+                        const [G,I] = this.firstSet(pi, new Set());
+                        F.takeUnion(G);
                     }
-                    const [G,I] = this.followSet(lhs,T);
-                    F.takeUnion(G);
+        
+                    if(!pi.length || (
+                        pi.every(x=>CFG.isNonTerminal(x) && this.derivesToLambda(x))
+                    )) {
+                        if(this.isStartingRule(lhs)) {
+                            F.add(CFG.EOF);
+                        }
+                        const [G,I] = followSet(lhs,T);
+                        F.takeUnion(G);
+                    }
                 }
             }
-        }
-    
-        return [F,T];
+        
+            return [F,T];
+        }).bind(this);
+
+        return followSet(A,T)[0];
     }
     
-    public predictSet([lhs,rhs]: CFGRule): Set<Terminal> {
+    public predictSet([lhs,rhs]: CFG.CFGRule): Set<Terminal> {
         const F = this.firstSet(rhs)[0];
         if(rhs.every(x=>this.derivesToLambda(x))) {
-            [...this.followSet(lhs)[0].values()].forEach(x=>F.add(x));
+            [...this.followSet(lhs).values()].forEach(x=>F.add(x));
         }
         return F;
     }
 
-    public getRuleList(): CFGRule[] {
-        return this.rules.entries().flatMap(([lhs,rules])=>rules.flatMap(rhs => [[lhs,rhs]])).toArray() as CFGRule[];
+    public getRuleList(): CFG.CFGRule[] {
+        return this.rules.entries().flatMap(([lhs,rules])=>rules.flatMap(rhs => [[lhs,rhs]])).toArray() as CFG.CFGRule[];
     }
 
-    public getRuleListFor(lhs: NonTerminal): CFGRule[] {
+    public getRuleListFor(lhs: NonTerminal): CFG.CFGRule[] {
         return this.rules.get(lhs)!.map(rhs => [lhs,rhs]);
     }
 
@@ -169,7 +177,7 @@ class CFG {
         return name;
     }
 
-    public stringifyRule(rule: CFGRule, lhs = true): string {
+    public stringifyRule(rule: CFG.CFGRule, lhs = true): string {
         if(lhs) return `${rule[0]} -> ${this.stringifyRule(rule, false)}`;
         else return (rule[1].length ? rule[1].join(' ') : CFG.LAMBDA_CHARACTER) + (this.isStartingRule(rule) ? ' ' + CFG.EOF_CHARACTER : '');
     }
@@ -180,6 +188,13 @@ class CFG {
                 ? CFG.EOF_CHARACTER
                 : `'${JSON.stringify(c).slice(1,-1).replace(/'/g,'\\\'').replace(/\\"/g,'"')}'`
         ).toArray().join(', ')}}`;
+    }
+
+    public getRuleNumber(rule: CFG.CFGRule): number {
+        if(this.isStartingRule(rule[0])) {
+            rule = [rule[0],rule[1].filter(x=>x !== CFG.EOF)];
+        }
+        return this.getRuleList().findIndex(([lhs, rhs]) => rule[0] === lhs && rule[1].length === rhs.length && rule[1].every((p,i)=>p===rhs[i]));
     }
 
     public static fromString(text: string, allowComments = true) {
@@ -199,7 +214,7 @@ class CFG {
             tokens.push(...line.split(' ').filter(x=>x));
         }
 
-        const rules: Map<NonTerminal,CFGRuleBody[]> = new Map();
+        const rules: Map<NonTerminal,CFG.CFGRuleBody[]> = new Map();
         let startingSymbol: NonTerminal | null = null;
         const terminals: Set<Terminal> = new Set();
     
@@ -244,12 +259,20 @@ class CFG {
     
         return new CFG(startingSymbol, rules, terminals);
     }
+
+    public cfsm() {
+        return new SLR1.CFSM(this);
+    }
 }
 
 type NonTerminal = Opaque<string,'NonTerminal'>;
 type Terminal = Opaque<string,'Terminal'>;
-type CFGRuleBody = (NonTerminal|Terminal)[];
-type CFGRule = [NonTerminal, CFGRuleBody];
+namespace CFG {
+    export type CFGRuleBody = (NonTerminal|Terminal)[];
+    export type CFGRule = [NonTerminal, CFGRuleBody];
+    export type GrammarSymbol = Terminal | NonTerminal | typeof CFG.EOF;
+}
+
 
 ///#if __MAIN__
 

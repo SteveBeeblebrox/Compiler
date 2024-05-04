@@ -1,0 +1,1 @@
+`zlang.json.lz` and `zlex.json.lz` contain precompiled tables to speed up execution. If you delete these, ZOBOS will recreate them on the next run, but it may take a few minutes.

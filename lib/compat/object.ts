@@ -9,6 +9,7 @@ installPolyfill(Object,ObjectPolyfill);
 declare interface ObjectConstructor {
     groupBy<T,Key extends PropertyKey>(values: T[], callback: (element: T,index: number)=>Key): {[key in Key]: T[]};
     hasOwn(o: object, v: PropertyKey): boolean;
+    fromEntries<T = any>(entries: Iterable<readonly [PropertyKey, T]>): {[k: string]: T};
 }
 
 namespace ObjectConstructorPolyfill {
@@ -21,6 +22,13 @@ namespace ObjectConstructorPolyfill {
     }
     export function hasOwn(o: object, v: PropertyKey): boolean {
         return Object.prototype.hasOwnProperty.call(o,v);
+    }
+    export function fromEntries<T = any>(entries: Iterable<readonly [PropertyKey, T]>): {[k: string]: T} {
+        const obj = {};
+        for(const [key,value] of entries) {
+            obj[key] = value;
+        }
+        return obj;
     }
 }
 
