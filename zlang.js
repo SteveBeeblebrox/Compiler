@@ -4057,7 +4057,7 @@ var ZLang;
                 V.add(node.header);
                 V.add(node.rvar);
                 for (const p of node.header.parameters) {
-                    node.scope.declare(p.ident.name, p.type.ztype, p.pos, { initialized: true });
+                    node.scope.declare(p.ident.name, p.type.ztype, p.ident.pos, { initialized: true });
                 }
                 node.scope.declare(node.rvar.name, node.header.rtype.ztype, node.rvar.pos, { initialized: true });
             }

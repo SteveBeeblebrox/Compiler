@@ -728,17 +728,14 @@ namespace ZLang {
         }
 
         public dir(pos?: Position): Declaration[] {
-            const data = new Map();
+            const dir = [];
             for(const [k,v] of this.entries()) {
                 if(pos === undefined || Position.offset(pos,v.pos) <= 0) {
-                    if(data.has(k)) {
-                        data.delete(k);
-                    }
-                    data.set(k,v);
+                    dir.push(v)
                 }
             }
 
-            return [...data.values()];
+            return dir;
         }
     }
 
