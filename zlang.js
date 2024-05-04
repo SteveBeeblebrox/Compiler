@@ -2385,14 +2385,15 @@ var FiniteAutomata;
     }
     FiniteAutomata.NFAContext = NFAContext;
     function toDFA(nfa, ctx) {
+        const lambdaMap = new Map(Object.entries(Object.groupBy(nfa.edges
+            .filter(([from, to, char]) => char === undefined)
+            .map(([from, to]) => [from, to]), ([from]) => from)).map(([k, v]) => [+k, v.map(([from, to]) => to)]));
         function followLambda(S) {
+            var _a;
             S = new Set(S);
             const M = [...S];
-            while (M.length) {
-                const t = M.pop();
-                for (const q of nfa.edges.flatMap(function ([from, to, char]) {
-                    return char === undefined && from === t ? [to] : [];
-                })) {
+            for (const t of M) {
+                for (const q of (_a = lambdaMap.get(t)) !== null && _a !== void 0 ? _a : []) {
                     if (!S.has(q)) {
                         S.add(q);
                         M.push(q);
@@ -2402,15 +2403,11 @@ var FiniteAutomata;
             return sorted(S);
         }
         function followChar(S, c) {
-            const F = new Set();
-            for (const t of S) {
-                for (const q of nfa.edges.flatMap(function ([from, to, char]) {
-                    return char === c && from === t ? [to] : [];
-                })) {
-                    F.add(q);
-                }
-            }
-            return sorted(F);
+            S = new Set(S);
+            const s = sorted(new Set(nfa.edges.flatMap(function ([from, to, char]) {
+                return char === c && S.has(from) ? [to] : [];
+            })));
+            return s;
         }
         function sorted(S) {
             return new Set([...S].sort((a, b) => a - b));
@@ -2891,7 +2888,7 @@ class Scanner {
         const ctx = new FiniteAutomata.NFAContext(alphabet);
         for (const line of lines) {
             const [regex, name, value] = line.split(/\s+/g);
-            // console.debug(`Compiling regex ${name}...`)
+            // console.debug(`Compiling regex ${name}...`);
             const nfa = RegexEngine.compile(regex, alphabet);
             const dfa = FiniteAutomata.optimizeDFA(FiniteAutomata.toDFA(nfa, ctx), ctx);
             patterns.set(name, {
