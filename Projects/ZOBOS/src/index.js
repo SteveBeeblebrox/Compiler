@@ -3647,7 +3647,7 @@ var ZLang;
                 this.data = data;
             }
             get [Graphviz.label]() {
-                return 'Emit';
+                return this.data.type === 'symbtable' ? 'Emit Symtable' : 'Emit';
             }
             get [Graphviz.children]() {
                 return [...(this.data.type === 'string' ? [['id', this.data.ident]] : []), ...Object.entries(this.data)];
