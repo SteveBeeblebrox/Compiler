@@ -666,7 +666,8 @@ namespace ZLang {
         UNKNOWN,
         REIDENT,
         EXPR,
-        CONST
+        CONST,
+        UNDECL
     }
 
     export let raise = function raise(errno: SemanticErrors, message: string, pos?: Position): void | never {
@@ -682,12 +683,16 @@ namespace ZLang {
             return this.parent ? this.parent.n + 1 : 0;
         }
         public declare(name: string, type: ZType | ZFunctionType, pos: Position, dtls?: Partial<DeclarationDetails>) {
-            if(this.hasLocal(name,pos)) ZLang.raise(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
+            if(this.hasLocal(name,pos)) {
+                ZLang.raise(SemanticErrors.REIDENT,`Cannot redeclare '${name}'`,pos);
+                return false;
+            }
             this.data.set(name, {n: this.n,name,type,pos,used:false,initialized:false,...(dtls??{})});
+            return true;
         }
 
         public has(name: string, pos?: Position): boolean {
-            return this.hasLocal(name,pos)|| (this.parent && this.parent.has(name,pos));
+            return this.hasLocal(name,pos) || (this.parent !== undefined && this.parent.has(name,pos));
         }
 
         public hasLocal(name: string, pos?: Position): boolean {
@@ -705,8 +710,13 @@ namespace ZLang {
                 if(dtls.initialized && t instanceof ZFunctionType) {
                     t.const = true;
                 }
+
+                return true;
             } else if(this.parent) {
-                this.parent.mark(name,pos,dtls);
+                return this.parent.mark(name,pos,dtls);
+            } else {
+                ZLang.raise(SemanticErrors.UNDECL,`Variable '${name}' has not been declared`, pos);
+                return false;
             }
         }
 
@@ -757,7 +767,7 @@ namespace ZLang {
             }
 
             function declareFunction(header: Nodes.FunctionHeaderNode) {
-                getEnclosingScope(node).declare(header.name, new ZFunctionType(
+                return getEnclosingScope(node).declare(header.name, new ZFunctionType(
                     header.rtype.ztype,
                     header.parameters.map(p=>p.type.ztype)
                 ),header.pos);
@@ -794,11 +804,19 @@ namespace ZLang {
                 }
             } else if(node instanceof Nodes.AssignmentStatement) {
                 const scope = getEnclosingScope(node);
-                if(scope.get(node.ident.name,node.pos).type.const) ZLang.raise(SemanticErrors.CONST,`Cannot assign to const variable '${node.ident.name}'`,node.pos);
-                scope.mark(node.ident.name,node.pos,{initialized:true});
-                V.add(node.ident);
+                
+                if(!scope.has(node.ident.name,node.pos)) {
+                    ZLang.raise(SemanticErrors.UNDECL,`Variable '${node.ident.name}' has not been declared`, node.pos);
+                    return false;
+                } else if(scope.get(node.ident.name,node.pos).type.const) {
+                    ZLang.raise(SemanticErrors.CONST,`Cannot assign to const variable '${node.ident.name}'`,node.pos);
+                    return false;
+                } else {
+                    scope.mark(node.ident.name,node.pos,{initialized:true});
+                    V.add(node.ident);
+                }
             } else if(node instanceof Nodes.IdentifierNode) {
-                getEnclosingScope(node).mark(node.name,node.pos,{used: true});
+                return getEnclosingScope(node).mark(node.name,node.pos,{used: true});
             }
         },'pre');
     }
@@ -950,9 +968,14 @@ ZLang.visit(ast, function(node) {
             (parent instanceof ZLang.Nodes.FunctionCallNode && parent.ident === node)
             || (parent instanceof ZLang.Nodes.FunctionHeaderNode && parent.ident === node)
         )) {
-            ZLang.raise(SemanticErrors.EXPR, `Function '${node.name}' cannot be treated like a variable!`, parent.pos); // node.pos for ident location, parent.pos for what expects a var
+            ZLang.raise(SemanticErrors.EXPR, `Function '${node.name}' cannot be treated like a variable!`, node.pos); // node.pos for ident location, parent.pos for what expects a var
             return false;
         }
+    }
+
+    if(node instanceof ZLang.Nodes.IdentifierNode) {
+        // issue would have already been raised above, this is just to ensure domain is valid
+        return ZLang.getEnclosingScope(node).has(node.name,node.pos);
     }
 },'post');
 

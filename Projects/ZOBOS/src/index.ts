@@ -91,7 +91,7 @@ namespace ZOBOS {
             output('DOMAIN',node.pos.line,node.pos.col,node.domain);
             return;
         }
-        
+
         // Validate operator types
         // This is not the same as typechecking for assignment
         if(node instanceof ZLang.Nodes.BinaryOp) {
@@ -127,9 +127,14 @@ namespace ZOBOS {
                 (parent instanceof ZLang.Nodes.FunctionCallNode && parent.ident === node)
                 || (parent instanceof ZLang.Nodes.FunctionHeaderNode && parent.ident === node)
             )) {
-                ZLang.raise(SemanticErrors.EXPR, `Function '${node.name}' cannot be treated like a variable!`, parent.pos); // node.pos for ident location, parent.pos for what expects a var
+                ZLang.raise(SemanticErrors.EXPR, `Function '${node.name}' cannot be treated like a variable!`, node.pos); // node.pos for ident location, parent.pos for what expects a var
                 return false;
             }
+        }
+
+        if(node instanceof ZLang.Nodes.IdentifierNode) {
+            // issue would have already been raised above, this is just to ensure domain is valid
+            return ZLang.getEnclosingScope(node)!.has(node.name,node.pos);
         }
     },'post');
     
