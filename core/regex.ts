@@ -174,11 +174,11 @@ namespace RegexEngine {
                     return null;
                 } else {
                     // Squish tree
-                    return node.pop();
+                    return node.pop() as StrayTree<Parsing.ParseTreeNode>;
                 }
             } else if(node.name.endsWith('\'')) {
                 // Simplify generated nodes
-                return node.splice(0,node.length);
+                return node.splice(0,node.length) as StrayTree<Parsing.ParseTreeNode>[];
             }
         },
         Primitive(node) {
@@ -192,11 +192,11 @@ namespace RegexEngine {
             }
         },
         Sequence(node) {
-            if(node.length === 1) return node.shift();
+            if(node.length === 1) return node.shift() as Parsing.ParseTreeNode;
             return new Nodes.SeqNode([...node].flatMap(node => node instanceof Nodes.SeqNode ? node.getChildNodes() : [node as RegexNode]) as RegexNode[]) as StrayTree<Nodes.SeqNode>;
         },
         Alternation(node) {
-            if(node.length === 1) return node.shift();
+            if(node.length === 1) return node.shift() as Parsing.ParseTreeNode;
             const l = node.length;
             const children = node.splice(0,node.length).filter(x=>x instanceof RegexNode) as RegexNode[];
             // Joining n items requires n-1 separators. if 2n-1 != num children, there exists an extra %|
@@ -215,10 +215,10 @@ namespace RegexEngine {
             }
         },
         Primary(node) {
-            return node.length === 1 ? node.shift() : node.splice(1,1);
+            return (node.length === 1 ? node.shift() : node.splice(1,1)) as StrayTree<Parsing.ParseTreeNode>[];
         },
         S(node) {
-            return node.shift();
+            return node.shift() as StrayTree<Parsing.ParseTreeNode>;
         }
     }));
 
