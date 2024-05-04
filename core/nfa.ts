@@ -62,17 +62,13 @@ namespace FiniteAutomata {
             return sorted(S);
         }
         function followChar(S: NFAState[] | Set<NFAState>, c: char): Set<NFAState> {
-            const F = new Set<NFAState>();
-        
-            for(const t of S) {
-                for(const q of nfa.edges.flatMap(function([from,to,char]) {
-                    return char === c && from === t ? [to] : [];
-                })) {
-                    F.add(q);
-                }
-            }
-        
-            return sorted(F);
+            S = new Set(S);
+
+            const s = sorted(new Set(nfa.edges.flatMap(function([from,to,char]) {
+                return char === c && S.has(from) ? [to] : [];
+            })));
+
+            return s;
         }
 
         function sorted(S: Set<NFAState>): typeof S {
@@ -104,7 +100,7 @@ namespace FiniteAutomata {
                     if(A.intersection(new Set(R)).size) {
                         T.get(R).accepting = true;
                     }
-                    L.push(R)
+                    L.push(R);
                 }
             }
         } while(L.length);
