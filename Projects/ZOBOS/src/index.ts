@@ -16,7 +16,6 @@
 
 namespace ZOBOS {
     import SemanticErrors = ZLang.SemanticErrors;
-    import Nodes = ZLang.Nodes;
 
     function output(...args: (string|number)[]) {
         const text = ['OUTPUT'];

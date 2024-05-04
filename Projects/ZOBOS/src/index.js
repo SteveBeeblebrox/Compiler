@@ -4005,16 +4005,13 @@ var ZLang;
             ];
         }
         dir(pos) {
-            const data = new Map();
+            const dir = [];
             for (const [k, v] of this.entries()) {
                 if (pos === undefined || Position.offset(pos, v.pos) <= 0) {
-                    if (data.has(k)) {
-                        data.delete(k);
-                    }
-                    data.set(k, v);
+                    dir.push(v);
                 }
             }
-            return [...data.values()];
+            return dir;
         }
     }
     ZLang.Scope = Scope;
@@ -4056,7 +4053,7 @@ var ZLang;
                 V.add(node.header);
                 V.add(node.rvar);
                 for (const p of node.header.parameters) {
-                    node.scope.declare(p.ident.name, p.type.ztype, p.pos, { initialized: true });
+                    node.scope.declare(p.ident.name, p.type.ztype, p.ident.pos, { initialized: true });
                 }
                 node.scope.declare(node.rvar.name, node.header.rtype.ztype, node.rvar.pos, { initialized: true });
             }
