@@ -43,15 +43,20 @@ namespace FiniteAutomata {
     export type DFA = Map<DFAState,Map<char,DFAState> & Partial<{start: boolean, accepting: boolean}>>;
 
     export function toDFA(nfa: NFA, ctx: NFAContext): DFA {
+        const lambdas = new Map<NFAState,NFAState[]>(Object.entries(
+            Object.groupBy(
+                nfa.edges
+                    .filter(([from,to,char])=>char===undefined)
+                    .map(([from,to])=>[from,to]),
+                ([from])=>from
+            )
+        ).map(([k,v])=>[+k as NFAState,v.map(([from,to])=>to)]));
         function followLambda(S: NFAState[] | Set<NFAState>): Set<NFAState> {
             S = new Set<NFAState>(S);
             const M: Stack<NFAState> = [...S];
-        
-            while(M.length) {
-                const t = M.pop()!;
-                for(const q of nfa.edges.flatMap(function([from,to,char]) {
-                    return char === undefined && from === t ? [to] : [];
-                })) {
+
+            for(const t of M) {
+                for(const q of lambdas.get(t)??[]) {
                     if(!S.has(q)) {
                         S.add(q);
                         M.push(q);
