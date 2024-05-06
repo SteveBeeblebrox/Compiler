@@ -23,6 +23,8 @@ namespace ZLang {
         ///#embed "zlang.cfg"
     ])));
     
+    type RegisterCount = [RN: number, RF: number];
+
     export namespace Nodes {
         export abstract class ZNode extends Tree {
             constructor(public readonly pos: Position, children: ZNode[] = []) {
@@ -50,13 +52,23 @@ namespace ZLang {
         }
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): Domain;
+            public abstract get regCount(): RegisterCount;
+            get [Graphviz.attributes]() {
+                try {
+                    return {xlabel:`${this.regCount[0]},${this.regCount[1]}`,forcelabels:true};
+                } catch {
+                    return {};
+                }
+            }
         }
         export abstract class LiteralNode<T> extends ExpressionNode {
             constructor(pos: Position, public readonly type: Domain, public readonly value: T) {super(pos)};
             get domain() {
                 return this.type;
             }
+            public abstract get isImmediate(): boolean;
         }
+        
         export class IntLiteral extends LiteralNode<number> {
             constructor(pos: Position,value: number) {
                 super(pos,'int',value);
@@ -64,7 +76,17 @@ namespace ZLang {
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
             }
+            get regCount(): RegisterCount {
+                return [this.isImmediate ? 0 : 1,0];
+            }
+            get isImmediate(): boolean {
+                return this.value >= IntLiteral.IMM_MIN && this.value <= IntLiteral.IMM_MAX;
+            }
         }
+        export namespace IntLiteral {
+            export const IMM_MIN = -16384, IMM_MAX = 16383;
+        }
+
         export class FloatLiteral extends LiteralNode<number> {
             constructor(pos: Position,value: number) {
                 super(pos,'float',value);
@@ -72,13 +94,35 @@ namespace ZLang {
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
             }
+            get regCount(): RegisterCount {
+                return [0, this.isImmediate ? 0 : 1];
+            }
+            get isImmediate(): boolean {
+                return this.value >= FloatLiteral.IMM_MIN && this.value <= FloatLiteral.IMM_MAX && this.decimals <= FloatLiteral.IMM_MAX_DECIMALS;
+            }
+            get decimals(): number {
+                return this.value % 1 ? this.value.toString().split('.')[1].length : 0;
+            }
         }
+        export namespace FloatLiteral {
+            export const IMM_MIN = 0, IMM_MAX = 1310.71;
+            export const IMM_MAX_DECIMALS = 2;
+
+        }
+        
+
         export class StringLiteral extends LiteralNode<string> {
             constructor(pos: Position,value: string) {
                 super(pos,'string',value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${escapeString(this.value)}`;
+            }
+            get isImmediate(): boolean {
+                return false;
+            }
+            get regCount(): RegisterCount {
+                throw new Error('String Literals NYI');
             }
         }
         export class IdentifierNode extends ExpressionNode {
@@ -88,6 +132,9 @@ namespace ZLang {
             }
             get [Graphviz.label]() {
                 return `id:${this.name}`;
+            }
+            get regCount(): RegisterCount {
+                return this.domain === 'float' ? [0,1] : [1,0];
             }
         }
         export class BinaryOp extends ExpressionNode {
@@ -118,6 +165,29 @@ namespace ZLang {
                     }
                 })();
             }
+            get regCount(): RegisterCount {
+                if(
+                    (this.lhs.domain === 'float' && this.rhs.domain !== 'float')
+                    || (this.lhs.domain !== 'float' && this.rhs.domain === 'float')
+                ) {
+                    throw new Error('Mixed Expressions NYI');
+                } else {
+                    const [Rleft,Fleft] = this.lhs.regCount;
+                    const [Rright,Fright] = this.rhs.regCount;
+
+                    function f(left,right): number {
+                        if(left === 0 && right === 0) {
+                            return 0;
+                        } else if(left === right) {
+                            return left + 1;
+                        } else {
+                            return Math.max(left,right);
+                        }
+                    }
+
+                    return [f(Rleft,Rright), f(Fleft,Fright)];
+                }
+            }
         }
         export class UnaryOp extends ExpressionNode {
             constructor(pos: Position,public override readonly name: string,public readonly val:ExpressionNode) {
@@ -125,6 +195,9 @@ namespace ZLang {
             }
             get domain() {
                 return this.val.domain; // +-~! all leave the type as is
+            }
+            get regCount(): RegisterCount {
+                return this.val.regCount;
             }
         }
         export class CastNode extends ExpressionNode {
@@ -139,6 +212,16 @@ namespace ZLang {
             }
             get [Graphviz.children]() {
                 return [['',this.val]];
+            }
+            get regCount(): RegisterCount {
+                if(
+                    (this.type.domain === 'float' && this.val.domain !== 'float')
+                    || (this.type.domain !== 'float' && this.val.domain === 'float')
+                ) {
+                    throw new Error('Mixed Expressions NYI');
+                } else {
+                    return this.val.regCount;
+                }
             }
         }
 
@@ -194,6 +277,9 @@ namespace ZLang {
             get [Graphviz.label]() {
                 return `${this.ident.name}(...)`;
             }
+            get regCount(): RegisterCount {
+                throw new Error('Function Calls NYI');
+            }
         }
 
         export class FunctionNode extends ZNode {
@@ -211,8 +297,8 @@ namespace ZLang {
 
         export class Program extends ZNode {
             public readonly scope = new Scope();
-            constructor(pos: Position, public readonly steps: (StatementNode|FunctionNode)[]) {
-                super(pos,[...steps]);
+            constructor(pos: Position, public readonly statements: (StatementNode|FunctionNode)[]) {
+                super(pos,[...statements]);
             }
             get [Graphviz.label]() {
                 return 'Program.z';
@@ -234,6 +320,9 @@ namespace ZLang {
             }
             get [Graphviz.children]() {
                 return [['',this.value]];
+            }
+            get regCount(): RegisterCount {
+                return this.value.regCount;
             }
         }
 
@@ -751,6 +840,7 @@ namespace ZLang {
 
     export function applySemantics(program: Program) {
         initSymbols(program);
+        return program;
     }
 
     function initSymbols(program: Program) {
