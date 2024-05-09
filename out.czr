@@ -1,0 +1,20 @@
+# Compiled at 2024-05-09T21:55:34.103Z
+# Literals
+label @1w !0
+data @1w #9876543
+label @2f !1
+data @2f #1.34500000
+label @3f !2
+data @3f #197483.00000000
+
+# Global Variables
+label @4w x
+label @5f y
+
+init @6i
+
+# Body
+#declare
+#declare
+#emit
+return

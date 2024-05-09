@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee zlang.js) "$@"; exit $?
+//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee czar.js) "$@"; exit $?
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
     for (var i = 0; i < initializers.length; i++) {
@@ -3296,7 +3296,6 @@ var SLR1;
 })(SLR1 || (SLR1 = {}));
 var ASM;
 (function (ASM) {
-    var Nodes = ZLang.Nodes;
     class AbstractRegister {
     }
     class HardwareRegister extends AbstractRegister {
@@ -3308,55 +3307,32 @@ var ASM;
     class CompileContext {
     }
     ASM.CompileContext = CompileContext;
-    class Data {
-        constructor(program) {
-            this.program = program;
-            this.literals = new Map();
-            this.offset = 0;
-        }
-        static domainToAlignment(domain) {
+    let ASMUtil;
+    (function (ASMUtil) {
+        function domainToAlignment(domain) {
             switch (domain) {
                 case 'bool':
-                case 'string': return 'b';
-                case 'float': return 'f';
-                case 'int': return 'w';
+                case 'string':
+                    return 'b';
+                case 'float':
+                    return 'f';
+                case 'int':
+                    return 'w';
             }
         }
-        nextAddr(alignment) {
-            return '0';
+        ASMUtil.domainToAlignment = domainToAlignment;
+        function alignmentToBytes(alignment) {
+            switch (alignment) {
+                case 'b':
+                    return 1;
+                case 'w':
+                case 'f':
+                case 'i':
+                    return 4;
+            }
         }
-        compile(ctx) {
-            const data = this;
-            const program = this.program;
-            const instructions = [];
-            instructions.push('# Literals');
-            let n = 0;
-            ZLang.visit(program, function (node) {
-                if (node instanceof Nodes.LiteralNode
-                    && !node.isImmediate
-                    && !this.literals.has(node.value)) {
-                    const address = this.nextAddr(Data.domainToAlignment(node.domain));
-                    instructions.push(`label ${address} !${n++}`);
-                    instructions.push(`data ${address} 117`);
-                }
-            }, 'pre', this);
-            instructions.push('# Global Variables');
-            ZLang.visit(program, function (node) {
-                if (node instanceof Nodes.DeclareStatement) {
-                    for (const [idents] of node.entries) {
-                        for (const ident of idents) {
-                            const address = this.nextAddr(Data.domainToAlignment(node.domain));
-                            ZLang.getEnclosingScope(node).setAddress(ident.name, address);
-                            instructions.push(`label ${address} ${ident.name}`);
-                        }
-                    }
-                }
-                return !(node instanceof ZLang.Nodes.FunctionNode);
-            }, 'pre', this);
-            return instructions;
-        }
-    }
-    ASM.Data = Data;
+        ASMUtil.alignmentToBytes = alignmentToBytes;
+    })(ASMUtil = ASM.ASMUtil || (ASM.ASMUtil = {}));
 })(ASM || (ASM = {}));
 var ZLang;
 (function (ZLang) {
@@ -3425,6 +3401,9 @@ var ZLang;
             get isImmediate() {
                 return this.value >= IntLiteral.IMM_MIN && this.value <= IntLiteral.IMM_MAX;
             }
+            toASM() {
+                return `#${this.value}`;
+            }
         }
         Nodes.IntLiteral = IntLiteral;
         (function (IntLiteral) {
@@ -3446,6 +3425,9 @@ var ZLang;
             get decimals() {
                 return this.value % 1 ? this.value.toString().split('.')[1].length : 0;
             }
+            toASM() {
+                return `#${this.value.toFixed(8)}`;
+            }
         }
         Nodes.FloatLiteral = FloatLiteral;
         (function (FloatLiteral) {
@@ -3464,6 +3446,10 @@ var ZLang;
             }
             get regCount() {
                 throw new Error('String Literals NYI');
+            }
+            toASM() {
+                throw new Error('String Literals NYI');
+                return alphaEncode(this.value);
             }
         }
         Nodes.StringLiteral = StringLiteral;
@@ -3654,6 +3640,9 @@ var ZLang;
             get [Graphviz.children]() {
                 return [['header', this.header], ['var', this.rvar], ['rvalue', this.rvalue], ['body', this.body]];
             }
+            compile(ctx) {
+                throw new Error('Functions NYI');
+            }
         }
         Nodes.FunctionNode = FunctionNode;
         class Program extends ZNode {
@@ -3670,25 +3659,50 @@ var ZLang;
             }
             compile(ctx) {
                 const instructions = [];
+                instructions.push(`# Compiled at ${new Date().toISOString()}`);
+                const literals = new Map();
+                let byteOffset = 0;
+                let n = 0;
+                function nextAddr(alignment) {
+                    const bytes = ASM.ASMUtil.alignmentToBytes(alignment);
+                    byteOffset += bytes - (byteOffset % bytes);
+                    return `@${byteOffset / bytes}${alignment}`;
+                }
                 instructions.push('# Literals');
                 ZLang.visit(this, function (node) {
-                    if (node instanceof LiteralNode) {
-                        const address = '?';
-                        instructions.push(`label ${address} !0`);
-                        instructions.push(`data ${address} 117`);
+                    if (node instanceof ZLang.Nodes.LiteralNode
+                        && !node.isImmediate
+                        && !literals.has(node.value)) {
+                        const address = nextAddr(ASM.ASMUtil.domainToAlignment(node.domain));
+                        literals.set(node.value, address);
+                        instructions.push(`label ${address} !${n++}`);
+                        instructions.push(`data ${address} ${node.toASM()}`);
                     }
-                });
+                }, 'pre', this);
+                instructions.push('');
                 instructions.push('# Global Variables');
                 ZLang.visit(this, function (node) {
-                    if (node instanceof DeclareStatement) {
-                        for (const [idents] of node.entries) {
+                    if (node instanceof ZLang.Nodes.DeclareStatement) {
+                        for (const [idents, value] of node.entries) {
                             for (const ident of idents) {
-                                instructions.push(`label ? ${ident.name}`);
+                                const address = nextAddr(ASM.ASMUtil.domainToAlignment(value.domain));
+                                ZLang.getEnclosingScope(node).setAddress(ident.name, address);
+                                instructions.push(`label ${address} ${ident.name}`);
                             }
                         }
                     }
-                    return !(node instanceof FunctionNode);
+                    return !(node instanceof ZLang.Nodes.FunctionNode);
                 }, 'pre');
+                instructions.push('');
+                instructions.push(`init ${nextAddr('i')}`);
+                instructions.push('');
+                instructions.push('# Body');
+                for (const statement of this.statements) {
+                    if (statement instanceof FunctionNode || statement instanceof StatementNode) {
+                        instructions.push(...statement.compile(ctx));
+                    }
+                }
+                instructions.push('return');
                 return instructions;
             }
         }
@@ -3747,6 +3761,9 @@ var ZLang;
                         return ['', value];
                     })];
             }
+            compile(ctx) {
+                return ['#declare'];
+            }
         }
         Nodes.DeclareStatement = DeclareStatement;
         class AssignmentStatement extends StatementNode {
@@ -3764,6 +3781,9 @@ var ZLang;
             get domain() {
                 return this.value.domain;
             }
+            compile(ctx) {
+                return ['#assign'];
+            }
         }
         Nodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
@@ -3776,6 +3796,9 @@ var ZLang;
             get [Graphviz.label]() {
                 return this.bfalse !== undefined ? 'If-Else' : 'If';
             }
+            compile(ctx) {
+                throw new Error('If/Else NYI');
+            }
         }
         Nodes.IfStatement = IfStatement;
         class DoWhileStatement extends StatementNode {
@@ -3787,6 +3810,9 @@ var ZLang;
             get [Graphviz.label]() {
                 return 'Do While';
             }
+            compile(ctx) {
+                throw new Error('Do While Loop NYI');
+            }
         }
         Nodes.DoWhileStatement = DoWhileStatement;
         class WhileStatement extends StatementNode {
@@ -3797,6 +3823,9 @@ var ZLang;
             }
             get [Graphviz.label]() {
                 return 'While';
+            }
+            compile(ctx) {
+                throw new Error('While Loop NYI');
             }
         }
         Nodes.WhileStatement = WhileStatement;
@@ -3817,6 +3846,9 @@ var ZLang;
             get [Graphviz.children]() {
                 return [...Object.entries(this.data)];
             }
+            compile(ctx) {
+                return ['#emit'];
+            }
         }
         Nodes.EmitStatement = EmitStatement;
         class RandStatement extends StatementNode {
@@ -3832,6 +3864,9 @@ var ZLang;
             get [Graphviz.children]() {
                 return [['id', this.ident], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
             }
+            compile(ctx) {
+                return ['#rand'];
+            }
         }
         Nodes.RandStatement = RandStatement;
         class StatementGroup extends StatementNode {
@@ -3845,6 +3880,9 @@ var ZLang;
             }
             get [Graphviz.exclude]() {
                 return ['scope', ...super[Graphviz.exclude]];
+            }
+            compile(ctx) {
+                return this.statements.flatMap(s => s.compile(ctx));
             }
         }
         Nodes.StatementGroup = StatementGroup;
