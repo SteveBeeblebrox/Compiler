@@ -368,7 +368,7 @@ namespace ZLang {
                 instructions.push(`init ${nextAddr('i')}`);
 
                 instructions.push('');
-                instructions.push('# Body')
+                instructions.push('# Body');
 
                 for(const statement of this.statements) {
                     if(statement instanceof FunctionNode || statement instanceof StatementNode) {
