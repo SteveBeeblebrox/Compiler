@@ -1,21 +1,24 @@
-# Compiled at 2024-05-10T20:51:31.499Z
-# 0 Virtual General Registers
+# Compiled at 2024-05-10T22:47:29.662Z
+# 1 Virtual General Registers
+label @0w !vr0
 
-# 0 Virtual Float Registers
+# 2 Virtual Float Registers
+label @1f !vf0
+label @2f !vf1
 
 # Literals
-label @0w !0
-data @0w #9876543
-label @1f !1
-data @1f #1.34500000
-label @2f !2
-data @2f #197483.00000000
+label @3w !0
+data @3w #9876543
+label @4f !1
+data @4f #1.34500000
+label @5f !2
+data @5f #197483.00000000
 
 # Global Variables
-label @3w x
-label @4f y
+label @6w x
+label @7f y
 
-init @5i
+init @8i
 
 # Body
 #declare

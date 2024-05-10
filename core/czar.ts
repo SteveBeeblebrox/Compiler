@@ -37,7 +37,7 @@ namespace CZAR {
 //
     // const AST = ZLang.applySemantics(ZLang.parse(`emit(1);`));
     const AST = ZLang.applySemantics(ZLang.parse(system.readTextFileSync(`data/dist/tests/${name}.src`)));
-    // dump('parsed', AST);
+    dump('parsed', AST);
     system.writeTextFileSync('out.czr', AST.compile({regCount: {r:RN,f:RF}}).join('\n'));
     
 

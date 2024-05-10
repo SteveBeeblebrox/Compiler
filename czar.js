@@ -3304,6 +3304,56 @@ var ZLang;
     ])));
     let ASM;
     (function (ASM) {
+        let RegisterCount;
+        (function (RegisterCount) {
+            RegisterCount.ZERO = { r: 0, f: 0 };
+            function joint(...counts) {
+                if (counts.length === 0)
+                    return RegisterCount.ZERO;
+                function g(a, c) {
+                    if (a === 0 && c === 0) {
+                        return 0;
+                    }
+                    if (a === c) {
+                        return a + 1;
+                    }
+                    else {
+                        return Math.max(a, c);
+                    }
+                }
+                return {
+                    r: counts.map(c => c.r).reduce(g),
+                    f: counts.map(c => c.f).reduce(g)
+                };
+            }
+            RegisterCount.joint = joint;
+            function disjoint(...counts) {
+                return {
+                    r: Math.max(0, ...counts.map(x => x.r)),
+                    f: Math.max(0, ...counts.map(x => x.f))
+                };
+            }
+            RegisterCount.disjoint = disjoint;
+            function add(...counts) {
+                return {
+                    r: counts.map(x => x.r).reduce((a, c) => a + c),
+                    f: counts.map(x => x.f).reduce((a, c) => a + c)
+                };
+            }
+            RegisterCount.add = add;
+            function general(n = 1) {
+                return { r: n, f: 0 };
+            }
+            RegisterCount.general = general;
+            function float(n = 1) {
+                return { r: 0, f: n };
+            }
+            RegisterCount.float = float;
+            function forDomain(domain, n = 1) {
+                return domain === 'float' ? RegisterCount.float(n) : RegisterCount.general(n);
+            }
+            RegisterCount.forDomain = forDomain;
+        })(RegisterCount = ASM.RegisterCount || (ASM.RegisterCount = {}));
         class AbstractRegister {
             constructor(name) {
                 this.name = name;
@@ -3388,14 +3438,20 @@ var ZLang;
                             r: range(physicalRegCount.r).map(n => new GeneralRegister(n)).toArray(),
                             f: range(physicalRegCount.f).map(n => new FloatRegister(n)).toArray(),
                         };
+                        const hr = [...this.hardwareRegisters.r], hf = [...this.hardwareRegisters.f];
+                        this.ancillaRegisters = { r: hr.splice(0, 2), f: hf.splice(0, 2) };
+                        this.workRegisters = { r: hr.splice(0, 2), f: hf.splice(0, 2) };
                         this.virtualRegisters = {
                             r: range(this.virtualRegCount.r).map(n => new VirtualGeneralRegister(n, this.nextAddr('w'))).toArray(),
                             f: range(this.virtualRegCount.f).map(n => new VirtualFloatRegister(n, this.nextAddr('f'))).toArray(),
                         };
-                        const hr = [...this.hardwareRegisters.r], hf = [...this.hardwareRegisters.f];
-                        this.ancillaRegisters = { r: hr.splice(0, 2), f: hf.splice(0, 2) };
-                        this.workRegisters = { r: hr.splice(0, 2), f: hf.splice(0, 2) };
                         this.expressionRegisters = { r: [...hr, ...this.virtualRegisters.r], f: [...hf, ...this.virtualRegisters.f] };
+                    }
+                    get virtualRegCount() {
+                        return {
+                            r: Math.max(0, this.requiredRegCount.r - (this.physicalRegCount.r - this.ancillaRegisters.r.length - this.workRegisters.r.length)),
+                            f: Math.max(0, this.requiredRegCount.f - (this.physicalRegCount.f - this.ancillaRegisters.f.length - this.workRegisters.f.length))
+                        };
                     }
                     nextAddr(alignment, size = ASM.alignmentToBytes(alignment)) {
                         const bytes = ASM.alignmentToBytes(alignment);
@@ -3444,12 +3500,6 @@ var ZLang;
                                 return this.reg(...name.padStart(3, 'X').split(''));
                             }
                         }
-                    }
-                    get virtualRegCount() {
-                        return {
-                            r: Math.max(0, this.requiredRegCount.r - this.physicalRegCount.r),
-                            f: Math.max(0, this.requiredRegCount.f - this.physicalRegCount.f)
-                        };
                     }
                     get [(_get_virtualRegCount_decorators = [enumerable], Symbol.toStringTag)]() {
                         return this.constructor.name;
@@ -3538,6 +3588,7 @@ var ZLang;
     let Nodes;
     (function (Nodes) {
         var CompileContext = ASM.CompileContext;
+        var RegisterCount = ASM.RegisterCount;
         var inst = ASM.inst;
         class ZNode extends Tree {
             constructor(pos, children = []) {
@@ -3558,15 +3609,6 @@ var ZLang;
             get [Graphviz.exclude]() {
                 return ['pos'];
             }
-            get regCount() {
-                return {
-                    r: Math.max(0, ...this.children.map(x => x.regCount.r)),
-                    f: Math.max(0, ...this.children.map(x => x.regCount.f))
-                };
-            }
-        }
-        Nodes.ZNode = ZNode;
-        class ExpressionNode extends ZNode {
             get [Graphviz.attributes]() {
                 try {
                     return { xlabel: `${this.regCount.r},${this.regCount.f}`, forcelabels: true };
@@ -3575,6 +3617,9 @@ var ZLang;
                     return {};
                 }
             }
+        }
+        Nodes.ZNode = ZNode;
+        class ExpressionNode extends ZNode {
         }
         Nodes.ExpressionNode = ExpressionNode;
         class LiteralNode extends ExpressionNode {
@@ -3598,7 +3643,7 @@ var ZLang;
                 return `${this.domain}val:${this.value}`;
             }
             get regCount() {
-                return { r: this.isImmediate ? 0 : 1, f: 0 };
+                return RegisterCount.general(+!this.isImmediate);
             }
             get isImmediate() {
                 return this.value >= IntLiteral.IMM_MIN && this.value <= IntLiteral.IMM_MAX;
@@ -3623,7 +3668,7 @@ var ZLang;
                 return `${this.domain}val:${this.value}`;
             }
             get regCount() {
-                return { r: 0, f: this.isImmediate ? 0 : 1 };
+                return RegisterCount.float(+!this.isImmediate);
             }
             get isImmediate() {
                 return this.value >= FloatLiteral.IMM_MIN && this.value <= FloatLiteral.IMM_MAX && this.decimals <= FloatLiteral.IMM_MAX_DECIMALS;
@@ -3654,7 +3699,7 @@ var ZLang;
                 return false;
             }
             get regCount() {
-                return { r: 1, f: 0 };
+                return RegisterCount.general();
             }
             toASM() {
                 return alphaEncode(this.value.slice(1, -1));
@@ -3676,7 +3721,7 @@ var ZLang;
                 return `id:${this.name}`;
             }
             get regCount() {
-                return this.domain === 'float' ? { r: 0, f: 1 } : { r: 1, f: 0 };
+                return RegisterCount.forDomain(this.domain);
             }
         }
         Nodes.IdentifierNode = IdentifierNode;
@@ -3714,20 +3759,7 @@ var ZLang;
                     throw new Error('Mixed Expressions NYI');
                 }
                 else {
-                    const { r: Rleft, f: Fleft } = this.lhs.regCount;
-                    const { r: Rright, f: Fright } = this.rhs.regCount;
-                    function f(left, right) {
-                        if (left === 0 && right === 0) {
-                            return 0;
-                        }
-                        else if (left === right) {
-                            return left + 1;
-                        }
-                        else {
-                            return Math.max(left, right);
-                        }
-                    }
-                    return { r: f(Rleft, Rright), f: f(Fleft, Fright) };
+                    return RegisterCount.disjoint(RegisterCount.forDomain(this.domain), RegisterCount.joint(this.lhs.regCount, this.rhs.regCount));
                 }
             }
         }
@@ -3784,6 +3816,9 @@ var ZLang;
             get [Graphviz.children]() {
                 return [];
             }
+            get regCount() {
+                return this.ident.regCount;
+            }
         }
         Nodes.ParameterNode = ParameterNode;
         class FunctionHeaderNode extends ZNode {
@@ -3796,6 +3831,9 @@ var ZLang;
             }
             get [Graphviz.label]() {
                 return `fn ${this.ident.name}(...)`;
+            }
+            get regCount() {
+                return RegisterCount.ZERO;
             }
         }
         Nodes.FunctionHeaderNode = FunctionHeaderNode;
@@ -3816,6 +3854,9 @@ var ZLang;
             }
             get ztype() {
                 return new ZType(this.type, this.meta.const);
+            }
+            get regCount() {
+                return RegisterCount.ZERO;
             }
         }
         Nodes.TypeNode = TypeNode;
@@ -3854,6 +3895,9 @@ var ZLang;
             compile(ctx) {
                 throw new Error('Functions NYI');
             }
+            get regCount() {
+                throw new Error('Functions NYI');
+            }
         }
         Nodes.FunctionNode = FunctionNode;
         class Program extends ZNode {
@@ -3868,11 +3912,13 @@ var ZLang;
             get [Graphviz.children]() {
                 return this.children.map((n, i) => [`statements[${i}]`, n]);
             }
+            get regCount() {
+                return RegisterCount.disjoint(...this.statements.map(s => s.regCount));
+            }
             compile(options) {
                 const ctx = new CompileContext(this.regCount, options.regCount);
                 const instructions = [];
                 instructions.push(`# Compiled at ${new Date().toISOString()}`);
-                let n = 0;
                 instructions.push(`# ${ctx.virtualRegCount.r} Virtual General Registers`);
                 for (const vr of ctx.virtualRegisters.r) {
                     instructions.push(...inst `label ${vr.address} ${{ raw: `!${vr.name}` }}`);
@@ -3884,6 +3930,7 @@ var ZLang;
                 }
                 instructions.push('');
                 instructions.push('# Literals');
+                let n = 0;
                 ZLang.visit(this, function (node) {
                     if (node instanceof ZLang.Nodes.LiteralNode
                         && !node.isImmediate
@@ -3957,11 +4004,10 @@ var ZLang;
                 return 'Declare';
             }
             get [Graphviz.children]() {
-                return [...Object.entries({ type: this.type }), ...this.entries.map(function ([...entry]) {
-                        var _a;
-                        let value = (_a = entry[1]) !== null && _a !== void 0 ? _a : entry[0].pop();
-                        while (entry[0].length) {
-                            const ident = entry[0].pop();
+                return [...Object.entries({ type: this.type }), ...this.entries.map(function ([[...idents], expr]) {
+                        let value = expr !== null && expr !== void 0 ? expr : idents.pop();
+                        while (idents.length) {
+                            const ident = idents.pop();
                             const rhs = value;
                             value = {
                                 get [Graphviz.label]() {
@@ -3977,6 +4023,9 @@ var ZLang;
             }
             compile(ctx) {
                 return ['#declare'];
+            }
+            get regCount() {
+                return RegisterCount.disjoint(...this.entries.flatMap(e => e[1] ? [RegisterCount.disjoint(e[0][0].regCount, e[1].regCount)] : []));
             }
         }
         Nodes.DeclareStatement = DeclareStatement;
@@ -3998,6 +4047,9 @@ var ZLang;
             compile(ctx) {
                 return ['#assign'];
             }
+            get regCount() {
+                return RegisterCount.disjoint(this.ident.regCount, this.value.regCount);
+            }
         }
         Nodes.AssignmentStatement = AssignmentStatement;
         class IfStatement extends StatementNode {
@@ -4013,6 +4065,9 @@ var ZLang;
             compile(ctx) {
                 throw new Error('If/Else NYI');
             }
+            get regCount() {
+                return RegisterCount.disjoint(this.predicate.regCount, this.btrue.regCount, ...(this.bfalse ? [this.bfalse.regCount] : []));
+            }
         }
         Nodes.IfStatement = IfStatement;
         class DoWhileStatement extends StatementNode {
@@ -4027,6 +4082,9 @@ var ZLang;
             compile(ctx) {
                 throw new Error('Do While Loop NYI');
             }
+            get regCount() {
+                return RegisterCount.disjoint(this.body.regCount, this.predicate.regCount);
+            }
         }
         Nodes.DoWhileStatement = DoWhileStatement;
         class WhileStatement extends StatementNode {
@@ -4040,6 +4098,9 @@ var ZLang;
             }
             compile(ctx) {
                 throw new Error('While Loop NYI');
+            }
+            get regCount() {
+                return RegisterCount.disjoint(this.predicate.regCount, this.body.regCount);
             }
         }
         Nodes.WhileStatement = WhileStatement;
@@ -4063,6 +4124,9 @@ var ZLang;
             compile(ctx) {
                 return ['#emit'];
             }
+            get regCount() {
+                return RegisterCount.add(...this.children.map(x => x instanceof LiteralNode && x.isImmediate ? RegisterCount.forDomain(x.domain) : RegisterCount.ZERO), RegisterCount.joint(...this.children.map(x => x.regCount)));
+            }
         }
         Nodes.EmitStatement = EmitStatement;
         class RandStatement extends StatementNode {
@@ -4081,6 +4145,9 @@ var ZLang;
             compile(ctx) {
                 return ['#rand'];
             }
+            get regCount() {
+                return RegisterCount.add(...this.children.map(x => x instanceof LiteralNode && x.isImmediate ? RegisterCount.forDomain(x.domain) : RegisterCount.ZERO), RegisterCount.joint(...this.children.map(x => x.regCount)));
+            }
         }
         Nodes.RandStatement = RandStatement;
         class StatementGroup extends StatementNode {
@@ -4094,6 +4161,9 @@ var ZLang;
             }
             get [Graphviz.exclude]() {
                 return ['scope', ...super[Graphviz.exclude]];
+            }
+            get regCount() {
+                return RegisterCount.disjoint(...this.statements.map(s => s.regCount));
             }
             compile(ctx) {
                 return this.statements.flatMap(s => s.compile(ctx));
@@ -4559,7 +4629,7 @@ var CZAR;
     //
     // const AST = ZLang.applySemantics(ZLang.parse(`emit(1);`));
     const AST = ZLang.applySemantics(ZLang.parse(system.readTextFileSync(`data/dist/tests/${name}.src`)));
-    // dump('parsed', AST);
+    dump('parsed', AST);
     system.writeTextFileSync('out.czr', AST.compile({ regCount: { r: RN, f: RF } }).join('\n'));
     // dump('restored',read(`data/dist/tests/${name}.def`));
     // For a language with instruction `op r1,r2,r3,...,rn` there must be n work registers
