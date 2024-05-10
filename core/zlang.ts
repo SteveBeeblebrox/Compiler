@@ -79,14 +79,13 @@ namespace ZLang {
             public toString(): string {
                 return this.name;
             }
-            public abstract toASM(i: number): string;
             public get [Symbol.toStringTag]() {
                 return this.constructor.name;
             }
         }
 
         export abstract class Register extends AbstractRegister {
-            toASM() {
+            toASM(): string {
                 return this.name;
             }
         }
@@ -106,13 +105,14 @@ namespace ZLang {
             constructor(name: string, public readonly address: Address) {
                 super(name);
             }
+            public abstract toASM(i: number): string;
         }
         export class VirtualFloatRegister extends VirtualRegister {
             constructor(n: number, address: Address) {
                 super(`vf${n}`, address);
             }
             toASM(i: number) {
-                return `r${i}`;
+                return `f${i}`;
             }
         }
         export class VirtualGeneralRegister extends VirtualRegister {
@@ -120,7 +120,7 @@ namespace ZLang {
                 super(`vr${n}`, address);
             }
             toASM(i: number) {
-                return `f${i}`;
+                return `r${i}`;
             }
         }
 
@@ -235,6 +235,11 @@ namespace ZLang {
             }
         }
 
+        export class ExpressionContext {
+            constructor(public readonly registerList: Readonly<RegisterList>[]) {}
+
+        }
+
         export function domainToAlignment(domain: ZLang.Domain): Alignment {
             switch(domain) {
                 case 'bool':
@@ -261,7 +266,7 @@ namespace ZLang {
         export function inst(strings: TemplateStringsArray, ...args: InstructionArgument[]): Instruction[] {
             const virtualReads = new Map<string,string>(), virtualWrites = new Map<string,string>();
             let instruction = '';
-            let n = 0;
+            let nRead = 0, nWrite = 0;
 
             for(const [i,s] of strings.entries()) {
                 const arg = (function f(arg) {
@@ -280,16 +285,16 @@ namespace ZLang {
                         
                         if(write) {
                             if(write instanceof VirtualRegister && !virtualWrites.has(write.name)) {
-                                virtualWrites.set(write.name,write.toASM(n++));
+                                virtualWrites.set(write.name,write.toASM(nWrite++));
                             }
-                            return virtualWrites.get(write.name)??write.toASM(n++);
+                            return virtualWrites.get(write.name)??(write as Register).toASM();
                         }
 
                         if(read) {
                             if(read instanceof VirtualRegister && !virtualReads.has(read.name)) {
-                                virtualReads.set(read.name,read.toASM(n++));
+                                virtualReads.set(read.name,read.toASM(nRead++));
                             }
-                            return virtualReads.get(read.name)??read.toASM(n++);
+                            return virtualReads.get(read.name)??(read as Register).toASM();
                         }
                     } else if(typeof arg === 'number') {
                         return ZLang.Nodes.FloatLiteral.toASM(arg);
@@ -312,6 +317,7 @@ namespace ZLang {
 
     export namespace Nodes {
         import CompileContext = ASM.CompileContext;
+        import ExpressionContext = ASM.ExpressionContext;
         import RegisterCount = ASM.RegisterCount;
         import Instruction = ASM.Instruction;
         import inst = ASM.inst;
@@ -350,6 +356,7 @@ namespace ZLang {
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): Domain;
             public abstract override get regCount(): RegisterCount;
+            // public abstract compile(etx: ASM.ExpressionContext);
         }
         export abstract class LiteralNode<T> extends ExpressionNode {
             constructor(pos: Position, public readonly type: Domain, public readonly value: T) {super(pos)};

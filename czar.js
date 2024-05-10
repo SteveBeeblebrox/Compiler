@@ -3398,7 +3398,7 @@ var ZLang;
                 super(`vf${n}`, address);
             }
             toASM(i) {
-                return `r${i}`;
+                return `f${i}`;
             }
         }
         ASM.VirtualFloatRegister = VirtualFloatRegister;
@@ -3407,7 +3407,7 @@ var ZLang;
                 super(`vr${n}`, address);
             }
             toASM(i) {
-                return `f${i}`;
+                return `r${i}`;
             }
         }
         ASM.VirtualGeneralRegister = VirtualGeneralRegister;
@@ -3513,6 +3513,12 @@ var ZLang;
                 _a;
         })();
         ASM.CompileContext = CompileContext;
+        class ExpressionContext {
+            constructor(registerList) {
+                this.registerList = registerList;
+            }
+        }
+        ASM.ExpressionContext = ExpressionContext;
         function domainToAlignment(domain) {
             switch (domain) {
                 case 'bool':
@@ -3539,7 +3545,7 @@ var ZLang;
         function inst(strings, ...args) {
             const virtualReads = new Map(), virtualWrites = new Map();
             let instruction = '';
-            let n = 0;
+            let nRead = 0, nWrite = 0;
             for (const [i, s] of strings.entries()) {
                 const arg = (function f(arg) {
                     var _a, _b;
@@ -3556,15 +3562,15 @@ var ZLang;
                         }
                         if (write) {
                             if (write instanceof VirtualRegister && !virtualWrites.has(write.name)) {
-                                virtualWrites.set(write.name, write.toASM(n++));
+                                virtualWrites.set(write.name, write.toASM(nWrite++));
                             }
-                            return (_a = virtualWrites.get(write.name)) !== null && _a !== void 0 ? _a : write.toASM(n++);
+                            return (_a = virtualWrites.get(write.name)) !== null && _a !== void 0 ? _a : write.toASM();
                         }
                         if (read) {
                             if (read instanceof VirtualRegister && !virtualReads.has(read.name)) {
-                                virtualReads.set(read.name, read.toASM(n++));
+                                virtualReads.set(read.name, read.toASM(nRead++));
                             }
-                            return (_b = virtualReads.get(read.name)) !== null && _b !== void 0 ? _b : read.toASM(n++);
+                            return (_b = virtualReads.get(read.name)) !== null && _b !== void 0 ? _b : read.toASM();
                         }
                     }
                     else if (typeof arg === 'number') {
