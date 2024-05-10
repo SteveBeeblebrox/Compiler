@@ -3334,13 +3334,6 @@ var ZLang;
                 };
             }
             RegisterCount.disjoint = disjoint;
-            function add(...counts) {
-                return {
-                    r: counts.map(x => x.r).reduce((a, c) => a + c),
-                    f: counts.map(x => x.f).reduce((a, c) => a + c)
-                };
-            }
-            RegisterCount.add = add;
             function general(n = 1) {
                 return { r: n, f: 0 };
             }
@@ -3649,7 +3642,7 @@ var ZLang;
                 return `${this.domain}val:${this.value}`;
             }
             get regCount() {
-                return RegisterCount.general(+!this.isImmediate);
+                return RegisterCount.general();
             }
             get isImmediate() {
                 return this.value >= IntLiteral.IMM_MIN && this.value <= IntLiteral.IMM_MAX;
@@ -3674,7 +3667,7 @@ var ZLang;
                 return `${this.domain}val:${this.value}`;
             }
             get regCount() {
-                return RegisterCount.float(+!this.isImmediate);
+                return RegisterCount.float();
             }
             get isImmediate() {
                 return this.value >= FloatLiteral.IMM_MIN && this.value <= FloatLiteral.IMM_MAX && this.decimals <= FloatLiteral.IMM_MAX_DECIMALS;
@@ -3765,7 +3758,13 @@ var ZLang;
                     throw new Error('Mixed Expressions NYI');
                 }
                 else {
-                    return RegisterCount.disjoint(RegisterCount.forDomain(this.domain), RegisterCount.joint(this.lhs.regCount, this.rhs.regCount));
+                    if (this.lhs instanceof LiteralNode && this.lhs.isImmediate) {
+                        return this.rhs.regCount;
+                    }
+                    else if (this.rhs instanceof LiteralNode && this.rhs.isImmediate) {
+                        return this.lhs.regCount;
+                    }
+                    return RegisterCount.joint(this.lhs.regCount, this.rhs.regCount);
                 }
             }
         }
@@ -4131,7 +4130,7 @@ var ZLang;
                 return ['#emit'];
             }
             get regCount() {
-                return RegisterCount.add(...this.children.map(x => x instanceof LiteralNode && x.isImmediate ? RegisterCount.forDomain(x.domain) : RegisterCount.ZERO), RegisterCount.joint(...this.children.map(x => x.regCount)));
+                return RegisterCount.joint(...this.children.map(x => x.regCount));
             }
         }
         Nodes.EmitStatement = EmitStatement;
@@ -4152,7 +4151,7 @@ var ZLang;
                 return ['#rand'];
             }
             get regCount() {
-                return RegisterCount.add(...this.children.map(x => x instanceof LiteralNode && x.isImmediate ? RegisterCount.forDomain(x.domain) : RegisterCount.ZERO), RegisterCount.joint(...this.children.map(x => x.regCount)));
+                return RegisterCount.joint(...this.children.map(x => x.regCount));
             }
         }
         Nodes.RandStatement = RandStatement;
