@@ -87,7 +87,10 @@ namespace ZLang {
                 return this.value >= IntLiteral.IMM_MIN && this.value <= IntLiteral.IMM_MAX;
             }
             public override toASM(): string {
-                return `#${this.value}`;
+                return IntLiteral.toASM(this.value);
+            }
+            public static toASM(value: IntLiteral['value'] | bigint): string {
+                return `#${value}`;
             }
         }
         export namespace IntLiteral {
@@ -111,7 +114,10 @@ namespace ZLang {
                 return this.value % 1 ? this.value.toString().split('.')[1].length : 0;
             }
             public override toASM(): string {
-                return `#${this.value.toFixed(8)}`;
+                return FloatLiteral.toASM(this.value);
+            }
+            public static toASM(value: FloatLiteral['value']): string {
+                return `#${value.toFixed(8)}`;
             }
         }
         export namespace FloatLiteral {
@@ -330,7 +336,7 @@ namespace ZLang {
                 let n = 0;
     
                 function nextAddr(alignment: ASM.Alignment): ASM.Address {
-                    const bytes = ASM.ASMUtil.alignmentToBytes(alignment);
+                    const bytes = ASM.alignmentToBytes(alignment);
                     byteOffset += bytes - (byteOffset % bytes);
                     return `@${byteOffset/bytes}${alignment}`;
                 }
@@ -342,7 +348,7 @@ namespace ZLang {
                         && !node.isImmediate
                         && !literals.has(node.value)
                     ) {
-                        const address = nextAddr(ASM.ASMUtil.domainToAlignment(node.domain));
+                        const address = nextAddr(ASM.domainToAlignment(node.domain));
                         literals.set(node.value, address);
                         instructions.push(`label ${address} !${n++}`);
                         instructions.push(`data ${address} ${node.toASM()}`);
@@ -355,7 +361,7 @@ namespace ZLang {
                     if(node instanceof ZLang.Nodes.DeclareStatement) {
                         for(const [idents,value] of node.entries) {
                             for(const ident of idents) {
-                                const address = nextAddr(ASM.ASMUtil.domainToAlignment(value.domain));
+                                const address = nextAddr(ASM.domainToAlignment(value.domain));
                                 ZLang.getEnclosingScope(node).setAddress(ident.name, address);
                                 instructions.push(`label ${address} ${ident.name}`);
                             }
