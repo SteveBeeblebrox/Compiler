@@ -429,7 +429,7 @@ namespace ZLang {
                             }
                         }
                     }
-                    return ['',value]
+                    return ['',value];
                 })];
             }
             compile(ctx: CompileContext): Instruction[] {
