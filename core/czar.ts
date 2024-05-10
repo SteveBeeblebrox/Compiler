@@ -30,15 +30,17 @@ namespace CZAR {
         await writer.write(new TextEncoder().encode(text));
         await writer.ready;
         await writer.close();
+        console.log('ok')
     }
 
-    const name = 'cgldata-1';
-
+    const name = 'cgldata-1'//'fltexpr-3'//'cgldata-1';
+//
+    // const AST = ZLang.applySemantics(ZLang.parse(`emit(1);`));
     const AST = ZLang.applySemantics(ZLang.parse(system.readTextFileSync(`data/dist/tests/${name}.src`)));
+    // dump('parsed', AST);
+    system.writeTextFileSync('out.czr', AST.compile({regCount: {r:RN,f:RF}}).join('\n'));
+    
 
-    system.writeTextFileSync('out.czr', AST.compile(new ASM.CompileContext()).join('\n'));
-
-    dump('parsed', AST);
     // dump('restored',read(`data/dist/tests/${name}.def`));
 
 

@@ -24,11 +24,252 @@ namespace ZLang {
         ///#embed "zlang.cfg"
     ])));
     
-    type RegisterCount = [RN: number, RF: number];
     
+    namespace ASM {
+        export type RegisterCount = {r:number,f:number};
+        export type RegisterList = {r:AbstractRegister[],f:AbstractRegister[]};
+        export type Address = `@${number}${Alignment}`;
+        export type Instruction = '' | `#${string}` | string;
+        export type Alignment = 'w' | 'f' | 'i' | 'b';
+        abstract class AbstractRegister {
+            public constructor(public readonly name: string) {}
+            public toString(): string {
+                return this.name;
+            }
+            public abstract toASM(i: number): string;
+            public get [Symbol.toStringTag]() {
+                return this.constructor.name;
+            }
+        }
+
+        export abstract class Register extends AbstractRegister {
+            toASM() {
+                return this.name;
+            }
+        }
+        export class DedicatedRegister extends Register {}
+        export class FloatRegister extends Register {
+            constructor(n: number) {
+                super(`f${n}`);
+            }
+        }
+        export class GeneralRegister extends Register {
+            constructor(n: number) {
+                super(`r${n}`);
+            }
+        }
+
+        export abstract class VirtualRegister extends AbstractRegister {
+            constructor(name: string, public readonly address: Address) {
+                super(name);
+            }
+        }
+        export class VirtualFloatRegister extends VirtualRegister {
+            constructor(n: number, address: Address) {
+                super(`vf${n}`, address);
+            }
+            toASM(i: number) {
+                return `r${i}`;
+            }
+        }
+        export class VirtualGeneralRegister extends VirtualRegister {
+            constructor(n: number, address: Address) {
+                super(`vr${n}`, address);
+            }
+            toASM(i: number) {
+                return `f${i}`;
+            }
+        }
+
+        export type CompileOptions = {
+            regCount: RegisterCount
+        }
+
+        export class CompileContext {
+            private byteOffset = 0;
+            private readonly literals = new Map<any,ASM.Address>();
+
+            private readonly sp = new DedicatedRegister('sp');
+            private readonly fp = new DedicatedRegister('fp');
+            private readonly ra = new DedicatedRegister('ra');
+            private readonly pc = new DedicatedRegister('pc');
+            public readonly ancillaRegisters: Readonly<RegisterList>;
+            public readonly workRegisters: Readonly<RegisterList>;
+            public readonly expressionRegisters: Readonly<RegisterList>;
+            public readonly hardwareRegisters: Readonly<RegisterList>;
+            public readonly virtualRegisters: Readonly<RegisterList>;
+            public get registers(): RegisterList {
+                return {
+                    r: [...this.hardwareRegisters.r,...this.virtualRegisters.r],
+                    f: [...this.hardwareRegisters.f,...this.virtualRegisters.f],
+                }
+            }
+            constructor(private readonly requiredRegCount: RegisterCount, private readonly physicalRegCount: RegisterCount) {
+                if(physicalRegCount.r < 4 || physicalRegCount.f < 4) {
+                    throw new Error(`At least 4 general purpose and 4 float registers are needed (in addition to sp and fp)`);
+                }
+
+                this.hardwareRegisters = {
+                    r: range(physicalRegCount.r).map(n=>new GeneralRegister(n)).toArray(),
+                    f: range(physicalRegCount.f).map(n=>new FloatRegister(n)).toArray(),
+                };
+                this.virtualRegisters = {
+                    r: range(this.virtualRegCount.r).map(n=>new VirtualGeneralRegister(n, this.nextAddr('w'))).toArray(),
+                    f: range(this.virtualRegCount.f).map(n=>new VirtualFloatRegister(n, this.nextAddr('f'))).toArray(),
+                };
+
+                const hr = [...this.hardwareRegisters.r], hf = [...this.hardwareRegisters.f]
+                
+                this.ancillaRegisters = { r: hr.splice(0,2), f: hf.splice(0,2) };
+                this.workRegisters = { r: hr.splice(0,2), f: hf.splice(0,2) };
+
+                this.expressionRegisters = {r: [...hr,...this.virtualRegisters.r], f: [...hf,...this.virtualRegisters.f]};
+            }
+
+            nextAddr(alignment: ASM.Alignment, size: number = ASM.alignmentToBytes(alignment)): ASM.Address {
+                const bytes = ASM.alignmentToBytes(alignment);
+                if(this.byteOffset % bytes) this.byteOffset += bytes - (this.byteOffset % bytes);
+                const address: ASM.Address = `@${this.byteOffset/bytes}${alignment}`;
+
+                this.byteOffset += size;
+
+                return address;
+            }
+
+            hasLiteral(literal: Nodes.LiteralNode<any>): boolean {
+                return this.literals.has(literal.value);
+            }
+
+            getLiteral(literal: Nodes.LiteralNode<any>): Address {
+                return this.literals.get(literal.value);
+            }
+
+            addLiteral(literal: Nodes.LiteralNode<any>): Address {
+                const address = this.nextAddr(ASM.domainToAlignment(literal.domain), literal.size);
+                this.literals.set(literal.value, address);
+                return address;
+            }
+
+            reg(name: `${'a'|'w'|'x'|'h'|'v'|'X'}${'f'|'r'}${number}`): Register;
+            reg(space:'a'|'w'|'x'|'h'|'v'|'X',type:'f'|'r',n:number|`${number}`): Register;
+            reg(arg0:string,arg1?:string,arg2?:number|`${number}`): Register {
+                if(arg1) {
+                    return Object.assign(Object.create(null), {
+                        a: this.ancillaRegisters,
+                        w: this.workRegisters,
+                        x: this.expressionRegisters,
+                        h: this.hardwareRegisters,
+                        v: this.virtualRegisters,
+                        X: this.registers
+                    })[arg0][arg1][+arg2];
+                } else {
+                    if(arg0 === 'sp') {
+                        return this.sp;
+                    } else if(arg0 === 'fp') {
+                        return this.fp;
+                    } else if(arg0 === 'ra') {
+                        return this.ra;
+                    } else if(arg0 === 'pc') {
+                        return this.pc;
+                    } else {
+                        return this.reg(...name.padStart(3,'X').split('') as ['a'|'w'|'x'|'h'|'v'|'X','f'|'r',`${number}`]);
+                    }
+                }
+            }
+
+            @enumerable
+            get virtualRegCount(): RegisterCount {
+                return {
+                    r: Math.max(0,this.requiredRegCount.r - this.physicalRegCount.r),
+                    f: Math.max(0,this.requiredRegCount.f - this.physicalRegCount.f)
+                };
+            }
+
+            public get [Symbol.toStringTag]() {
+                return this.constructor.name;
+            }
+        }
+
+        export function domainToAlignment(domain: ZLang.Domain): Alignment {
+            switch(domain) {
+                case 'bool':
+                case 'string':
+                    return 'b';
+                case 'float':
+                    return 'f'
+                case 'int':
+                    return 'w';
+            }
+        }
+        export function alignmentToBytes(alignment: Alignment) {
+            switch(alignment) {
+                case 'b':
+                    return 1;
+                case 'w':
+                case 'f':
+                case 'i':
+                    return 4;
+            }
+        }
+
+        type InstructionArgument = {toASM():string} | AbstractRegister | {read:AbstractRegister} | {write:AbstractRegister} | {raw:string} | Address | number | bigint;
+        export function inst(strings: TemplateStringsArray, ...args: InstructionArgument[]): Instruction[] {
+            const virtualReads = new Map<string,string>(), virtualWrites = new Map<string,string>();
+            let instruction = '';
+            let n = 0;
+
+            for(const [i,s] of strings.entries()) {
+                const arg = (function f(arg) {
+                    if(arg instanceof AbstractRegister) {
+                        return f({read:arg});
+                    } else if(typeof arg === 'object' && arg !== null) {
+                        const {read,write,raw}:{read?:AbstractRegister,write?:AbstractRegister,raw?:string,toASM?:()=>string} = arg;
+                        
+                        if('toASM' in arg) {
+                            return arg.toASM();
+                        }
+                        
+                        if(raw) {
+                            return raw;
+                        }
+                        
+                        if(write) {
+                            if(write instanceof VirtualRegister && !virtualWrites.has(write.name)) {
+                                virtualWrites.set(write.name,write.toASM(n++));
+                            }
+                            return virtualWrites.get(write.name)??write.toASM(n++);
+                        }
+
+                        if(read) {
+                            if(read instanceof VirtualRegister && !virtualReads.has(read.name)) {
+                                virtualReads.set(read.name,read.toASM(n++));
+                            }
+                            return virtualReads.get(read.name)??read.toASM(n++);
+                        }
+                    } else if(typeof arg === 'number') {
+                        return ZLang.Nodes.FloatLiteral.toASM(arg);
+                    } else if(typeof arg === 'bigint') {
+                        return ZLang.Nodes.IntLiteral.toASM(arg);
+                    }
+                    return arg;
+                })(args[i]);
+                
+                instruction+=s + (arg??'');
+            }
+
+            return [
+                ...virtualReads.entries().map(([v,w])=>`#${v}->${w}`),
+                instruction,
+                ...virtualWrites.entries().map(([v,w])=>`#${w}->${v}`)
+            ];
+        }
+    }
+
     export namespace Nodes {
         import CompileContext = ASM.CompileContext;
+        import RegisterCount = ASM.RegisterCount;
         import Instruction = ASM.Instruction;
+        import inst = ASM.inst;
         export abstract class ZNode extends Tree {
             constructor(public readonly pos: Position, children: ZNode[] = []) {
                 super();
@@ -48,17 +289,24 @@ namespace ZLang {
             get [Graphviz.exclude]() {
                 return ['pos'];
             }
+            public get regCount(): RegisterCount {
+                return {
+                    r:Math.max(0,...this.children.map(x=>x.regCount.r)),
+                    f:Math.max(0,...this.children.map(x=>x.regCount.f))
+                }
+            }
+
         }
         export interface ZNode {
             get parent() : ZNode;
-
         }
+        
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): Domain;
-            public abstract get regCount(): RegisterCount;
+            public abstract override get regCount(): RegisterCount;
             get [Graphviz.attributes]() {
                 try {
-                    return {xlabel:`${this.regCount[0]},${this.regCount[1]}`,forcelabels:true};
+                    return {xlabel:`${this.regCount.r},${this.regCount.f}`,forcelabels:true};
                 } catch {
                     return {};
                 }
@@ -69,11 +317,13 @@ namespace ZLang {
             get domain() {
                 return this.type;
             }
+            public abstract get size(): number;
             public abstract get isImmediate(): boolean;
             public abstract toASM(): string;
         }
         
         export class IntLiteral extends LiteralNode<number> {
+            public readonly size = 4;
             constructor(pos: Position,value: number) {
                 super(pos,'int',value);
             }
@@ -81,12 +331,12 @@ namespace ZLang {
                 return `${this.domain}val:${this.value}`;
             }
             get regCount(): RegisterCount {
-                return [this.isImmediate ? 0 : 1,0];
+                return {r:this.isImmediate ? 0 : 1,f:0};
             }
             get isImmediate(): boolean {
                 return this.value >= IntLiteral.IMM_MIN && this.value <= IntLiteral.IMM_MAX;
             }
-            public override toASM(): string {
+           toASM(): string {
                 return IntLiteral.toASM(this.value);
             }
             public static toASM(value: IntLiteral['value'] | bigint): string {
@@ -98,6 +348,7 @@ namespace ZLang {
         }
 
         export class FloatLiteral extends LiteralNode<number> {
+            public readonly size = 4;
             constructor(pos: Position,value: number) {
                 super(pos,'float',value);
             }
@@ -105,7 +356,7 @@ namespace ZLang {
                 return `${this.domain}val:${this.value}`;
             }
             get regCount(): RegisterCount {
-                return [0, this.isImmediate ? 0 : 1];
+                return {r:0,f:this.isImmediate ? 0 : 1};
             }
             get isImmediate(): boolean {
                 return this.value >= FloatLiteral.IMM_MIN && this.value <= FloatLiteral.IMM_MAX && this.decimals <= FloatLiteral.IMM_MAX_DECIMALS;
@@ -113,7 +364,7 @@ namespace ZLang {
             get decimals(): number {
                 return this.value % 1 ? this.value.toString().split('.')[1].length : 0;
             }
-            public override toASM(): string {
+            toASM(): string {
                 return FloatLiteral.toASM(this.value);
             }
             public static toASM(value: FloatLiteral['value']): string {
@@ -136,11 +387,13 @@ namespace ZLang {
                 return false;
             }
             get regCount(): RegisterCount {
-                throw new Error('String Literals NYI');
+                return {r:1,f:0};
             }
-            public override toASM(): string {
-                throw new Error('String Literals NYI');
-                return alphaEncode(this.value);
+            toASM(): string {
+                return alphaEncode(this.value.slice(1,-1));
+            }
+            get size() {
+                return this.value.slice(1,-1).length;
             }
         }
         export class IdentifierNode extends ExpressionNode {
@@ -152,7 +405,7 @@ namespace ZLang {
                 return `id:${this.name}`;
             }
             get regCount(): RegisterCount {
-                return this.domain === 'float' ? [0,1] : [1,0];
+                return this.domain === 'float' ? {r:0,f:1} : {r:1,f:0};
             }
         }
         export class BinaryOp extends ExpressionNode {
@@ -190,8 +443,8 @@ namespace ZLang {
                 ) {
                     throw new Error('Mixed Expressions NYI');
                 } else {
-                    const [Rleft,Fleft] = this.lhs.regCount;
-                    const [Rright,Fright] = this.rhs.regCount;
+                    const {r:Rleft,f:Fleft} = this.lhs.regCount;
+                    const {r:Rright,f:Fright} = this.rhs.regCount;
 
                     function f(left,right): number {
                         if(left === 0 && right === 0) {
@@ -203,7 +456,7 @@ namespace ZLang {
                         }
                     }
 
-                    return [f(Rleft,Rright), f(Fleft,Fright)];
+                    return {r:f(Rleft,Rright), f:f(Fleft,Fright)};
                 }
             }
         }
@@ -327,53 +580,58 @@ namespace ZLang {
             get [Graphviz.children]() {
                 return this.children.map((n,i) => [`statements[${i}]`,n]);
             }
-            compile(ctx: CompileContext): Instruction[] {
+            compile(options: ASM.CompileOptions): Instruction[] {
+                const ctx = new CompileContext(this.regCount,options.regCount);
                 const instructions: Instruction[] = [];
+
                 instructions.push(`# Compiled at ${new Date().toISOString()}`);
                 
-                const literals = new Map<any,ASM.Address>();
-                let byteOffset = 0;
                 let n = 0;
-    
-                function nextAddr(alignment: ASM.Alignment): ASM.Address {
-                    const bytes = ASM.alignmentToBytes(alignment);
-                    byteOffset += bytes - (byteOffset % bytes);
-                    return `@${byteOffset/bytes}${alignment}`;
+
+                instructions.push(`# ${ctx.virtualRegCount.r} Virtual General Registers`);
+                for(const vr of ctx.virtualRegisters.r as ASM.VirtualRegister[]) {
+                    instructions.push(...inst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
                 }
+                instructions.push('');
+
+                instructions.push(`# ${ctx.virtualRegCount.f} Virtual Float Registers`);
+                for(const vr of ctx.virtualRegisters.f as ASM.VirtualRegister[]) {
+                    instructions.push(...inst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
+                }
+                instructions.push('');
 
                 instructions.push('# Literals');
                 ZLang.visit(this, function(node) {
                     if(
                         node instanceof ZLang.Nodes.LiteralNode
                         && !node.isImmediate
-                        && !literals.has(node.value)
+                        && !ctx.hasLiteral(node)
                     ) {
-                        const address = nextAddr(ASM.domainToAlignment(node.domain));
-                        literals.set(node.value, address);
-                        instructions.push(`label ${address} !${n++}`);
-                        instructions.push(`data ${address} ${node.toASM()}`);
+                        const address = ctx.addLiteral(node);
+                        instructions.push(...inst`label ${address} ${{raw:`!${n++}`}}`);
+                        instructions.push(...inst`data ${address} ${node}`);
                     } 
                 }, 'pre', this);
-
                 instructions.push('');
+
                 instructions.push('# Global Variables');
                 ZLang.visit(this, function(node) {
                     if(node instanceof ZLang.Nodes.DeclareStatement) {
-                        for(const [idents,value] of node.entries) {
+                        for(const [idents] of node.entries) {
                             for(const ident of idents) {
-                                const address = nextAddr(ASM.domainToAlignment(value.domain));
+                                const address = ctx.nextAddr(ASM.domainToAlignment(node.type.domain));
                                 ZLang.getEnclosingScope(node).setAddress(ident.name, address);
-                                instructions.push(`label ${address} ${ident.name}`);
+                                instructions.push(...inst`label ${address} ${{raw:ident.name}}`);
                             }
                         }
                     }
                     return !(node instanceof ZLang.Nodes.FunctionNode);
                 }, 'pre');
-
                 instructions.push('');
-                instructions.push(`init ${nextAddr('i')}`);
 
+                instructions.push(...inst`init ${ctx.nextAddr('i')}`);
                 instructions.push('');
+
                 instructions.push('# Body');
 
                 for(const statement of this.statements) {
@@ -383,6 +641,7 @@ namespace ZLang {
                 }
                 
                 instructions.push('return');
+
                 return instructions;
             }
         }
@@ -917,7 +1176,7 @@ namespace ZLang {
             if(this.hasLocal(name)) {
                 this.data.get(name).address = address;
             } else {
-                throw new Error(`Scope does not contain '${name}'. This is not a user issue.`);
+                throw new Error(`'${name}' does not exist in the current scope chain`);
             }
         }
 
