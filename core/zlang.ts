@@ -1025,7 +1025,7 @@ namespace ZLang {
                             instructions.push(...inst`emit @${{read:w0}} ${{read:r1}}, ${{read:r0}}`);
                         }
                         
-                        throw new Error('Emit for strings nyi');
+                        return instructions;
                     }
                     case 'value': {
                         const instructions: Instruction[] = [];
