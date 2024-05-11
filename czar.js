@@ -3378,9 +3378,12 @@ var ZLang;
         RegisterCount.ZERO = new RegisterCount(0, 0);
         ASM.RegisterCount = RegisterCount;
         class RegisterList extends RegisterPair {
-            constructor() {
-                super(...arguments);
-                this.i = 1;
+            at(domain, index) {
+                return this[ASM.domainToRegisterType(domain)].at(index);
+            }
+            slice(domain, start, end) {
+                const type = ASM.domainToRegisterType(domain);
+                return type === 'r' ? new RegisterList(this.r.slice(start, end), [...this.f]) : new RegisterList([...this.r], this.f.slice(start, end));
             }
         }
         ASM.RegisterList = RegisterList;
@@ -3525,8 +3528,8 @@ var ZLang;
                     get [(_get_virtualRegCount_decorators = [enumerable], Symbol.toStringTag)]() {
                         return this.constructor.name;
                     }
-                    get etx() {
-                        return new ExpressionContext(this, new RegisterList([...this.registers.r], [...this.registers.f]));
+                    createExpressionContext() {
+                        return new ExpressionContext(this, new RegisterList([...this.expressionRegisters.r], [...this.expressionRegisters.f]));
                     }
                 },
                 (() => {
@@ -3542,17 +3545,12 @@ var ZLang;
                 this.ctx = ctx;
                 this.registerList = registerList;
             }
-            r(index) {
+            reg(domain, index) {
+                this.registerList[ASM.domainToRegisterType(domain)].at(index);
                 return this.registerList.r.at(index);
             }
-            f(index) {
-                return this.registerList.f.at(index);
-            }
-            rslice(start, end) {
-                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
-            }
-            fslice(start, end) {
-                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
+            sliceRegs(domain, start, end) {
+                return new ExpressionContext(this.ctx, this.registerList.slice(domain, start, end));
             }
         }
         ASM.ExpressionContext = ExpressionContext;
@@ -3568,6 +3566,17 @@ var ZLang;
             }
         }
         ASM.domainToAlignment = domainToAlignment;
+        function domainToRegisterType(domain) {
+            switch (domain) {
+                case 'bool':
+                case 'string':
+                case 'int':
+                    return 'r';
+                case 'float':
+                    return 'f';
+            }
+        }
+        ASM.domainToRegisterType = domainToRegisterType;
         function alignmentToBytes(alignment) {
             switch (alignment) {
                 case 'b':
@@ -3631,6 +3640,7 @@ var ZLang;
     let Nodes;
     (function (Nodes) {
         var CompileContext = ASM.CompileContext;
+        var ExpressionContext = ASM.ExpressionContext;
         var RegisterCount = ASM.RegisterCount;
         var inst = ASM.inst;
         class ZNode extends Tree {
@@ -3697,6 +3707,9 @@ var ZLang;
             static toASM(value) {
                 return `#${value}`;
             }
+            compile(etx) {
+                return inst `load ${{ write: etx.reg(this.domain, 0) }} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+            }
         }
         Nodes.IntLiteral = IntLiteral;
         (function (IntLiteral) {
@@ -3725,6 +3738,9 @@ var ZLang;
             static toASM(value) {
                 return `#${value.toFixed(8)}`;
             }
+            compile(etx) {
+                return inst `load ${{ write: etx.reg(this.domain, 0) }} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+            }
         }
         Nodes.FloatLiteral = FloatLiteral;
         (function (FloatLiteral) {
@@ -3750,6 +3766,9 @@ var ZLang;
             get size() {
                 return this.value.slice(1, -1).length;
             }
+            compile(etx) {
+                throw new Error('String literals NYI');
+            }
         }
         Nodes.StringLiteral = StringLiteral;
         class IdentifierNode extends ExpressionNode {
@@ -3766,35 +3785,65 @@ var ZLang;
             get regCount() {
                 return RegisterCount.forDomain(this.domain);
             }
+            compile(etx) {
+                return inst `load ${{ write: etx.reg(this.domain, 0) }} ${this.enclosingScope.get(this.name, this.pos).address}`;
+            }
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
         }
         Nodes.IdentifierNode = IdentifierNode;
         class BinaryOp extends ExpressionNode {
+            static willUseInlineImmediate(node) {
+                return node instanceof LiteralNode
+                    && node.isImmediate
+                    && node.parent instanceof BinaryOp
+                    && node.parent.supportsImmediate
+                    && (node.parent.rhs === node
+                        || !BinaryOp.willUseInlineImmediate(node.parent.rhs));
+            }
             constructor(pos, name, lhs, rhs) {
                 super(pos, [lhs, rhs]);
                 this.name = name;
                 this.lhs = lhs;
                 this.rhs = rhs;
             }
+            get supportsImmediate() {
+                switch (this.name) {
+                    case '+':
+                    case '*':
+                        return true;
+                    case '-':
+                    case '/':
+                    case '%':
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
+                    case '!=': // unused
+                    default:
+                        return false;
+                }
+            }
             get domain() {
-                return (() => {
-                    switch (this.name) {
-                        case '-':
-                        case '+':
-                        case '*':
-                        case '/':
-                        case '%':
-                            return [this.lhs.domain, this.rhs.domain].includes('float') ? 'float' : this.lhs.domain;
-                        case '<':
-                        case '<=':
-                        case '==':
-                        case '>=':
-                        case '>':
-                            return 'bool';
-                        case '!=': // unused
-                        default:
-                            throw new Error(`Unknown binary operator '${this.name}'`);
-                    }
-                })();
+                switch (this.name) {
+                    case '-':
+                    case '+':
+                    case '*':
+                    case '/':
+                    case '%':
+                        return [this.lhs.domain, this.rhs.domain].includes('float') ? 'float' : this.lhs.domain;
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
+                        return 'bool';
+                    case '!=': // unused
+                    default:
+                        throw new Error(`Unknown binary operator '${this.name}'`);
+                }
             }
             get regCount() {
                 if ((this.lhs.domain === 'float' && this.rhs.domain !== 'float')
@@ -3802,14 +3851,17 @@ var ZLang;
                     throw new Error('Mixed Expressions NYI');
                 }
                 else {
-                    if (this.lhs instanceof LiteralNode && this.lhs.isImmediate) {
+                    if (BinaryOp.willUseInlineImmediate(this.lhs)) {
                         return this.rhs.regCount;
                     }
-                    else if (this.rhs instanceof LiteralNode && this.rhs.isImmediate) {
+                    else if (BinaryOp.willUseInlineImmediate(this.rhs)) {
                         return this.lhs.regCount;
                     }
                     return RegisterCount.joint(this.lhs.regCount, this.rhs.regCount);
                 }
+            }
+            compile(etx) {
+                throw new Error('TODO bops!!');
             }
         }
         Nodes.BinaryOp = BinaryOp;
@@ -3828,7 +3880,7 @@ var ZLang;
             compile(etx) {
                 const instructions = [];
                 instructions.push(...this.val.compile(etx));
-                instructions.push(...inst `${{ raw: UnaryOp.imap[this.name] }} ${{ write: etx }}, ${{ read: etx }}`);
+                instructions.push(...inst `${{ raw: UnaryOp.imap[this.name] }} ${{ write: etx.reg(this.domain, 0) }}, ${{ read: etx.reg(this.domain, 0) }}`);
                 return instructions;
             }
         }
@@ -3862,6 +3914,9 @@ var ZLang;
                 else {
                     return this.val.regCount;
                 }
+            }
+            compile(etx) {
+                throw new Error('Mixed Expressions NYI');
             }
         }
         Nodes.CastNode = CastNode;
@@ -4000,7 +4055,8 @@ var ZLang;
                 let n = 0;
                 ZLang.visit(this, function (node) {
                     if (node instanceof ZLang.Nodes.LiteralNode
-                        && !node.isImmediate
+                        // Even if op does not permit imm, we can load it in ahead of time from an imm
+                        && !node.isImmediate // BinaryOp.willUseImmediate(node)
                         && !ctx.hasLiteral(node)) {
                         const address = ctx.addLiteral(node);
                         instructions.push(...inst `label ${address} ${{ raw: `!${n++}` }}`);
@@ -4089,11 +4145,24 @@ var ZLang;
                         return ['', value];
                     })];
             }
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
             compile(ctx) {
-                return ['#declare'];
+                const instructions = [];
+                for (const [idents, value] of this.entries) {
+                    if (value) {
+                        const etx = ctx.createExpressionContext();
+                        instructions.push(...value.compile(etx));
+                        for (const ident of idents) {
+                            instructions.push(...inst `store ${{ read: etx.reg(this.type.domain, 0) }} ${this.enclosingScope.get(ident.name, ident.pos).address}`);
+                        }
+                    }
+                }
+                return instructions;
             }
             get regCount() {
-                return RegisterCount.disjoint(...this.entries.flatMap(e => e[1] ? [RegisterCount.disjoint(e[0][0].regCount, e[1].regCount)] : []));
+                return RegisterCount.disjoint(...this.entries.flatMap(e => e[1] ? [e[1].regCount] : []));
             }
         }
         Nodes.DeclareStatement = DeclareStatement;
@@ -4112,8 +4181,16 @@ var ZLang;
             get domain() {
                 return this.value.domain;
             }
-            compile(ctx) {
-                return ['#assign'];
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
+            compile(ectx) {
+                if (!(ectx instanceof ExpressionContext))
+                    return this.compile(ectx.createExpressionContext());
+                const instructions = [];
+                instructions.push(...this.value.compile(ectx));
+                instructions.push(...inst `store ${{ read: ectx.reg(this.ident.domain, 0) }} ${this.enclosingScope.get(this.ident.name, this.ident.pos).address}`);
+                return instructions;
             }
             get regCount() {
                 return RegisterCount.disjoint(this.ident.regCount, this.value.regCount);

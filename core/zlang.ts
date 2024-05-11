@@ -68,7 +68,13 @@ namespace ZLang {
         }
 
         export class RegisterList extends RegisterPair<AbstractRegister[]> {
-            public i = 1;
+            at(domain: Domain, index: number) {
+                return this[ASM.domainToRegisterType(domain)].at(index);
+            }
+            slice(domain: Domain, start?: number, end?: number): RegisterList {
+                const type = ASM.domainToRegisterType(domain);
+                return type === 'r' ? new RegisterList(this.r.slice(start,end),[...this.f]) : new RegisterList([...this.r],this.f.slice(start,end))
+            }
         }
 
         export type Address = `@${number}${Alignment}`;
@@ -234,27 +240,20 @@ namespace ZLang {
                 return this.constructor.name;
             }
 
-            public get etx() {
-                return new ExpressionContext(this, new RegisterList([...this.registers.r],[...this.registers.f]));
+            public createExpressionContext() {
+                return new ExpressionContext(this, new RegisterList([...this.expressionRegisters.r],[...this.expressionRegisters.f]));
             }
         }
 
         export class ExpressionContext {
             constructor(public readonly ctx: CompileContext, private readonly registerList: Readonly<RegisterList>) {}
             
-
-            
-            r(index: number) {
+            reg(domain: Domain, index: number) {
+                this.registerList[ASM.domainToRegisterType(domain)].at(index);
                 return this.registerList.r.at(index);
             }
-            f(index: number) {
-                return this.registerList.f.at(index);
-            }
-            rslice(start?: number, end?: number): ExpressionContext {
-                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
-            }
-            fslice(start?: number, end?: number): ExpressionContext {
-                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
+            sliceRegs(domain: Domain, start?: number, end?: number): ExpressionContext {
+                return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end));
             }
         }
 
@@ -267,6 +266,16 @@ namespace ZLang {
                     return 'f'
                 case 'int':
                     return 'w';
+            }
+        }
+        export function domainToRegisterType(domain: ZLang.Domain): 'r'|'f' {
+            switch(domain) {
+                case 'bool':
+                case 'string':
+                case 'int':
+                    return 'r';
+                case 'float':
+                    return 'f'
             }
         }
         export function alignmentToBytes(alignment: Alignment) {
@@ -374,7 +383,7 @@ namespace ZLang {
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): Domain;
             public abstract override get regCount(): RegisterCount;
-            // public abstract compile(etx: ASM.ExpressionContext);
+            public abstract compile(etx: ASM.ExpressionContext): Instruction[];
         }
         export abstract class LiteralNode<T> extends ExpressionNode {
             constructor(pos: Position, public readonly type: Domain, public readonly value: T) {super(pos)};
@@ -406,6 +415,9 @@ namespace ZLang {
             public static toASM(value: IntLiteral['value'] | bigint): string {
                 return `#${value}`;
             }
+            compile(etx: ExpressionContext): Instruction[] {
+                return inst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+            }
         }
         export namespace IntLiteral {
             export const IMM_MIN = -16384, IMM_MAX = 16383;
@@ -434,6 +446,9 @@ namespace ZLang {
             public static toASM(value: FloatLiteral['value']): string {
                 return `#${value.toFixed(8)}`;
             }
+            compile(etx: ExpressionContext): Instruction[] {
+                return inst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+            }
         }
         export namespace FloatLiteral {
             export const IMM_MIN = 0, IMM_MAX = 1310.71;
@@ -459,6 +474,9 @@ namespace ZLang {
             get size() {
                 return this.value.slice(1,-1).length;
             }
+            compile(etx: ExpressionContext): Instruction[] {
+                throw new Error('String literals NYI');
+            }
         }
         export class IdentifierNode extends ExpressionNode {
             constructor(pos: Position,public override readonly name: string) {super(pos)}
@@ -470,6 +488,12 @@ namespace ZLang {
             }
             get regCount(): RegisterCount {
                 return RegisterCount.forDomain(this.domain);
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                return inst`load ${{write:etx.reg(this.domain,0)}} ${this.enclosingScope.get(this.name,this.pos).address}`;
+            }
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
             }
         }
         export class BinaryOp extends ExpressionNode {
@@ -545,6 +569,13 @@ namespace ZLang {
                     return RegisterCount.joint(this.lhs.regCount,this.rhs.regCount);
                 }
             }
+            compile(etx: ExpressionContext): Instruction[] {
+            
+                ///#warning TODO bops and vreg saving
+                throw new Error('TODO bops!!');
+            
+            
+            }
         }
         export class UnaryOp extends ExpressionNode {
             private static imap = new Mapping({
@@ -565,7 +596,7 @@ namespace ZLang {
             compile(etx: ExpressionContext): Instruction[] {
                 const instructions: Instruction[] = [];
                 instructions.push(...this.val.compile(etx));
-                instructions.push(...inst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx}}, ${{read:etx}}`);
+                instructions.push(...inst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.reg(this.domain,0)}}, ${{read:etx.reg(this.domain,0)}}`);
                 return instructions;
             }
         }
@@ -591,6 +622,9 @@ namespace ZLang {
                 } else {
                     return this.val.regCount;
                 }
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                throw new Error('Mixed Expressions NYI');
             }
         }
 
@@ -821,11 +855,24 @@ namespace ZLang {
                     return ['',value];
                 })];
             }
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
             compile(ctx: CompileContext): Instruction[] {
-                return ['#declare'];
+                const instructions: Instruction[] = [];
+                for(const [idents,value] of this.entries) {
+                    if(value) {
+                        const etx = ctx.createExpressionContext();
+                        instructions.push(...value.compile(etx));
+                        for(const ident of idents) {
+                            instructions.push(...inst`store ${{read:etx.reg(this.type.domain,0)}} ${this.enclosingScope.get(ident.name,ident.pos).address}`);
+                        }
+                    }
+                }
+                return instructions;
             }
             get regCount(): RegisterCount {
-                return RegisterCount.disjoint(...this.entries.flatMap(e => e[1] ? [RegisterCount.disjoint(e[0][0].regCount,e[1].regCount)] : []));
+                return RegisterCount.disjoint(...this.entries.flatMap(e => e[1] ? [e[1].regCount] : []));
             }
         }
 
@@ -842,8 +889,15 @@ namespace ZLang {
             get domain() {
                 return this.value.domain;
             }
-            compile(ctx: CompileContext): Instruction[] {
-                return ['#assign'];   
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
+            compile(ectx: CompileContext | ExpressionContext): Instruction[] {
+                if(!(ectx instanceof ExpressionContext)) return this.compile(ectx.createExpressionContext());
+                const instructions: Instruction[] = [];
+                instructions.push(...this.value.compile(ectx));
+                instructions.push(...inst`store ${{read:ectx.reg(this.ident.domain,0)}} ${this.enclosingScope.get(this.ident.name,this.ident.pos).address}`);
+                return instructions;   
             }
             get regCount(): RegisterCount {
                 return RegisterCount.disjoint(this.ident.regCount, this.value.regCount);
@@ -923,7 +977,7 @@ namespace ZLang {
                 return [...Object.entries(this.data)];
             }
             compile(ctx: CompileContext): Instruction[] {
-                return ['#emit'];
+                return ['#emit'] as never as number;
             }
             get regCount(): RegisterCount {
                 return RegisterCount.joint(...this.children.map(x=>x.regCount));
@@ -941,7 +995,7 @@ namespace ZLang {
                 return [['id',this.ident],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
             }
             compile(ctx: CompileContext): Instruction[] {
-                return ['#rand'];
+                return ['#rand'] as never as number;
             }
             get regCount(): RegisterCount {
                 return RegisterCount.joint(...this.children.map(x=>x.regCount));

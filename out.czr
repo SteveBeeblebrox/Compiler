@@ -1,4 +1,4 @@
-# Compiled at 2024-05-11T03:08:01.533Z
+# Compiled at 2024-05-11T04:25:14.034Z
 # 1 Virtual General Registers
 label @0w !vr0
 
@@ -21,7 +21,20 @@ label @7f y
 init @8i
 
 # Body
-#declare
-#declare
+load r0 @3w
+#r0->vr0
+#vr0->r0
+store r0 @6w
+load r0 @4f
+#r0->vr0
+#vr0->r0
+chs r0, r0
+#r0->vr0
+#vr0->r0
+store r0 @7f
 #emit
+load r0 #1
+#r0->vr0
+#vr0->r0
+store r0 @7f
 return
