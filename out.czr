@@ -1,4 +1,4 @@
-# Compiled at 2024-05-11T04:25:14.034Z
+# Compiled at 2024-05-11T04:42:00.636Z
 # 1 Virtual General Registers
 label @0w !vr0
 
@@ -13,28 +13,31 @@ label @4f !1
 data @4f #1.34500000
 label @5f !2
 data @5f #197483.00000000
+label @24b !3
+data @24b hellox20world
 
 # Global Variables
-label @6w x
-label @7f y
+label @9w x
+label @10f y
+label @44b s
 
-init @8i
+init @12i
 
 # Body
 load r0 @3w
 #r0->vr0
 #vr0->r0
-store r0 @6w
+store r0 @9w
 load r0 @4f
 #r0->vr0
 #vr0->r0
 chs r0, r0
 #r0->vr0
 #vr0->r0
-store r0 @7f
+store r0 @10f
 #emit
-load r0 #1
+load r0 #24b
 #r0->vr0
 #vr0->r0
-store r0 @7f
+store r0 @44b
 return

@@ -475,7 +475,7 @@ namespace ZLang {
                 return this.value.slice(1,-1).length;
             }
             compile(etx: ExpressionContext): Instruction[] {
-                throw new Error('String literals NYI');
+                return inst`load ${{write:etx.reg(this.domain,0)}} ${{raw:`#${etx.ctx.getLiteral(this).slice(1)}`}}`
             }
         }
         export class IdentifierNode extends ExpressionNode {
