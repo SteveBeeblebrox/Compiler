@@ -4,6 +4,7 @@
 ///#pragma once
 
 ///#include <compat.ts>
+///#include <mapping.ts>
 ///#include <signature.ts>
 ///#include <encoding.ts>
 
@@ -25,11 +26,13 @@ namespace ZLang {
     ])));
     
     
-    namespace ASM {
-        export type RegisterCount = {r:number,f:number};
-        export namespace RegisterCount {
-            export const ZERO: RegisterCount = {r:0,f:0};
-            export function joint(...counts: RegisterCount[]): RegisterCount {
+    export namespace ASM {
+        abstract class RegisterPair<T> {
+            constructor(public readonly r: T, public readonly f: T) {}
+        }
+        export class RegisterCount extends RegisterPair<number>{
+            public static readonly ZERO: RegisterCount = new RegisterCount(0,0);
+            public static joint(...counts: RegisterCount[]): RegisterCount {
                 if(counts.length === 0) return RegisterCount.ZERO;
 
                 function g(a: number, c: number) {
@@ -42,29 +45,32 @@ namespace ZLang {
                     }
                 }
 
-                return {
-                    r: counts.map(c=>c.r).reduce(g),
-                    f: counts.map(c=>c.f).reduce(g)
-                }
+                return new RegisterCount(
+                    counts.map(c=>c.r).reduce(g),
+                    counts.map(c=>c.f).reduce(g)
+                );
             }
-            export function disjoint(...counts: RegisterCount[]): RegisterCount {
-                return {
-                    r: Math.max(0,...counts.map(x=>x.r)),
-                    f: Math.max(0,...counts.map(x=>x.f))
-                }
+            public static disjoint(...counts: RegisterCount[]): RegisterCount {
+                return new RegisterCount(
+                    Math.max(0,...counts.map(x=>x.r)),
+                    Math.max(0,...counts.map(x=>x.f))
+                )
             }
-            export function general(n: number = 1) {
-                return {r:n,f:0};
+            public static general(n: number = 1) {
+                return new RegisterCount(n,0);
             }
-            export function float(n: number = 1) {
-                return {r:0,f:n};
+            public static float(n: number = 1) {
+                return new RegisterCount(0,n);
             }
-            export function forDomain(domain: Domain, n: number = 1) {
+            public static forDomain(domain: Domain, n: number = 1) {
                 return domain === 'float' ? RegisterCount.float(n) : RegisterCount.general(n);
             }
         }
 
-        export type RegisterList = {r:AbstractRegister[],f:AbstractRegister[]};
+        export class RegisterList extends RegisterPair<AbstractRegister[]> {
+            public i = 1;
+        }
+
         export type Address = `@${number}${Alignment}`;
         export type Instruction = '' | `#${string}` | string;
         export type Alignment = 'w' | 'f' | 'i' | 'b';
@@ -136,33 +142,33 @@ namespace ZLang {
             public readonly hardwareRegisters: Readonly<RegisterList>;
             public readonly virtualRegisters: Readonly<RegisterList>;
             public get registers(): RegisterList {
-                return {
-                    r: [...this.hardwareRegisters.r,...this.virtualRegisters.r],
-                    f: [...this.hardwareRegisters.f,...this.virtualRegisters.f],
-                }
+                return new RegisterList(
+                    [...this.hardwareRegisters.r,...this.virtualRegisters.r],
+                    [...this.hardwareRegisters.f,...this.virtualRegisters.f],
+                );
             }
             constructor(private readonly requiredRegCount: RegisterCount, private readonly physicalRegCount: RegisterCount) {
                 if(physicalRegCount.r < 4 || physicalRegCount.f < 4) {
                     throw new Error(`At least 4 general purpose and 4 float registers are needed (in addition to sp and fp)`);
                 }
 
-                this.hardwareRegisters = {
-                    r: range(physicalRegCount.r).map(n=>new GeneralRegister(n)).toArray(),
-                    f: range(physicalRegCount.f).map(n=>new FloatRegister(n)).toArray(),
-                };
+                this.hardwareRegisters = new RegisterList(
+                    range(physicalRegCount.r).map(n=>new GeneralRegister(n)).toArray(),
+                    range(physicalRegCount.f).map(n=>new FloatRegister(n)).toArray(),
+                );
 
                 const hr = [...this.hardwareRegisters.r], hf = [...this.hardwareRegisters.f]
                 
-                this.ancillaRegisters = { r: hr.splice(0,2), f: hf.splice(0,2) };
-                this.workRegisters = { r: hr.splice(0,2), f: hf.splice(0,2) };
+                this.ancillaRegisters = new RegisterList(hr.splice(0,2), hf.splice(0,2));
+                this.workRegisters = new RegisterList(hr.splice(0,2), hf.splice(0,2));
                 
-                this.virtualRegisters = {
-                    r: range(this.virtualRegCount.r).map(n=>new VirtualGeneralRegister(n, this.nextAddr('w'))).toArray(),
-                    f: range(this.virtualRegCount.f).map(n=>new VirtualFloatRegister(n, this.nextAddr('f'))).toArray(),
-                };
+                this.virtualRegisters = new RegisterList(
+                    range(this.virtualRegCount.r).map(n=>new VirtualGeneralRegister(n, this.nextAddr('w'))).toArray(),
+                    range(this.virtualRegCount.f).map(n=>new VirtualFloatRegister(n, this.nextAddr('f'))).toArray(),
+                );
 
 
-                this.expressionRegisters = {r: [...hr,...this.virtualRegisters.r], f: [...hf,...this.virtualRegisters.f]};
+                this.expressionRegisters = new RegisterList([...hr,...this.virtualRegisters.r], [...hf,...this.virtualRegisters.f]);
             }
 
             @enumerable
@@ -227,11 +233,29 @@ namespace ZLang {
             public get [Symbol.toStringTag]() {
                 return this.constructor.name;
             }
+
+            public get etx() {
+                return new ExpressionContext(this, new RegisterList([...this.registers.r],[...this.registers.f]));
+            }
         }
 
         export class ExpressionContext {
-            constructor(public readonly registerList: Readonly<RegisterList>[]) {}
+            constructor(public readonly ctx: CompileContext, private readonly registerList: Readonly<RegisterList>) {}
+            
 
+            
+            r(index: number) {
+                return this.registerList.r.at(index);
+            }
+            f(index: number) {
+                return this.registerList.f.at(index);
+            }
+            rslice(start?: number, end?: number): ExpressionContext {
+                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
+            }
+            fslice(start?: number, end?: number): ExpressionContext {
+                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
+            }
         }
 
         export function domainToAlignment(domain: ZLang.Domain): Alignment {
@@ -449,32 +473,62 @@ namespace ZLang {
             }
         }
         export class BinaryOp extends ExpressionNode {
+            static willUseInlineImmediate(node: ZNode): boolean {
+                return node instanceof LiteralNode
+                    && node.isImmediate
+                    && node.parent instanceof BinaryOp
+                    && node.parent.supportsImmediate
+                    && (
+                        node.parent.rhs === node
+                        || !BinaryOp.willUseInlineImmediate(node.parent.rhs)
+                    )
+                ;
+            }
             constructor(pos: Position,public override readonly name: string,public readonly lhs:ExpressionNode, public readonly rhs:ExpressionNode) {
                 super(pos,[lhs,rhs]);
             }
-            get domain() {
-                return (() => {
-                    switch(this.name) {
-                        case '-':
-                        case '+':
-                        
-                        case '*':
-                        case '/':
-                        case '%':
-                            return [this.lhs.domain,this.rhs.domain].includes('float') ? 'float' : this.lhs.domain;
+            get supportsImmediate(): boolean {
+                switch(this.name) {
+                    case '+':
+                    case '*':
+                        return true;
 
-                        case '<':
-                        case '<=':
-                        case '==':
-                        case '>=':
-                        case '>':
-                            return 'bool';
+                    case '-':
+                    case '/':
+                    case '%':
+
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
                         
-                        case '!=': // unused
-                        default:
-                            throw new Error(`Unknown binary operator '${this.name}'`);
-                    }
-                })();
+                    case '!=': // unused
+                    default:
+                        return false;
+                }
+            }
+            get domain() {
+                switch(this.name) {
+                    case '-':
+                    case '+':
+                    
+                    case '*':
+                    case '/':
+                    case '%':
+                        return [this.lhs.domain,this.rhs.domain].includes('float') ? 'float' : this.lhs.domain;
+
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
+                        return 'bool';
+                    
+                    case '!=': // unused
+                    default:
+                        throw new Error(`Unknown binary operator '${this.name}'`);
+                }
             }
             get regCount(): RegisterCount {
                 if(
@@ -483,9 +537,9 @@ namespace ZLang {
                 ) {
                     throw new Error('Mixed Expressions NYI');
                 } else {
-                    if(this.lhs instanceof LiteralNode && this.lhs.isImmediate) {
+                    if(BinaryOp.willUseInlineImmediate(this.lhs)) {
                         return this.rhs.regCount;
-                    } else if(this.rhs instanceof LiteralNode && this.rhs.isImmediate) {
+                    } else if(BinaryOp.willUseInlineImmediate(this.rhs)) {
                         return this.lhs.regCount;
                     }
                     return RegisterCount.joint(this.lhs.regCount,this.rhs.regCount);
@@ -493,6 +547,12 @@ namespace ZLang {
             }
         }
         export class UnaryOp extends ExpressionNode {
+            private static imap = new Mapping({
+                '+': 'abs',
+                '-': 'chs',
+                '!': 'not',
+                '~': 'compl'
+            });
             constructor(pos: Position,public override readonly name: string,public readonly val:ExpressionNode) {
                 super(pos,[val]);
             }
@@ -501,6 +561,12 @@ namespace ZLang {
             }
             get regCount(): RegisterCount {
                 return this.val.regCount;
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                const instructions: Instruction[] = [];
+                instructions.push(...this.val.compile(etx));
+                instructions.push(...inst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx}}, ${{read:etx}}`);
+                return instructions;
             }
         }
         export class CastNode extends ExpressionNode {
@@ -543,7 +609,7 @@ namespace ZLang {
             }
         }
 
-        export class FunctionHeaderNode extends ZNode {
+        export class FunctionHeaderNode extends ZNode implements StatementLikeNode {
             public override readonly name: string;
             constructor(pos: Position, public readonly ident: IdentifierNode, public readonly rtype: TypeNode, public readonly parameters: ParameterNode[]) {
                 super(pos,[rtype,ident,...parameters]);
@@ -554,6 +620,9 @@ namespace ZLang {
             }
             get regCount(): RegisterCount {
                 return RegisterCount.ZERO;
+            }
+            compile(ctx: CompileContext): Instruction[] {
+                return [];
             }
         }
 
@@ -592,9 +661,12 @@ namespace ZLang {
             get regCount(): RegisterCount {
                 throw new Error('Function Calls NYI');
             }
+            compile(etx: ExpressionContext): Instruction[] {
+                throw new Error('Function Calls NYI');    
+            }
         }
 
-        export class FunctionNode extends ZNode {
+        export class FunctionNode extends ZNode implements StatementLikeNode {
             public readonly scope = new Scope();
             constructor(pos: Position, public readonly header: FunctionHeaderNode, public readonly rvar: IdentifierNode, public readonly rvalue: ExpressionNode, public readonly body: StatementGroup) {
                 super(pos,[header,rvar,rvalue,body]);
@@ -650,7 +722,8 @@ namespace ZLang {
                 ZLang.visit(this, function(node) {
                     if(
                         node instanceof ZLang.Nodes.LiteralNode
-                        && !node.isImmediate
+                        // Even if op does not permit imm, we can load it in ahead of time from an imm
+                        && !node.isImmediate // BinaryOp.willUseImmediate(node)
                         && !ctx.hasLiteral(node)
                     ) {
                         const address = ctx.addLiteral(node);
@@ -681,9 +754,7 @@ namespace ZLang {
                 instructions.push('# Body');
 
                 for(const statement of this.statements) {
-                    if(statement instanceof FunctionNode || statement instanceof StatementNode) {
-                        instructions.push(...statement.compile(ctx));
-                    }
+                    instructions.push(...statement.compile(ctx));
                 }
                 
                 instructions.push('return');
@@ -708,13 +779,20 @@ namespace ZLang {
             get regCount(): RegisterCount {
                 return this.value.regCount;
             }
+            compile(etx: ExpressionContext): Instruction[] {
+                return this.value.compile(etx);    
+            }
         }
 
-        export abstract class StatementNode extends ZNode {
+        export abstract class StatementNode extends ZNode implements StatementLikeNode {
             get [Graphviz.label]() {
                 return 'Statement';
             }
             abstract compile(ctx: ASM.CompileContext): Instruction[];
+        }
+
+        interface StatementLikeNode {
+            compile(ctx: ASM.CompileContext): Instruction[];
         }
 
         export class DeclareStatement extends StatementNode {

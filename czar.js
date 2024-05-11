@@ -166,6 +166,36 @@ var ArrayPolyfill;
         return Array.prototype.map.call(this, callback, thisArg).flat();
     }
     ArrayPolyfill.flatMap = flatMap;
+    function toReversed() {
+        return [...this.values()].reverse();
+    }
+    ArrayPolyfill.toReversed = toReversed;
+    function toSorted(compareFn) {
+        return [...this.values()].sort(compareFn);
+    }
+    ArrayPolyfill.toSorted = toSorted;
+    function toSpliced(start, deleteCount, ...items) {
+        const array = [...this.values()];
+        array.splice(start, deleteCount, ...items);
+        return array;
+    }
+    ArrayPolyfill.toSpliced = toSpliced;
+    ArrayPolyfill['with'] = {
+        'with': function (index, value) {
+            const array = [...this.values()];
+            index *= 1;
+            if (index >= 0) {
+                this[index] = value;
+            }
+            else if (index < 0) {
+                this[this.length + index] = value;
+            }
+            else {
+                throw new TypeError(`First argument to with() is not a number`);
+            }
+            return array;
+        }
+    }['with'];
 })(ArrayPolyfill || (ArrayPolyfill = {}));
 installPolyfill(Array, ArrayPolyfill);
 var ArrayConstructorPolyfill;
@@ -674,7 +704,12 @@ class BasicTextDecoder {
         });
     }
 }
-//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee zlang.js) "$@"; exit $?
+const Mapping = function Mapping(values) {
+    if (!new.target) {
+        throw new TypeError(`TypeError: Class constructor ${Mapping.name} cannot be invoked without 'new'`);
+    }
+    return Object.defineProperties(Object.create(null), Object.fromEntries([...Object.entries(values !== null && values !== void 0 ? values : {}), ...Object.entries(values !== null && values !== void 0 ? values : {}).map(o => o.toReversed())].map(([key, value]) => [key, { value, enumerable: true }])));
+};
 /*
  * LZ Compression
  * (c) 2013 Pieroxy - WTFPLv2
@@ -3304,10 +3339,14 @@ var ZLang;
     ])));
     let ASM;
     (function (ASM) {
-        let RegisterCount;
-        (function (RegisterCount) {
-            RegisterCount.ZERO = { r: 0, f: 0 };
-            function joint(...counts) {
+        class RegisterPair {
+            constructor(r, f) {
+                this.r = r;
+                this.f = f;
+            }
+        }
+        class RegisterCount extends RegisterPair {
+            static joint(...counts) {
                 if (counts.length === 0)
                     return RegisterCount.ZERO;
                 function g(a, c) {
@@ -3321,32 +3360,30 @@ var ZLang;
                         return Math.max(a, c);
                     }
                 }
-                return {
-                    r: counts.map(c => c.r).reduce(g),
-                    f: counts.map(c => c.f).reduce(g)
-                };
+                return new RegisterCount(counts.map(c => c.r).reduce(g), counts.map(c => c.f).reduce(g));
             }
-            RegisterCount.joint = joint;
-            function disjoint(...counts) {
-                return {
-                    r: Math.max(0, ...counts.map(x => x.r)),
-                    f: Math.max(0, ...counts.map(x => x.f))
-                };
+            static disjoint(...counts) {
+                return new RegisterCount(Math.max(0, ...counts.map(x => x.r)), Math.max(0, ...counts.map(x => x.f)));
             }
-            RegisterCount.disjoint = disjoint;
-            function general(n = 1) {
-                return { r: n, f: 0 };
+            static general(n = 1) {
+                return new RegisterCount(n, 0);
             }
-            RegisterCount.general = general;
-            function float(n = 1) {
-                return { r: 0, f: n };
+            static float(n = 1) {
+                return new RegisterCount(0, n);
             }
-            RegisterCount.float = float;
-            function forDomain(domain, n = 1) {
+            static forDomain(domain, n = 1) {
                 return domain === 'float' ? RegisterCount.float(n) : RegisterCount.general(n);
             }
-            RegisterCount.forDomain = forDomain;
-        })(RegisterCount = ASM.RegisterCount || (ASM.RegisterCount = {}));
+        }
+        RegisterCount.ZERO = new RegisterCount(0, 0);
+        ASM.RegisterCount = RegisterCount;
+        class RegisterList extends RegisterPair {
+            constructor() {
+                super(...arguments);
+                this.i = 1;
+            }
+        }
+        ASM.RegisterList = RegisterList;
         class AbstractRegister {
             constructor(name) {
                 this.name = name;
@@ -3410,10 +3447,7 @@ var ZLang;
             let _get_virtualRegCount_decorators;
             return _a = class CompileContext {
                     get registers() {
-                        return {
-                            r: [...this.hardwareRegisters.r, ...this.virtualRegisters.r],
-                            f: [...this.hardwareRegisters.f, ...this.virtualRegisters.f],
-                        };
+                        return new RegisterList([...this.hardwareRegisters.r, ...this.virtualRegisters.r], [...this.hardwareRegisters.f, ...this.virtualRegisters.f]);
                     }
                     constructor(requiredRegCount, physicalRegCount) {
                         this.requiredRegCount = (__runInitializers(this, _instanceExtraInitializers), requiredRegCount);
@@ -3427,18 +3461,12 @@ var ZLang;
                         if (physicalRegCount.r < 4 || physicalRegCount.f < 4) {
                             throw new Error(`At least 4 general purpose and 4 float registers are needed (in addition to sp and fp)`);
                         }
-                        this.hardwareRegisters = {
-                            r: range(physicalRegCount.r).map(n => new GeneralRegister(n)).toArray(),
-                            f: range(physicalRegCount.f).map(n => new FloatRegister(n)).toArray(),
-                        };
+                        this.hardwareRegisters = new RegisterList(range(physicalRegCount.r).map(n => new GeneralRegister(n)).toArray(), range(physicalRegCount.f).map(n => new FloatRegister(n)).toArray());
                         const hr = [...this.hardwareRegisters.r], hf = [...this.hardwareRegisters.f];
-                        this.ancillaRegisters = { r: hr.splice(0, 2), f: hf.splice(0, 2) };
-                        this.workRegisters = { r: hr.splice(0, 2), f: hf.splice(0, 2) };
-                        this.virtualRegisters = {
-                            r: range(this.virtualRegCount.r).map(n => new VirtualGeneralRegister(n, this.nextAddr('w'))).toArray(),
-                            f: range(this.virtualRegCount.f).map(n => new VirtualFloatRegister(n, this.nextAddr('f'))).toArray(),
-                        };
-                        this.expressionRegisters = { r: [...hr, ...this.virtualRegisters.r], f: [...hf, ...this.virtualRegisters.f] };
+                        this.ancillaRegisters = new RegisterList(hr.splice(0, 2), hf.splice(0, 2));
+                        this.workRegisters = new RegisterList(hr.splice(0, 2), hf.splice(0, 2));
+                        this.virtualRegisters = new RegisterList(range(this.virtualRegCount.r).map(n => new VirtualGeneralRegister(n, this.nextAddr('w'))).toArray(), range(this.virtualRegCount.f).map(n => new VirtualFloatRegister(n, this.nextAddr('f'))).toArray());
+                        this.expressionRegisters = new RegisterList([...hr, ...this.virtualRegisters.r], [...hf, ...this.virtualRegisters.f]);
                     }
                     get virtualRegCount() {
                         return {
@@ -3497,6 +3525,9 @@ var ZLang;
                     get [(_get_virtualRegCount_decorators = [enumerable], Symbol.toStringTag)]() {
                         return this.constructor.name;
                     }
+                    get etx() {
+                        return new ExpressionContext(this, new RegisterList([...this.registers.r], [...this.registers.f]));
+                    }
                 },
                 (() => {
                     const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(null) : void 0;
@@ -3507,8 +3538,21 @@ var ZLang;
         })();
         ASM.CompileContext = CompileContext;
         class ExpressionContext {
-            constructor(registerList) {
+            constructor(ctx, registerList) {
+                this.ctx = ctx;
                 this.registerList = registerList;
+            }
+            r(index) {
+                return this.registerList.r.at(index);
+            }
+            f(index) {
+                return this.registerList.f.at(index);
+            }
+            rslice(start, end) {
+                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
+            }
+            fslice(start, end) {
+                // return new ExpressionContext(this.ctx, {r:this.registerList.r.slice(start,end),f:this.registerList.f});
             }
         }
         ASM.ExpressionContext = ExpressionContext;
@@ -3583,7 +3627,7 @@ var ZLang;
             ];
         }
         ASM.inst = inst;
-    })(ASM || (ASM = {}));
+    })(ASM = ZLang.ASM || (ZLang.ASM = {}));
     let Nodes;
     (function (Nodes) {
         var CompileContext = ASM.CompileContext;
@@ -3781,7 +3825,19 @@ var ZLang;
             get regCount() {
                 return this.val.regCount;
             }
+            compile(etx) {
+                const instructions = [];
+                instructions.push(...this.val.compile(etx));
+                instructions.push(...inst `${{ raw: UnaryOp.imap[this.name] }} ${{ write: etx }}, ${{ read: etx }}`);
+                return instructions;
+            }
         }
+        UnaryOp.imap = new Mapping({
+            '+': 'abs',
+            '-': 'chs',
+            '!': 'not',
+            '~': 'compl'
+        });
         Nodes.UnaryOp = UnaryOp;
         class CastNode extends ExpressionNode {
             constructor(pos, type, val) {
@@ -3840,6 +3896,9 @@ var ZLang;
             get regCount() {
                 return RegisterCount.ZERO;
             }
+            compile(ctx) {
+                return [];
+            }
         }
         Nodes.FunctionHeaderNode = FunctionHeaderNode;
         class TypeNode extends ZNode {
@@ -3878,6 +3937,9 @@ var ZLang;
                 return `${this.ident.name}(...)`;
             }
             get regCount() {
+                throw new Error('Function Calls NYI');
+            }
+            compile(etx) {
                 throw new Error('Function Calls NYI');
             }
         }
@@ -3964,9 +4026,7 @@ var ZLang;
                 instructions.push('');
                 instructions.push('# Body');
                 for (const statement of this.statements) {
-                    if (statement instanceof FunctionNode || statement instanceof StatementNode) {
-                        instructions.push(...statement.compile(ctx));
-                    }
+                    instructions.push(...statement.compile(ctx));
                 }
                 instructions.push('return');
                 return instructions;
@@ -3989,6 +4049,9 @@ var ZLang;
             }
             get regCount() {
                 return this.value.regCount;
+            }
+            compile(etx) {
+                return this.value.compile(etx);
             }
         }
         Nodes.DomainNode = DomainNode;
@@ -4635,7 +4698,7 @@ var CZAR;
     // const AST = ZLang.applySemantics(ZLang.parse(`emit(1);`));
     const AST = ZLang.applySemantics(ZLang.parse(system.readTextFileSync(`data/dist/tests/${name}.src`)));
     dump('parsed', AST);
-    system.writeTextFileSync('out.czr', AST.compile({ regCount: { r: RN, f: RF } }).join('\n'));
+    system.writeTextFileSync('out.czr', AST.compile({ regCount: new ZLang.ASM.RegisterCount(RN, RF) }).join('\n'));
     // dump('restored',read(`data/dist/tests/${name}.def`));
     // For a language with instruction `op r1,r2,r3,...,rn` there must be n work registers
     // Blaster lang needs at least three

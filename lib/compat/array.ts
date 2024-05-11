@@ -32,6 +32,34 @@ namespace ArrayPolyfill {
     export function flatMap<T,U, This>(callback: (this: This, value: T, index: number, array: T[]) => U | readonly U[], thisArg?: This | undefined): U[] {
         return Array.prototype.map.call(this, callback, thisArg).flat();
     }
+
+    export function toReversed<T>(this: T[]): T[] {
+        return [...this.values()].reverse();
+    }
+    export function toSorted<T>(this: T[], compareFn?: (a: T, b: T) => number): T[] {
+        return [...this.values()].sort(compareFn);
+    }
+    export function toSpliced<T>(this: T[], start: number, deleteCount?: number, ...items: T[]): T[] {
+        const array = [...this.values()];
+        array.splice(start,deleteCount,...items);
+        return array;
+    }
+    ArrayPolyfill['with'] = {
+        'with': function<T>(this: T[], index: number, value: T): T[] {
+            const array = [...this.values()];
+
+            index*=1;
+            if(index >= 0) {
+                this[index] = value;
+            } else if (index < 0) {
+                this[this.length + index] = value;
+            } else {
+                throw new TypeError(`First argument to with() is not a number`);
+            }
+
+            return array;
+        }
+    }['with'];
 }
 
 installPolyfill(Array,ArrayPolyfill);
