@@ -54,7 +54,7 @@ namespace ZLang {
                 return new RegisterCount(
                     Math.max(0,...counts.map(x=>x.r)),
                     Math.max(0,...counts.map(x=>x.f))
-                )
+                );
             }
             public static general(n: number = 1) {
                 return new RegisterCount(n,0);
@@ -64,6 +64,12 @@ namespace ZLang {
             }
             public static forDomain(domain: Domain, n: number = 1) {
                 return domain === 'float' ? RegisterCount.float(n) : RegisterCount.general(n);
+            }
+
+            public static sortExpressionsDescending(nodes: ExpressionNode[]): ExpressionNode[] {
+                return nodes.sort(function({regCount:a,domain:A},{regCount:b,domain:B}) {
+                    return b[ASM.domainToRegisterType(B)] - a[ASM.domainToRegisterType(A)];
+                });
             }
         }
 
@@ -252,7 +258,7 @@ namespace ZLang {
                 this.registerList[ASM.domainToRegisterType(domain)].at(index);
                 return this.registerList.r.at(index);
             }
-            sliceRegs(domain: Domain, start?: number, end?: number): ExpressionContext {
+            slice(domain: Domain, start?: number, end?: number): ExpressionContext {
                 return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end));
             }
         }
@@ -501,17 +507,17 @@ namespace ZLang {
                 return node instanceof LiteralNode
                     && node.isImmediate
                     && node.parent instanceof BinaryOp
-                    && node.parent.supportsImmediate
                     && (
-                        node.parent.rhs === node
-                        || !BinaryOp.willUseInlineImmediate(node.parent.rhs)
+                        (node.parent.rhs === node && node.parent.supportsRightImmediate)
+                        || (!BinaryOp.willUseInlineImmediate(node.parent.rhs) && node.parent.supportsLeftImmediate)
                     )
                 ;
             }
             constructor(pos: Position,public override readonly name: string,public readonly lhs:ExpressionNode, public readonly rhs:ExpressionNode) {
                 super(pos,[lhs,rhs]);
             }
-            get supportsImmediate(): boolean {
+            // Commutative property allows immediates for either side of operation
+            get supportsLeftImmediate(): boolean {
                 switch(this.name) {
                     case '+':
                     case '*':
@@ -520,6 +526,26 @@ namespace ZLang {
                     case '-':
                     case '/':
                     case '%':
+
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
+                        
+                    case '!=': // unused
+                    default:
+                        return false;
+                }
+            }
+            get supportsRightImmediate(): boolean {
+                switch(this.name) {
+                    case '+':
+                    case '*':
+                    case '-':
+                    case '/':
+                    case '%':
+                        return true;
 
                     case '<':
                     case '<=':
@@ -572,8 +598,8 @@ namespace ZLang {
             compile(etx: ExpressionContext): Instruction[] {
             
                 ///#warning TODO bops and vreg saving
-                throw new Error('TODO bops!!');
-            
+                //throw new Error('TODO bops!!');
+            return []
             
             }
         }
@@ -977,7 +1003,40 @@ namespace ZLang {
                 return [...Object.entries(this.data)];
             }
             compile(ctx: CompileContext): Instruction[] {
-                return ['#emit'] as never as number;
+                switch(this.data.type) {
+                    case 'symbtable': return [];
+                    case 'string': {
+                        const instructions: Instruction[] = [];
+                        const etx = ctx.createExpressionContext();
+                        const address = ZLang.getEnclosingScope(this).get(this.data.ident.name,this.data.ident.pos).address;
+                        
+                        // Compile larger first
+                        const [e0,e1] = RegisterCount.sortExpressionsDescending([this.data.index!,this.data.length!]);
+                        const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
+                        instructions.push(...e0.compile(etx));
+                        instructions.push(...e1.compile(etx.slice(e1.domain,1)));
+
+                        const w0 = etx.ctx.reg('wr0');
+                        instructions.push(...inst`load ${{write:w0}} ${address}`);
+                        
+                        if(e0 === this.data.index) {
+                            instructions.push(...inst`emit @${{read:w0}} ${{read:r0}}, ${{read:r1}}`);
+                        } else {
+                            instructions.push(...inst`emit @${{read:w0}} ${{read:r1}}, ${{read:r0}}`);
+                        }
+                        
+                        throw new Error('Emit for strings nyi');
+                    }
+                    case 'value': {
+                        const instructions: Instruction[] = [];
+                        const etx = ctx.createExpressionContext();
+
+                        instructions.push(...this.data.value.compile(etx));
+                        instructions.push(...inst`emit ${{read:etx.reg(this.data.value.domain,0)}}`);
+
+                        return instructions;
+                    }
+                }
             }
             get regCount(): RegisterCount {
                 return RegisterCount.joint(...this.children.map(x=>x.regCount));
@@ -995,7 +1054,39 @@ namespace ZLang {
                 return [['id',this.ident],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
             }
             compile(ctx: CompileContext): Instruction[] {
-                return ['#rand'] as never as number;
+                const address = ZLang.getEnclosingScope(this).get(this.ident.name,this.ident.pos).address;
+
+                switch(this.ident.domain) {
+                    case 'bool':
+                    case 'float': {
+                            const w0 = ctx.reg('w',ASM.domainToRegisterType(this.ident.domain),0);
+                            return [
+                                ...inst`rand ${{write:w0}}`,
+                                ...inst`store ${{read:w0}} ${address}`
+                            ];
+                        }
+                    case 'int': {
+                        const instructions: Instruction[] = [];
+                        const etx = ctx.createExpressionContext();
+                        
+                        // Compile larger first
+                        const [e0,e1] = RegisterCount.sortExpressionsDescending([this.min!,this.max!]);
+                        const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
+                        instructions.push(...e0.compile(etx));
+                        instructions.push(...e1.compile(etx.slice(e1.domain,1)));
+                        
+                        const w0 = etx.ctx.reg('wr0');
+
+                        if(e0 === this.min) {
+                            instructions.push(...inst`rand ${{write:w0}} ${{read:r0}}, ${{read:r1}}`);
+                        } else {
+                            instructions.push(...inst`rand ${{write:w0}} ${{read:r1}}, ${{read:r0}}`);
+                        }
+                        instructions.push(...inst`store ${{read:w0}} ${address}`);
+
+                        return instructions;
+                    }
+                }
             }
             get regCount(): RegisterCount {
                 return RegisterCount.joint(...this.children.map(x=>x.regCount));

@@ -3861,7 +3861,8 @@ var ZLang;
                 }
             }
             compile(etx) {
-                throw new Error('TODO bops!!');
+                //throw new Error('TODO bops!!');
+                return [];
             }
         }
         Nodes.BinaryOp = BinaryOp;
@@ -4267,7 +4268,19 @@ var ZLang;
                 return [...Object.entries(this.data)];
             }
             compile(ctx) {
-                return ['#emit'];
+                switch (this.data.type) {
+                    case 'symbtable': return [];
+                    case 'string': {
+                        throw new Error('Emit for strings nyi');
+                    }
+                    case 'value': {
+                        const instructions = [];
+                        const etx = ctx.createExpressionContext();
+                        instructions.push(...this.data.value.compile(etx));
+                        instructions.push(...inst `emit ${{ read: etx.reg(this.data.value.domain, 0) }}`);
+                        return instructions;
+                    }
+                }
             }
             get regCount() {
                 return RegisterCount.joint(...this.children.map(x => x.regCount));
@@ -4288,6 +4301,17 @@ var ZLang;
                 return [['id', this.ident], ...[this.min !== undefined ? ['min', this.min] : []], ...[this.max !== undefined ? ['max', this.max] : []]];
             }
             compile(ctx) {
+                switch (this.ident.domain) {
+                    case 'bool':
+                    case 'float': {
+                        const etx = ctx.createExpressionContext();
+                        return inst `rand ${{ write: etx.reg(this.ident.domain, 0) }}`;
+                    }
+                    case 'int': {
+                        const instructions = [];
+                        const etx = ctx.createExpressionContext();
+                    }
+                }
                 return ['#rand'];
             }
             get regCount() {
