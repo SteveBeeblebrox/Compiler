@@ -1090,7 +1090,7 @@ namespace ZLang {
                 const predicate = this.predicate.compile(etx);
                 const body = this.body.compile(ctx);
 
-                const condition = ctx.inst`ifz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:body.length + 1}}`;
+                const condition = ctx.inst`ifz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:body.length}}`;
 
                 instructions.push(...predicate);
                 instructions.push(...condition);
