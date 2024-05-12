@@ -9,6 +9,7 @@ float                      float
 if                         if
 else                       else
 while                      while
+do                         do
 emit                       emit
 symtable                   symtable
 returns                    returns
