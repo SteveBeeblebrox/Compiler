@@ -978,8 +978,8 @@ namespace ZLang {
                 if(!(ectx instanceof ExpressionContext)) return this.compile(ectx.createExpressionContext());
                 const instructions: Instruction[] = [];
                 instructions.push(...this.value.compile(ectx));
-                instructions.push(...inst`store ${{read:ectx.reg(this.ident.domain,0)}} ${this.enclosingScope.get(this.ident.name,this.ident.pos).address}`);
-                return instructions;   
+                instructions.push(...cinst`store ${{read:ectx.reg(this.ident.domain,0)}} ${this.enclosingScope.get(this.ident.name,this.ident.pos).address}`);
+                return instructions;
             }
             get regCount(): RegisterCount {
                 return RegisterCount.disjoint(this.ident.regCount, this.value.regCount);
