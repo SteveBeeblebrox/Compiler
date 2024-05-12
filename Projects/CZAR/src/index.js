@@ -4947,5 +4947,5 @@ var ZLang;
     const [RN, RF] = regs.split(',').map(x => +x);
     // Validate that .def file is readable
     void system.readTextFileSync(def);
-    system.writeTextFileSync(output, ZLang.compile(system.readTextFileSync(def.replace(/\.def$/, '.src')), { regCount: new ZLang.ASM.RegisterCount(RN, RF) }));
+    system.writeTextFileSync(output, ZLang.compile(system.readTextFileSync(def.replace(/\.def$/, '.src')), { regCount: new ZLang.ASM.RegisterCount(RN, RF) }) + '\n');
 })();

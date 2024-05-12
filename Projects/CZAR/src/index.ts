@@ -20,5 +20,5 @@
     system.writeTextFileSync(output, ZLang.compile(
         system.readTextFileSync(def.replace(/\.def$/,'.src')),
         {regCount: new ZLang.ASM.RegisterCount(RN,RF)}
-    ));
+    )+'\n');
 })();
