@@ -4338,7 +4338,7 @@ var ZLang;
                 const predicate = this.predicate.compile(etx);
                 instructions.push(...body);
                 instructions.push(...predicate);
-                instructions.push(...ctx.inst `ifnz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: -(body.length + predicate.length + 1) }}`);
+                instructions.push(...ctx.inst `ifnz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: -(body.length + predicate.length + 2) }}`);
                 return instructions;
             }
             get regCount() {
@@ -4360,7 +4360,7 @@ var ZLang;
                 const etx = ctx.createExpressionContext();
                 const predicate = this.predicate.compile(etx);
                 const body = this.body.compile(ctx);
-                const condition = ctx.inst `ifz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: body.length + 2 }}`;
+                const condition = ctx.inst `ifz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: body.length + 1 }}`;
                 instructions.push(...predicate);
                 instructions.push(...condition);
                 instructions.push(...body);
