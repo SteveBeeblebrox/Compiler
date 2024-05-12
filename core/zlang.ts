@@ -255,14 +255,13 @@ namespace ZLang {
             constructor(
                 public readonly ctx: CompileContext,
                 private readonly registerList: Readonly<RegisterList>,
-                private readonly ancillaStates: Map<Register,VirtualRegister> = new Map()
             ) {}
             
             reg(domain: Domain, index: number) {
                 return this.registerList[ASM.domainToRegisterType(domain)].at(index) as VirtualRegister|Register;
             }
             slice(domain: Domain, start?: number, end?: number): ExpressionContext {
-                return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end),this.ancillaStates);
+                return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end));
             }
         }
 
