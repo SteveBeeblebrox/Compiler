@@ -4338,7 +4338,7 @@ var ZLang;
                 const predicate = this.predicate.compile(etx);
                 instructions.push(...body);
                 instructions.push(...predicate);
-                instructions.push(...ctx.inst `ifnz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: -(body.length + predicate.length + 2) }}`);
+                instructions.push(...ctx.inst `ifnz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: -(body.length + predicate.length + 1) }}`);
                 return instructions;
             }
             get regCount() {
@@ -4364,7 +4364,7 @@ var ZLang;
                 instructions.push(...predicate);
                 instructions.push(...condition);
                 instructions.push(...body);
-                instructions.push(...ctx.inst `jump ${{ jump: -(predicate.length + condition.length + body.length + 2) }}`);
+                instructions.push(...ctx.inst `jump ${{ jump: -(predicate.length + condition.length + body.length + 1) }}`);
                 return instructions;
             }
             get regCount() {
