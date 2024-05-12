@@ -11,8 +11,6 @@
 ///#include "scanner.ts"
 ///#include "slr1.ts"
 ///#include "cfg.ts"
-///#include "asm.ts"
-
 
 namespace ZLang {
     export type Domain = 'string' | 'bool' | 'int' | 'float';
@@ -83,11 +81,17 @@ namespace ZLang {
             }
         }
 
-        export type Address = `@${number}${Alignment}`;
+        export type Address = `@${number}${Alignment}${'(pc)'|''}`;
         export type Instruction = '' | `#${string}` | string;
         export type Alignment = 'w' | 'f' | 'i' | 'b';
-        type InstructionArgument = {toASM():string} | VirtualRegister|Register | {read:VirtualRegister|Register} | {write:VirtualRegister|Register} | {raw:string|number|bigint} | Address | number | bigint;
-
+        type InstructionArgumentObject = {
+            toASM(): string,
+            read: Register | VirtualRegister,
+            write: Register | VirtualRegister,
+            raw: string |number | bigint,
+            jump: number
+        }
+        type InstructionArgument = Register | VirtualRegister | Address | number | bigint | One<InstructionArgumentObject>;
         abstract class AbstractRegister {
             public constructor(public readonly name: string) {}
             public toString(): string {
@@ -133,7 +137,7 @@ namespace ZLang {
 
         export type CompileOptions = {
             regCount: RegisterCount,
-            includeComments: boolean
+            includeComments?: boolean
         }
 
         export class CompileContext {
@@ -275,10 +279,10 @@ namespace ZLang {
                         if(arg instanceof AbstractRegister) {
                             return f({read:arg});
                         } else if(typeof arg === 'object' && arg !== null) {
-                            const {read,write,raw}:{read?:VirtualRegister|Register,write?:VirtualRegister|Register,raw?:string|number|bigint,toASM?:()=>string} = arg;
+                            const {read,write,raw,jump} = arg as InstructionArgumentObject;
                             
                             if('toASM' in arg) {
-                                return arg.toASM();
+                                return (arg as InstructionArgumentObject).toASM();
                             }
                             
                             if(raw) {
@@ -306,6 +310,16 @@ namespace ZLang {
                                 }
                                 return read.toASM();
                             }
+
+                            if(jump) {
+                                let n = jump;
+                                if(n < 0) {
+                                    n -= this.virtualReads.length;
+                                } else if(n > 0) {
+                                    n += this.virtualWrites.length;
+                                }
+                                return f(`@${n}i(pc)`);
+                            }
                         } else if(typeof arg === 'number') {
                             return ZLang.Nodes.FloatLiteral.toASM(arg,true);
                         } else if(typeof arg === 'bigint') {
@@ -325,6 +339,7 @@ namespace ZLang {
 
                 if(!contiguous) {
                     ///#warning TODO set up ancilla map and filter reads. do we need to worry if some code changes the virtual register? yes.
+                    // also handle the {relative:n} InstructionArgument
                     // this.ancillaStates.clear();
                 }
 
@@ -338,7 +353,7 @@ namespace ZLang {
                 private readonly registerList: Readonly<RegisterList>,
             ) {}
             
-            reg(domain: Domain, index: number) {
+            xreg(domain: Domain, index: number) {
                 return this.registerList[ASM.domainToRegisterType(domain)].at(index) as VirtualRegister|Register;
             }
             slice(domain: Domain, start?: number, end?: number): ExpressionContext {
@@ -459,7 +474,7 @@ namespace ZLang {
                 return `#${value}`;
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return etx.cinst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
             }
         }
         export namespace IntLiteral {
@@ -490,7 +505,7 @@ namespace ZLang {
                 return `#${value.toFixed(imm ? 2 : 8)}`;
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return etx.cinst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
             }
         }
         export namespace FloatLiteral {
@@ -518,7 +533,7 @@ namespace ZLang {
                 return this.value.slice(1,-1).length;
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return etx.cinst`load ${{write:etx.reg(this.domain,0)}} ${{raw:`#${etx.ctx.getLiteral(this).slice(1)}`}}`
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${{raw:`#${etx.ctx.getLiteral(this).slice(1)}`}}`
             }
         }
         export class IdentifierNode extends ExpressionNode {
@@ -533,7 +548,7 @@ namespace ZLang {
                 return RegisterCount.forDomain(this.domain);
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return etx.cinst`load ${{write:etx.reg(this.domain,0)}} ${this.enclosingScope.get(this.name,this.pos).address}`;
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${this.enclosingScope.get(this.name,this.pos).address}`;
             }
             get enclosingScope() {
                 return ZLang.getEnclosingScope(this);
@@ -651,26 +666,26 @@ namespace ZLang {
                     (this.lhs as LiteralNode<any>).toASM
                     return [
                         ...this.rhs.compile(etx),
-                        ...etx.cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.rhs.domain,0)}}, ${this.lhs as LiteralNode<any>}`
+                        ...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:etx.xreg(this.rhs.domain,0)}}, ${this.lhs as LiteralNode<any>}`
                     ];
                 } else if(BinaryOp.willUseInlineImmediate(this.rhs)) {
                     return [
                         ...this.lhs.compile(etx),
-                        ...etx.cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.lhs.domain,0)}}, ${this.rhs as LiteralNode<any>}`
+                        ...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:etx.xreg(this.lhs.domain,0)}}, ${this.rhs as LiteralNode<any>}`
                     ];
                 } else {
                     const instructions: Instruction[] = [];
 
                     // Compile larger first
                     const [e0,e1] = RegisterCount.sortExpressionsDescending([this.lhs, this.rhs]);
-                    const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
+                    const [r0, r1] = [etx.xreg(e0.domain,0),etx.xreg(e1.domain,1)];
                     instructions.push(...e0.compile(etx));
                     instructions.push(...e1.compile(etx.slice(e1.domain,1)));
                     
                     if(e0 === this.lhs) {
-                        instructions.push(...etx.cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r0}}, ${{read:r1}}`);
+                        instructions.push(...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:r0}}, ${{read:r1}}`);
                     } else {
-                        instructions.push(...etx.cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r1}}, ${{read:r0}}`);
+                        instructions.push(...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:r1}}, ${{read:r0}}`);
                     }
 
                     return instructions;
@@ -697,7 +712,7 @@ namespace ZLang {
             compile(etx: ExpressionContext): Instruction[] {
                 const instructions: Instruction[] = [];
                 instructions.push(...this.val.compile(etx));
-                instructions.push(...etx.cinst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.domain,0)}}`);
+                instructions.push(...etx.cinst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.xreg(this.domain,0)}} ${{read:etx.xreg(this.domain,0)}}`);
                 return instructions;
             }
         }
@@ -966,7 +981,7 @@ namespace ZLang {
                         const etx = ctx.createExpressionContext();
                         instructions.push(...value.compile(etx));
                         for(const ident of idents) {
-                            instructions.push(...ctx.cinst`store ${{read:etx.reg(this.type.domain,0)}} ${this.enclosingScope.get(ident.name,ident.pos).address}`);
+                            instructions.push(...ctx.cinst`store ${{read:etx.xreg(this.type.domain,0)}} ${this.enclosingScope.get(ident.name,ident.pos).address}`);
                         }
                     }
                 }
@@ -997,7 +1012,7 @@ namespace ZLang {
                 if(!(ectx instanceof ExpressionContext)) return this.compile(ectx.createExpressionContext());
                 const instructions: Instruction[] = [];
                 instructions.push(...this.value.compile(ectx));
-                instructions.push(...ectx.cinst`store ${{read:ectx.reg(this.ident.domain,0)}} ${this.enclosingScope.get(this.ident.name,this.ident.pos).address}`);
+                instructions.push(...ectx.cinst`store ${{read:ectx.xreg(this.ident.domain,0)}} ${this.enclosingScope.get(this.ident.name,this.ident.pos).address}`);
                 return instructions;
             }
             get regCount(): RegisterCount {
@@ -1021,10 +1036,10 @@ namespace ZLang {
                 const trueBranch = this.btrue.compile(ctx);
                 const falseBranch = this.bfalse?.compile(ctx) ?? [];
 
-                instructions.push(...ctx.inst`ifz ${{read:etx.reg(this.predicate.domain,0)}} @${{raw:trueBranch.length + +!!falseBranch.length}}i(pc)`);
+                instructions.push(...ctx.inst`ifz ${{read:etx.xreg(this.predicate.domain,0)}} @${{raw:trueBranch.length + +!!falseBranch.length}}i(pc)`);
                 instructions.push(...trueBranch);
                 if(falseBranch.length) {
-                    instructions.push(...ctx.inst`jump @${{raw:falseBranch.length}}i(pc)`);
+                    instructions.push(...ctx.inst`jump ${{jump:falseBranch.length}}`);
                     instructions.push(...falseBranch);
                 }
                 
@@ -1043,7 +1058,18 @@ namespace ZLang {
                 return 'Do While';
             }
             compile(ctx: CompileContext): Instruction[] {
-                throw new Error('Do While Loop NYI');   
+                const instructions: Instruction[] = [];
+                const etx = ctx.createExpressionContext();
+
+                const body = this.body.compile(ctx);
+                const predicate = this.predicate.compile(etx);
+
+                instructions.push(...body);
+                instructions.push(...predicate);
+
+                instructions.push(...ctx.inst`ifnz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:-(body.length + predicate.length + 1)}}`);
+
+                return instructions;
             }
             get regCount(): RegisterCount {
                 return  RegisterCount.disjoint(this.body.regCount,this.predicate.regCount);
@@ -1058,7 +1084,21 @@ namespace ZLang {
                 return 'While';
             }
             compile(ctx: CompileContext): Instruction[] {
-                throw new Error('While Loop NYI');
+                const instructions: Instruction[] = [];
+                const etx = ctx.createExpressionContext();
+
+                const predicate = this.predicate.compile(etx);
+                const body = this.body.compile(ctx);
+
+                const condition = ctx.inst`ifz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:body.length + 1}}`;
+
+                instructions.push(...predicate);
+                instructions.push(...condition);
+                instructions.push(...body);
+
+                instructions.push(...ctx.inst`jump ${{jump:-(predicate.length + condition.length + body.length + 1)}}`)
+                
+                return instructions;
             }
             get regCount(): RegisterCount {
                 return  RegisterCount.disjoint(this.predicate.regCount,this.body.regCount);
@@ -1102,7 +1142,7 @@ namespace ZLang {
                         
                         // Compile larger first
                         const [e0,e1] = RegisterCount.sortExpressionsDescending([this.data.index,this.data.length]);
-                        const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
+                        const [r0, r1] = [etx.xreg(e0.domain,0),etx.xreg(e1.domain,1)];
                         instructions.push(...e0.compile(etx));
                         instructions.push(...e1.compile(etx.slice(e1.domain,1)));
 
@@ -1122,7 +1162,7 @@ namespace ZLang {
                         const etx = ctx.createExpressionContext();
 
                         instructions.push(...this.data.value.compile(etx));
-                        instructions.push(...ctx.cinst`emit ${{read:etx.reg(this.data.value.domain,0)}}`);
+                        instructions.push(...ctx.cinst`emit ${{read:etx.xreg(this.data.value.domain,0)}}`);
 
                         return instructions;
                     }
@@ -1161,7 +1201,7 @@ namespace ZLang {
                         
                         // Compile larger first
                         const [e0,e1] = RegisterCount.sortExpressionsDescending([this.min!,this.max!]);
-                        const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
+                        const [r0, r1] = [etx.xreg(e0.domain,0),etx.xreg(e1.domain,1)];
                         instructions.push(...e0.compile(etx));
                         instructions.push(...e1.compile(etx.slice(e1.domain,1)));
                         
