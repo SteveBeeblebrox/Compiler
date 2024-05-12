@@ -632,12 +632,12 @@ namespace ZLang {
                     (this.lhs as LiteralNode<any>).toASM
                     return [
                         ...this.rhs.compile(etx),
-                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.rhs.domain,0)}}, ${this.lhs as LiteralNode<any>}`
+                        ...cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.rhs.domain,0)}}, ${this.lhs as LiteralNode<any>}`
                     ];
                 } else if(BinaryOp.willUseInlineImmediate(this.rhs)) {
                     return [
                         ...this.lhs.compile(etx),
-                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.lhs.domain,0)}}, ${this.rhs as LiteralNode<any>}`
+                        ...cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.lhs.domain,0)}}, ${this.rhs as LiteralNode<any>}`
                     ];
                 } else {
                     const instructions: Instruction[] = [];
@@ -649,9 +649,9 @@ namespace ZLang {
                     instructions.push(...e1.compile(etx.slice(e1.domain,1)));
                     
                     if(e0 === this.lhs) {
-                        instructions.push(...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r0}}, ${{read:r1}}`);
+                        instructions.push(...cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r0}}, ${{read:r1}}`);
                     } else {
-                        instructions.push(...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r1}}, ${{read:r0}}`);
+                        instructions.push(...cinst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r1}}, ${{read:r0}}`);
                     }
 
                     return instructions;
@@ -678,7 +678,7 @@ namespace ZLang {
             compile(etx: ExpressionContext): Instruction[] {
                 const instructions: Instruction[] = [];
                 instructions.push(...this.val.compile(etx));
-                instructions.push(...inst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.domain,0)}}`);
+                instructions.push(...cinst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.domain,0)}}`);
                 return instructions;
             }
         }
@@ -823,13 +823,13 @@ namespace ZLang {
                 
                 instructions.push(`# ${ctx.virtualRegCount.r} Virtual General Registers`);
                 for(const vr of ctx.virtualRegisters.r as ASM.VirtualRegister[]) {
-                    instructions.push(...inst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
+                    instructions.push(...cinst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
                 }
                 instructions.push('');
                 
                 instructions.push(`# ${ctx.virtualRegCount.f} Virtual Float Registers`);
                 for(const vr of ctx.virtualRegisters.f as ASM.VirtualRegister[]) {
-                    instructions.push(...inst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
+                    instructions.push(...cinst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
                 }
                 instructions.push('');
                 
@@ -843,8 +843,8 @@ namespace ZLang {
                         && !ctx.hasLiteral(node)
                     ) {
                         const address = ctx.addLiteral(node);
-                        instructions.push(...inst`label ${address} ${{raw:`!${n++}`}}`);
-                        instructions.push(...inst`data ${address} ${node}`);
+                        instructions.push(...cinst`label ${address} ${{raw:`!${n++}`}}`);
+                        instructions.push(...cinst`data ${address} ${node}`);
                     } 
                 }, 'pre', this);
                 instructions.push('');
@@ -856,7 +856,7 @@ namespace ZLang {
                             for(const ident of idents) {
                                 const address = ctx.nextAddr(ASM.domainToAlignment(node.type.domain));
                                 ZLang.getEnclosingScope(node).setAddress(ident.name, address);
-                                instructions.push(...inst`label ${address} ${{raw:ident.name}}`);
+                                instructions.push(...cinst`label ${address} ${{raw:ident.name}}`);
                             }
                         }
                     }
@@ -864,7 +864,7 @@ namespace ZLang {
                 }, 'pre');
                 instructions.push('');
 
-                instructions.push(...inst`init ${ctx.nextAddr('i')}`);
+                instructions.push(...cinst`init ${ctx.nextAddr('i')}`);
                 instructions.push('');
 
                 instructions.push('# Body');
