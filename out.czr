@@ -1,0 +1,45 @@
+# Compiled at 2024-05-12T02:43:52.365Z
+# 1 Virtual General Registers
+label @0w !vr0
+
+# 2 Virtual Float Registers
+label @1f !vf0
+label @2f !vf1
+
+# Literals
+label @3w !0
+data @3w #9876543
+label @4f !1
+data @4f #1.34500000
+label @5f !2
+data @5f #197483.00000000
+
+# Global Variables
+label @6w x
+label @7f y
+
+init @8i
+
+# Body
+load r0 @3w
+store r0 @0w #vr0
+load r0 @0w #vr0
+store r0 @6w
+load f0 @4f
+store f0 @1f #vf0
+load f0 @1f #vf0
+chs f0 f0
+store f0 @1f #vf0
+load f0 @1f #vf0
+store f0 @7f
+load f0 @7f
+store f0 @1f #vf0
+load f0 @5f
+store f0 @2f #vf1
+load f0 @1f #vf0
+load f1 @2f #vf1
+add f0 f0, f1
+store f0 @1f #vf0
+load f0 @1f #vf0
+emit f0
+return

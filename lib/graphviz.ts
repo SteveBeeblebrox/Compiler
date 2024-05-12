@@ -10,7 +10,7 @@ namespace Graphviz {
     export const label = Symbol('Graphviz.label');
     export const children = Symbol('Graphviz.children');
     export const exclude = Symbol('Graphviz.exclude');
-    export const attributes = Symbol('Graphviz.attributes');
+    export const attributes = Symbol('Graphviz.attributes'); // https://graphviz.org/doc/info/attrs.html
 
     export function text(text: string, attributes: GraphvizAttributes = {}): Graphable {
         return {...attributes, [Graphviz.label]: text};

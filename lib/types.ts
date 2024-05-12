@@ -42,3 +42,8 @@ type Constructor<ParameterTypes extends any[],ThisType>=new(...args: ParameterTy
 
 type MapKey<T> = T extends Map<infer K, any> ? K : never;
 type MapValue<T> = T extends Map<any, infer V> ? V : never;
+
+// Take one and only one property from T
+type One<T, Keys extends keyof T = keyof T> = Pick<T, Exclude<keyof T, Keys>> & {
+    [K in Keys]-?: Required<Pick<T, K>> & Partial<Record<Exclude<Keys, K>, undefined>>
+}[Keys];

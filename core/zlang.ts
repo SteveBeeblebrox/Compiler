@@ -4,6 +4,7 @@
 ///#pragma once
 
 ///#include <compat.ts>
+///#include <mapping.ts>
 ///#include <signature.ts>
 ///#include <encoding.ts>
 
@@ -11,19 +12,400 @@
 ///#include "slr1.ts"
 ///#include "cfg.ts"
 
-
 namespace ZLang {
-    type Domain = 'string' | 'bool' | 'int' | 'float';
+    export type Domain = 'string' | 'bool' | 'int' | 'float';
 
     function escapeString(text: string) {
         return JSON.stringify(text).slice(1,-1).replace(/'/g,'\\\'').replace(/\\"/g,'"');
     }
-
+    
     const GRAMMAR = CFG.fromString(new BasicTextDecoder().decode(new Uint8Array([
         ///#embed "zlang.cfg"
     ])));
     
+    
+    export namespace ASM {
+        abstract class RegisterPair<T> {
+            constructor(public readonly r: T, public readonly f: T) {}
+        }
+        export class RegisterCount extends RegisterPair<number>{
+            public static readonly ZERO: RegisterCount = new RegisterCount(0,0);
+            public static joint(...counts: RegisterCount[]): RegisterCount {
+                if(counts.length === 0) return RegisterCount.ZERO;
+
+                function g(a: number, c: number) {
+                    if(a === 0 && c === 0) {
+                        return 0;
+                    } if(a === c) {
+                        return a + 1;
+                    } else {
+                        return Math.max(a,c);
+                    }
+                }
+
+                return new RegisterCount(
+                    counts.map(c=>c.r).reduce(g),
+                    counts.map(c=>c.f).reduce(g)
+                );
+            }
+            public static disjoint(...counts: RegisterCount[]): RegisterCount {
+                return new RegisterCount(
+                    Math.max(0,...counts.map(x=>x.r)),
+                    Math.max(0,...counts.map(x=>x.f))
+                );
+            }
+            public static general(n: number = 1) {
+                return new RegisterCount(n,0);
+            }
+            public static float(n: number = 1) {
+                return new RegisterCount(0,n);
+            }
+            public static forDomain(domain: Domain, n: number = 1) {
+                return domain === 'float' ? RegisterCount.float(n) : RegisterCount.general(n);
+            }
+
+            public static sortExpressionsDescending(nodes: ExpressionNode[]): ExpressionNode[] {
+                return nodes.sort(function({regCount:a,domain:A},{regCount:b,domain:B}) {
+                    return b[ASM.domainToRegisterType(B)] - a[ASM.domainToRegisterType(A)];
+                });
+            }
+        }
+
+        export class RegisterList extends RegisterPair<AbstractRegister[]> {
+            at(domain: Domain, index: number) {
+                return this[ASM.domainToRegisterType(domain)].at(index);
+            }
+            slice(domain: Domain, start?: number, end?: number): RegisterList {
+                const type = ASM.domainToRegisterType(domain);
+                return type === 'r' ? new RegisterList(this.r.slice(start,end),[...this.f]) : new RegisterList([...this.r],this.f.slice(start,end))
+            }
+        }
+
+        export type Address = `@${number}${Alignment}${'(pc)'|''}`;
+        export type Instruction = '' | `#${string}` | string;
+        export type Alignment = 'w' | 'f' | 'i' | 'b';
+        type InstructionArgumentObject = {
+            toASM(): string,
+            read: Register | VirtualRegister,
+            write: Register | VirtualRegister,
+            raw: string |number | bigint,
+            jump: number
+        }
+        type InstructionArgument = Register | VirtualRegister | Address | number | bigint | One<InstructionArgumentObject>;
+        abstract class AbstractRegister {
+            public constructor(public readonly name: string) {}
+            public toString(): string {
+                return this.name;
+            }
+            public get [Symbol.toStringTag]() {
+                return this.constructor.name;
+            }
+        }
+
+        export abstract class Register extends AbstractRegister {
+            toASM(): string {
+                return this.name;
+            }
+        }
+        export class DedicatedRegister extends Register {}
+        export class FloatRegister extends Register {
+            constructor(n: number) {
+                super(`f${n}`);
+            }
+        }
+        export class GeneralRegister extends Register {
+            constructor(n: number) {
+                super(`r${n}`);
+            }
+        }
+
+        export abstract class VirtualRegister extends AbstractRegister {
+            constructor(name: string, public readonly address: Address) {
+                super(name);
+            }            
+        }
+        export class VirtualFloatRegister extends VirtualRegister {
+            constructor(n: number, address: Address) {
+                super(`vf${n}`, address);
+            }
+        }
+        export class VirtualGeneralRegister extends VirtualRegister {
+            constructor(n: number, address: Address) {
+                super(`vr${n}`, address);
+            }
+        }
+
+        export type CompileOptions = {
+            regCount: RegisterCount,
+            includeComments?: boolean
+        }
+
+        export class CompileContext {
+            private byteOffset = 0;
+            private readonly literals = new Map<any,ASM.Address>();
+
+            private readonly sp = new DedicatedRegister('sp');
+            private readonly fp = new DedicatedRegister('fp');
+            private readonly ra = new DedicatedRegister('ra');
+            private readonly pc = new DedicatedRegister('pc');
+            public readonly ancillaRegisters: Readonly<RegisterList>;
+            public readonly workRegisters: Readonly<RegisterList>;
+            public readonly expressionRegisters: Readonly<RegisterList>;
+            public readonly hardwareRegisters: Readonly<RegisterList>;
+            public readonly virtualRegisters: Readonly<RegisterList>;
+
+            // public readonly ancillaStates: Map<Register,VirtualRegister> = new Map();
+
+            public get registers(): RegisterList {
+                return new RegisterList(
+                    [...this.hardwareRegisters.r,...this.virtualRegisters.r],
+                    [...this.hardwareRegisters.f,...this.virtualRegisters.f],
+                );
+            }
+            constructor(private readonly requiredRegCount: RegisterCount, private readonly physicalRegCount: RegisterCount) {
+                if(physicalRegCount.r < 4 || physicalRegCount.f < 4) {
+                    throw new Error(`At least 4 general purpose and 4 float registers are needed (in addition to sp and fp)`);
+                }
+
+                this.hardwareRegisters = new RegisterList(
+                    range(physicalRegCount.r).map(n=>new GeneralRegister(n)).toArray(),
+                    range(physicalRegCount.f).map(n=>new FloatRegister(n)).toArray()
+                );
+
+                const hr = [...this.hardwareRegisters.r], hf = [...this.hardwareRegisters.f];
+                
+                this.ancillaRegisters = new RegisterList(hr.splice(0,2), hf.splice(0,2));
+                this.workRegisters = new RegisterList(hr.splice(0,2), hf.splice(0,2));
+                
+                this.virtualRegisters = new RegisterList(
+                    range(this.virtualRegCount.r).map(n=>new VirtualGeneralRegister(n, this.nextAddr('w'))).toArray(),
+                    range(this.virtualRegCount.f).map(n=>new VirtualFloatRegister(n, this.nextAddr('f'))).toArray()
+                );
+
+
+                this.expressionRegisters = new RegisterList([...hr,...this.virtualRegisters.r], [...hf,...this.virtualRegisters.f]);
+            }
+
+            @enumerable
+            get virtualRegCount(): RegisterCount {
+                return {
+                    r: Math.max(0,this.requiredRegCount.r - (this.physicalRegCount.r - this.ancillaRegisters.r.length - this.workRegisters.r.length)),
+                    f: Math.max(0,this.requiredRegCount.f - (this.physicalRegCount.f - this.ancillaRegisters.f.length - this.workRegisters.f.length))
+                };
+            }
+
+            getAncilla(n: number,v: VirtualGeneralRegister|VirtualFloatRegister) {
+                return this.reg('a',v instanceof VirtualGeneralRegister ? 'r' : 'f',n);
+            }
+
+            nextAddr(alignment: ASM.Alignment, size: number = ASM.alignmentToBytes(alignment)): ASM.Address {
+                const bytes = ASM.alignmentToBytes(alignment);
+                if(this.byteOffset % bytes) this.byteOffset += bytes - (this.byteOffset % bytes);
+                const address: ASM.Address = `@${this.byteOffset/bytes}${alignment}`;
+
+                this.byteOffset += size;
+
+                return address;
+            }
+
+            hasLiteral(literal: Nodes.LiteralNode<any>): boolean {
+                return this.literals.has(literal.value);
+            }
+
+            getLiteral(literal: Nodes.LiteralNode<any>): Address {
+                return this.literals.get(literal.value);
+            }
+
+            addLiteral(literal: Nodes.LiteralNode<any>): Address {
+                const address = this.nextAddr(ASM.domainToAlignment(literal.domain), literal.size);
+                this.literals.set(literal.value, address);
+                return address;
+            }
+
+            reg(name: `${'a'|'w'|'x'|'h'|'v'|'X'}${'f'|'r'}${number}`): Register;
+            reg(space:'a'|'w'|'x'|'h'|'v'|'X',type:'f'|'r',n:number|`${number}`): Register;
+            reg(arg0:string,arg1?:string,arg2?:number|`${number}`): Register {
+                if(arg1) {
+                    return Object.assign(Object.create(null), {
+                        a: this.ancillaRegisters,
+                        w: this.workRegisters,
+                        x: this.expressionRegisters,
+                        h: this.hardwareRegisters,
+                        v: this.virtualRegisters,
+                        X: this.registers
+                    })[arg0][arg1][+arg2];
+                } else {
+                    if(arg0 === 'sp') {
+                        return this.sp;
+                    } else if(arg0 === 'fp') {
+                        return this.fp;
+                    } else if(arg0 === 'ra') {
+                        return this.ra;
+                    } else if(arg0 === 'pc') {
+                        return this.pc;
+                    } else {
+                        return this.reg(...arg0.padStart(3,'X').split('') as ['a'|'w'|'x'|'h'|'v'|'X','f'|'r',`${number}`]);
+                    }
+                }
+            }
+
+            public get [Symbol.toStringTag]() {
+                return this.constructor.name;
+            }
+
+            public createExpressionContext() {
+                return new ExpressionContext(this, new RegisterList([...this.expressionRegisters.r],[...this.expressionRegisters.f]));
+            }
+
+            // Use when an instruction is guarenteed to not jump, this allows for some significant vreg optimizations
+            // Most expressions expcept function calls should use this
+            public cinst(strings: TemplateStringsArray, ...args: InstructionArgument[]) {
+                return this.createInstruction(true,strings,...args);
+            }
+            // Noncontiguous instructions must NOT modify virtual registers
+            // In most reasonable ISA's this is not an issue (ra, pc, etc... are dedicated physical registers)
+            public inst(strings: TemplateStringsArray, ...args: InstructionArgument[]) {
+                return this.createInstruction(false,strings,...args);
+            } 
+
+            public createInstruction(contiguous: boolean, strings: TemplateStringsArray, ...args: InstructionArgument[]): Instruction[] {
+                const virtualReads = new Map<VirtualRegister,Register>(), virtualWrites = new Map<VirtualRegister,Register>();
+                const ctx = this;
+                let instruction = '';
+                let nRead = 0, nWrite = 0;
+
+                for(const [i,s] of strings.entries()) {
+                    const arg = (function f(arg) {
+                        if(arg instanceof AbstractRegister) {
+                            return f({read:arg});
+                        } else if(typeof arg === 'object' && arg !== null) {
+                            const {read,write,raw,jump} = arg as InstructionArgumentObject;
+                            
+                            if('toASM' in arg) {
+                                return (arg as InstructionArgumentObject).toASM();
+                            }
+                            
+                            if(raw) {
+                                return raw;
+                            }
+                            
+                            if(write) {
+                                if(write instanceof VirtualRegister) {
+                                    if(!virtualWrites.has(write)) {
+                                        const ancilla = ctx.getAncilla(nWrite++,write);
+                                        virtualWrites.set(write,ancilla);
+                                    }
+                                    return virtualWrites.get(write);
+                                }
+                                return write.toASM();
+                            }
+
+                            if(read) {
+                                if(read instanceof VirtualRegister) {
+                                    if(!virtualReads.has(read)) {
+                                        const ancilla = ctx.getAncilla(nRead++,read);
+                                        virtualReads.set(read,ancilla);
+                                    }
+                                    return virtualReads.get(read);
+                                }
+                                return read.toASM();
+                            }
+
+                            if(jump) {
+                                let n = jump;
+                                if(n < 0) {
+                                    n -= virtualReads.size;
+                                } else if(n > 0) {
+                                    n += virtualWrites.size;
+                                }
+                                return f(`@${n}i(pc)`);
+                            }
+                        } else if(typeof arg === 'number') {
+                            return ZLang.Nodes.FloatLiteral.toASM(arg,true);
+                        } else if(typeof arg === 'bigint') {
+                            return ZLang.Nodes.IntLiteral.toASM(arg);
+                        }
+                        return arg;
+                    })(args[i]);
+                    
+                    instruction+=s + (arg??'');
+                }
+
+                const instructions: Instruction[] = [
+                    ...virtualReads.entries().map(([{name,address},ancilla])=>`load ${ancilla} ${address}`),
+                    instruction,
+                    ...virtualWrites.entries().map(([{name,address},ancilla])=>`store ${ancilla} ${address}`)
+                ];
+
+                if(!contiguous) {
+                    ///#warning TODO set up ancilla map and filter reads. do we need to worry if some code changes the virtual register? yes.
+                    // also handle the {relative:n} InstructionArgument
+                    // this.ancillaStates.clear();
+                }
+
+                return instructions;
+            }
+        }
+
+        export class ExpressionContext {
+            constructor(
+                public readonly ctx: CompileContext,
+                private readonly registerList: Readonly<RegisterList>,
+            ) {}
+            
+            xreg(domain: Domain, index: number) {
+                return this.registerList[ASM.domainToRegisterType(domain)].at(index) as VirtualRegister|Register;
+            }
+            slice(domain: Domain, start?: number, end?: number): ExpressionContext {
+                return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end));
+            }
+
+            get cinst() {
+                return this.ctx.cinst.bind(this.ctx);
+            }
+            get inst() {
+                return this.ctx.inst.bind(this.ctx);
+            }
+        }
+
+        export function domainToAlignment(domain: ZLang.Domain): Alignment {
+            switch(domain) {
+                case 'bool':
+                case 'string':
+                    return 'b';
+                case 'float':
+                    return 'f'
+                case 'int':
+                    return 'w';
+            }
+        }
+        export function domainToRegisterType(domain: ZLang.Domain): 'r'|'f' {
+            switch(domain) {
+                case 'bool':
+                case 'string':
+                case 'int':
+                    return 'r';
+                case 'float':
+                    return 'f';
+            }
+        }
+        export function alignmentToBytes(alignment: Alignment) {
+            switch(alignment) {
+                case 'b':
+                    return 1;
+                case 'w':
+                case 'f':
+                case 'i':
+                    return 4;
+            }
+        }
+    }
+
     export namespace Nodes {
+        import CompileContext = ASM.CompileContext;
+        import ExpressionContext = ASM.ExpressionContext;
+        import RegisterCount = ASM.RegisterCount;
+        import Instruction = ASM.Instruction;
         export abstract class ZNode extends Tree {
             constructor(public readonly pos: Position, children: ZNode[] = []) {
                 super();
@@ -43,42 +425,115 @@ namespace ZLang {
             get [Graphviz.exclude]() {
                 return ['pos'];
             }
+            get [Graphviz.attributes]() {
+                try {
+                    return {xlabel:`${this.regCount.r},${this.regCount.f}`,forcelabels:true};
+                } catch {
+                    return {};
+                }
+            }
+            public abstract get regCount(): RegisterCount;
         }
         export interface ZNode {
             get parent() : ZNode;
-
         }
+        
         export abstract class ExpressionNode extends ZNode {
             public abstract get domain(): Domain;
+            public abstract override get regCount(): RegisterCount;
+            public abstract compile(etx: ASM.ExpressionContext): Instruction[];
         }
         export abstract class LiteralNode<T> extends ExpressionNode {
             constructor(pos: Position, public readonly type: Domain, public readonly value: T) {super(pos)};
             get domain() {
                 return this.type;
             }
+            public abstract get size(): number;
+            public abstract get isImmediate(): boolean;
+            public abstract toASM(): string;
         }
+        
         export class IntLiteral extends LiteralNode<number> {
+            public readonly size = 4;
             constructor(pos: Position,value: number) {
                 super(pos,'int',value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
             }
+            get regCount(): RegisterCount {
+                return RegisterCount.general();
+            }
+            get isImmediate(): boolean {
+                return this.value >= IntLiteral.IMM_MIN && this.value <= IntLiteral.IMM_MAX;
+            }
+           toASM(): string {
+                return IntLiteral.toASM(this.value);
+            }
+            public static toASM(value: IntLiteral['value'] | bigint): string {
+                return `#${value}`;
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+            }
         }
+        export namespace IntLiteral {
+            export const IMM_MIN = -16384, IMM_MAX = 16383;
+        }
+
         export class FloatLiteral extends LiteralNode<number> {
+            public readonly size = 4;
             constructor(pos: Position,value: number) {
                 super(pos,'float',value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${this.value}`;
             }
+            get regCount(): RegisterCount {
+                return RegisterCount.float();
+            }
+            get isImmediate(): boolean {
+                return this.value >= FloatLiteral.IMM_MIN && this.value <= FloatLiteral.IMM_MAX && this.decimals <= FloatLiteral.IMM_MAX_DECIMALS;
+            }
+            get decimals(): number {
+                return this.value % 1 ? this.value.toString().split('.')[1].length : 0;
+            }
+            toASM(): string {
+                return FloatLiteral.toASM(this.value, this.isImmediate);
+            }
+            public static toASM(value: FloatLiteral['value'], imm: boolean = false): string {
+                return `#${value.toFixed(imm ? 2 : 8)}`;
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+            }
         }
+        export namespace FloatLiteral {
+            export const IMM_MIN = 0, IMM_MAX = 1310.71;
+            export const IMM_MAX_DECIMALS = 2;
+        }
+
         export class StringLiteral extends LiteralNode<string> {
             constructor(pos: Position,value: string) {
                 super(pos,'string',value);
             }
             get [Graphviz.label]() {
                 return `${this.domain}val:${escapeString(this.value)}`;
+            }
+            get isImmediate(): boolean {
+                return false;
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.general();
+            }
+            toASM(): string {
+                return alphaEncode(this.value.slice(1,-1));
+            }
+            get size() {
+                return this.value.slice(1,-1).length;
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${{raw:`#${etx.ctx.getLiteral(this).slice(1)}`}}`
             }
         }
         export class IdentifierNode extends ExpressionNode {
@@ -89,42 +544,176 @@ namespace ZLang {
             get [Graphviz.label]() {
                 return `id:${this.name}`;
             }
+            get regCount(): RegisterCount {
+                return RegisterCount.forDomain(this.domain);
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                return etx.cinst`load ${{write:etx.xreg(this.domain,0)}} ${this.enclosingScope.get(this.name,this.pos).address}`;
+            }
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
         }
         export class BinaryOp extends ExpressionNode {
+            private static imap = new Mapping({
+                '+': 'add',
+                '-': 'sub',
+                '*': 'mul',
+                '/': 'div',
+                '%': 'rem',
+                '<': 'lt',
+                '<=': 'lte',
+                '==': 'eq',
+                '>=': 'gte',
+                '>': 'gt'
+            });
+
+            public static willUseInlineImmediate(node: ZNode): boolean {
+                return node instanceof LiteralNode
+                    && node.isImmediate
+                    && node.parent instanceof BinaryOp
+                    && (
+                        (node.parent.rhs === node && node.parent.supportsRightImmediate)
+                        || (node.parent.lhs === node && node.parent.supportsLeftImmediate && !BinaryOp.willUseInlineImmediate(node.parent.rhs))
+                    )
+                ;
+            }
             constructor(pos: Position,public override readonly name: string,public readonly lhs:ExpressionNode, public readonly rhs:ExpressionNode) {
                 super(pos,[lhs,rhs]);
             }
-            get domain() {
-                return (() => {
-                    switch(this.name) {
-                        case '-':
-                        case '+':
-                        
-                        case '*':
-                        case '/':
-                        case '%':
-                            return [this.lhs.domain,this.rhs.domain].includes('float') ? 'float' : this.lhs.domain;
+            // Commutative property allows immediates for either side of operation
+            get supportsLeftImmediate(): boolean {
+                switch(this.name) {
+                    case '+':
+                    case '*':
+                        return true;
 
-                        case '<':
-                        case '<=':
-                        case '==':
-                        case '>=':
-                        case '>':
-                            return 'bool';
+                    case '-':
+                    case '/':
+                    case '%':
+
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
                         
-                        case '!=': // unused
-                        default:
-                            throw new Error(`Unknown binary operator '${this.name}'`);
+                    case '!=': // unused
+                    default:
+                        return false;
+                }
+            }
+            get supportsRightImmediate(): boolean {
+                switch(this.name) {
+                    case '+':
+                    case '*':
+                    case '-':
+                    case '/':
+                    case '%':
+                        return true;
+
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
+                        
+                    case '!=': // unused
+                    default:
+                        return false;
+                }
+            }
+            get domain() {
+                switch(this.name) {
+                    case '+':
+                    case '-':
+                    
+                    case '*':
+                    case '/':
+                    case '%':
+                        return [this.lhs.domain,this.rhs.domain].includes('float') ? 'float' : this.lhs.domain;
+
+                    case '<':
+                    case '<=':
+                    case '==':
+                    case '>=':
+                    case '>':
+                        return 'bool';
+                    
+                    case '!=': // unused
+                    default:
+                        throw new Error(`Unknown binary operator '${this.name}'`);
+                }
+            }
+            get regCount(): RegisterCount {
+                if(
+                    (this.lhs.domain === 'float' && this.rhs.domain !== 'float')
+                    || (this.lhs.domain !== 'float' && this.rhs.domain === 'float')
+                ) {
+                    throw new Error('Mixed Expressions NYI');
+                } else {
+                    if(BinaryOp.willUseInlineImmediate(this.lhs)) {
+                        return this.rhs.regCount;
+                    } else if(BinaryOp.willUseInlineImmediate(this.rhs)) {
+                        return this.lhs.regCount;
                     }
-                })();
+                    return RegisterCount.joint(this.lhs.regCount,this.rhs.regCount);
+                }
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                const op = BinaryOp.imap[this.name];
+                if(BinaryOp.willUseInlineImmediate(this.lhs)) {
+                    (this.lhs as LiteralNode<any>).toASM
+                    return [
+                        ...this.rhs.compile(etx),
+                        ...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:etx.xreg(this.rhs.domain,0)}}, ${this.lhs as LiteralNode<any>}`
+                    ];
+                } else if(BinaryOp.willUseInlineImmediate(this.rhs)) {
+                    return [
+                        ...this.lhs.compile(etx),
+                        ...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:etx.xreg(this.lhs.domain,0)}}, ${this.rhs as LiteralNode<any>}`
+                    ];
+                } else {
+                    const instructions: Instruction[] = [];
+
+                    // Compile larger first
+                    const [e0,e1] = RegisterCount.sortExpressionsDescending([this.lhs, this.rhs]);
+                    const [r0, r1] = [etx.xreg(e0.domain,0),etx.xreg(e1.domain,1)];
+                    instructions.push(...e0.compile(etx));
+                    instructions.push(...e1.compile(etx.slice(e1.domain,1)));
+                    
+                    if(e0 === this.lhs) {
+                        instructions.push(...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:r0}}, ${{read:r1}}`);
+                    } else {
+                        instructions.push(...etx.cinst`${{raw:op}} ${{write:etx.xreg(this.domain,0)}} ${{read:r1}}, ${{read:r0}}`);
+                    }
+
+                    return instructions;
+                }
             }
         }
         export class UnaryOp extends ExpressionNode {
+            private static imap = new Mapping({
+                '+': 'abs',
+                '-': 'chs',
+                '!': 'not',
+                '~': 'compl'
+            });
+
             constructor(pos: Position,public override readonly name: string,public readonly val:ExpressionNode) {
                 super(pos,[val]);
             }
             get domain() {
                 return this.val.domain; // +-~! all leave the type as is
+            }
+            get regCount(): RegisterCount {
+                return this.val.regCount;
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                const instructions: Instruction[] = [];
+                instructions.push(...this.val.compile(etx));
+                instructions.push(...etx.cinst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.xreg(this.domain,0)}} ${{read:etx.xreg(this.domain,0)}}`);
+                return instructions;
             }
         }
         export class CastNode extends ExpressionNode {
@@ -140,6 +729,19 @@ namespace ZLang {
             get [Graphviz.children]() {
                 return [['',this.val]];
             }
+            get regCount(): RegisterCount {
+                if(
+                    (this.type.domain === 'float' && this.val.domain !== 'float')
+                    || (this.type.domain !== 'float' && this.val.domain === 'float')
+                ) {
+                    throw new Error('Mixed Expressions NYI');
+                } else {
+                    return this.val.regCount;
+                }
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                throw new Error('Mixed Expressions NYI');
+            }
         }
 
         export class ParameterNode extends ZNode {
@@ -152,9 +754,12 @@ namespace ZLang {
             get [Graphviz.children]() {
                 return [];
             }
+            get regCount(): RegisterCount {
+                return this.ident.regCount;    
+            }
         }
 
-        export class FunctionHeaderNode extends ZNode {
+        export class FunctionHeaderNode extends ZNode implements StatementLikeNode {
             public override readonly name: string;
             constructor(pos: Position, public readonly ident: IdentifierNode, public readonly rtype: TypeNode, public readonly parameters: ParameterNode[]) {
                 super(pos,[rtype,ident,...parameters]);
@@ -162,6 +767,12 @@ namespace ZLang {
             }
             get [Graphviz.label]() {
                 return `fn ${this.ident.name}(...)`;
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.ZERO;
+            }
+            compile(ctx: CompileContext): Instruction[] {
+                return [];
             }
         }
 
@@ -182,6 +793,9 @@ namespace ZLang {
             public get ztype() {
                 return new ZType(this.type,this.meta.const);
             }
+            get regCount(): RegisterCount {
+                return RegisterCount.ZERO;
+            }
         }
 
         export class FunctionCallNode extends ExpressionNode {
@@ -194,9 +808,15 @@ namespace ZLang {
             get [Graphviz.label]() {
                 return `${this.ident.name}(...)`;
             }
+            get regCount(): RegisterCount {
+                throw new Error('Function Calls NYI');
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                throw new Error('Function Calls NYI');    
+            }
         }
 
-        export class FunctionNode extends ZNode {
+        export class FunctionNode extends ZNode implements StatementLikeNode {
             public readonly scope = new Scope();
             constructor(pos: Position, public readonly header: FunctionHeaderNode, public readonly rvar: IdentifierNode, public readonly rvalue: ExpressionNode, public readonly body: StatementGroup) {
                 super(pos,[header,rvar,rvalue,body]);
@@ -207,18 +827,89 @@ namespace ZLang {
             get [Graphviz.children]() {
                 return [['header',this.header],['var',this.rvar],['rvalue',this.rvalue], ['body',this.body]];
             }
+            compile(ctx: ASM.CompileContext): Instruction[] {
+                throw new Error('Functions NYI');
+            }
+            get regCount(): RegisterCount {
+                throw new Error('Functions NYI');
+            }
         }
 
         export class Program extends ZNode {
             public readonly scope = new Scope();
-            constructor(pos: Position, public readonly steps: (StatementNode|FunctionNode)[]) {
-                super(pos,[...steps]);
+            constructor(pos: Position, public readonly statements: (StatementNode|FunctionNode|FunctionHeaderNode)[]) {
+                super(pos,[...statements]);
             }
             get [Graphviz.label]() {
                 return 'Program.z';
             }
             get [Graphviz.children]() {
                 return this.children.map((n,i) => [`statements[${i}]`,n]);
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.disjoint(...this.statements.map(s=>s.regCount));    
+            }
+            compile(options: ASM.CompileOptions): Instruction[] {
+                const ctx = new CompileContext(this.regCount,options.regCount);
+                const instructions: Instruction[] = [];
+                
+                instructions.push(`# Compiled at ${new Date().toISOString()}`);
+                
+                instructions.push(`# ${ctx.virtualRegCount.r} Virtual General Registers`);
+                for(const vr of ctx.virtualRegisters.r as ASM.VirtualRegister[]) {
+                    instructions.push(...ctx.cinst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
+                }
+                instructions.push('');
+                
+                instructions.push(`# ${ctx.virtualRegCount.f} Virtual Float Registers`);
+                for(const vr of ctx.virtualRegisters.f as ASM.VirtualRegister[]) {
+                    instructions.push(...ctx.cinst`label ${vr.address} ${{raw: `!${vr.name}`}}`);
+                }
+                instructions.push('');
+                
+                instructions.push('# Literals');
+                let n = 0;
+                ZLang.visit(this, function(node) {
+                    if(
+                        node instanceof ZLang.Nodes.LiteralNode
+                        // Even if op does not permit imm, we can load it in ahead of time from an imm
+                        && !node.isImmediate // BinaryOp.willUseImmediate(node)
+                        && !ctx.hasLiteral(node)
+                    ) {
+                        const address = ctx.addLiteral(node);
+                        instructions.push(...ctx.cinst`label ${address} ${{raw:`!${n++}`}}`);
+                        instructions.push(...ctx.cinst`data ${address} ${node}`);
+                    } 
+                }, 'pre', this);
+                instructions.push('');
+
+                instructions.push('# Global Variables');
+                ZLang.visit(this, function(node) {
+                    if(node instanceof ZLang.Nodes.DeclareStatement) {
+                        for(const [idents] of node.entries) {
+                            for(const ident of idents) {
+                                const address = ctx.nextAddr(ASM.domainToAlignment(node.type.domain));
+                                ZLang.getEnclosingScope(node).setAddress(ident.name, address);
+                                instructions.push(...ctx.cinst`label ${address} ${{raw:ident.name}}`);
+                            }
+                        }
+                    }
+                    return !(node instanceof ZLang.Nodes.FunctionNode);
+                }, 'pre');
+                instructions.push('');
+
+                instructions.push(...ctx.cinst`init ${ctx.nextAddr('i')}`);
+                instructions.push('');
+
+                instructions.push('# Body');
+
+                for(const statement of this.statements) {
+                    instructions.push(...statement.compile(ctx));
+                }
+                
+                instructions.push('return');
+
+                return instructions;
             }
         }
 
@@ -235,12 +926,23 @@ namespace ZLang {
             get [Graphviz.children]() {
                 return [['',this.value]];
             }
+            get regCount(): RegisterCount {
+                return this.value.regCount;
+            }
+            compile(etx: ExpressionContext): Instruction[] {
+                return this.value.compile(etx);    
+            }
         }
 
-        export abstract class StatementNode extends ZNode {
+        export abstract class StatementNode extends ZNode implements StatementLikeNode {
             get [Graphviz.label]() {
                 return 'Statement';
             }
+            abstract compile(ctx: ASM.CompileContext): Instruction[];
+        }
+
+        interface StatementLikeNode {
+            compile(ctx: ASM.CompileContext): Instruction[];
         }
 
         export class DeclareStatement extends StatementNode {
@@ -252,10 +954,10 @@ namespace ZLang {
                 return 'Declare';
             }
             get [Graphviz.children]() {
-                return [...Object.entries({type:this.type}), ...this.entries.map(function([...entry]) {
-                    let value: object = entry[1]??entry[0].pop();
-                    while(entry[0].length) {
-                        const ident = entry[0].pop();
+                return [...Object.entries({type:this.type}), ...this.entries.map(function([[...idents],expr]) {
+                    let value: object = expr??idents.pop();
+                    while(idents.length) {
+                        const ident = idents.pop();
                         const rhs = value;
                         value = {
                             get [Graphviz.label]() {
@@ -266,8 +968,27 @@ namespace ZLang {
                             }
                         }
                     }
-                    return ['',value]
+                    return ['',value];
                 })];
+            }
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
+            compile(ctx: CompileContext): Instruction[] {
+                const instructions: Instruction[] = [];
+                for(const [idents,value] of this.entries) {
+                    if(value) {
+                        const etx = ctx.createExpressionContext();
+                        instructions.push(...value.compile(etx));
+                        for(const ident of idents) {
+                            instructions.push(...ctx.cinst`store ${{read:etx.xreg(this.type.domain,0)}} ${this.enclosingScope.get(ident.name,ident.pos).address}`);
+                        }
+                    }
+                }
+                return instructions;
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.disjoint(...this.entries.flatMap(e => e[1] ? [e[1].regCount] : []));
             }
         }
 
@@ -284,6 +1005,19 @@ namespace ZLang {
             get domain() {
                 return this.value.domain;
             }
+            get enclosingScope() {
+                return ZLang.getEnclosingScope(this);
+            }
+            compile(ectx: CompileContext | ExpressionContext): Instruction[] {
+                if(!(ectx instanceof ExpressionContext)) return this.compile(ectx.createExpressionContext());
+                const instructions: Instruction[] = [];
+                instructions.push(...this.value.compile(ectx));
+                instructions.push(...ectx.cinst`store ${{read:ectx.xreg(this.ident.domain,0)}} ${this.enclosingScope.get(this.ident.name,this.ident.pos).address}`);
+                return instructions;
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.disjoint(this.ident.regCount, this.value.regCount);
+            }
         }
 
         export  class IfStatement extends StatementNode {
@@ -292,6 +1026,27 @@ namespace ZLang {
             }
             get [Graphviz.label]() {
                 return this.bfalse !== undefined ? 'If-Else' : 'If'
+            }
+            compile(ctx: CompileContext): Instruction[] {
+                const instructions: Instruction[] = [];
+                const etx = ctx.createExpressionContext();
+
+                instructions.push(...this.predicate.compile(etx));
+
+                const trueBranch = this.btrue.compile(ctx);
+                const falseBranch = this.bfalse?.compile(ctx) ?? [];
+
+                instructions.push(...ctx.inst`ifz ${{read:etx.xreg(this.predicate.domain,0)}} @${{raw:trueBranch.length + +!!falseBranch.length}}i(pc)`);
+                instructions.push(...trueBranch);
+                if(falseBranch.length) {
+                    instructions.push(...ctx.inst`jump ${{jump:falseBranch.length}}`);
+                    instructions.push(...falseBranch);
+                }
+                
+                return instructions;
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.disjoint(this.predicate.regCount, this.btrue.regCount, ...(this.bfalse ? [this.bfalse.regCount]: []));
             }
         }
 
@@ -302,6 +1057,23 @@ namespace ZLang {
             get [Graphviz.label]() {
                 return 'Do While';
             }
+            compile(ctx: CompileContext): Instruction[] {
+                const instructions: Instruction[] = [];
+                const etx = ctx.createExpressionContext();
+
+                const body = this.body.compile(ctx);
+                const predicate = this.predicate.compile(etx);
+
+                instructions.push(...body);
+                instructions.push(...predicate);
+
+                instructions.push(...ctx.inst`ifnz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:-(body.length + predicate.length + 1)}}`);
+
+                return instructions;
+            }
+            get regCount(): RegisterCount {
+                return  RegisterCount.disjoint(this.body.regCount,this.predicate.regCount);
+            }
         }
 
         export  class WhileStatement extends StatementNode {
@@ -310,6 +1082,26 @@ namespace ZLang {
             }
             get [Graphviz.label]() {
                 return 'While';
+            }
+            compile(ctx: CompileContext): Instruction[] {
+                const instructions: Instruction[] = [];
+                const etx = ctx.createExpressionContext();
+
+                const predicate = this.predicate.compile(etx);
+                const body = this.body.compile(ctx);
+
+                const condition = ctx.inst`ifz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:body.length + 1}}`;
+
+                instructions.push(...predicate);
+                instructions.push(...condition);
+                instructions.push(...body);
+
+                instructions.push(...ctx.inst`jump ${{jump:-(predicate.length + condition.length + body.length + 1)}}`);
+                
+                return instructions;
+            }
+            get regCount(): RegisterCount {
+                return  RegisterCount.disjoint(this.predicate.regCount,this.body.regCount);
             }
         }
 
@@ -340,17 +1132,94 @@ namespace ZLang {
             get [Graphviz.children]() {
                 return [...Object.entries(this.data)];
             }
+            compile(ctx: CompileContext): Instruction[] {
+                switch(this.data.type) {
+                    case 'symbtable': return [];
+                    case 'string': {
+                        const instructions: Instruction[] = [];
+                        const etx = ctx.createExpressionContext();
+                        const address = ZLang.getEnclosingScope(this).get(this.data.ident.name,this.data.ident.pos).address;
+                        
+                        // Compile larger first
+                        const [e0,e1] = RegisterCount.sortExpressionsDescending([this.data.index,this.data.length]);
+                        const [r0, r1] = [etx.xreg(e0.domain,0),etx.xreg(e1.domain,1)];
+                        instructions.push(...e0.compile(etx));
+                        instructions.push(...e1.compile(etx.slice(e1.domain,1)));
+
+                        const w0 = etx.ctx.reg('wr0');
+                        instructions.push(...ctx.cinst`load ${{write:w0}} ${address}`);
+                        
+                        if(e0 === this.data.index) {
+                            instructions.push(...ctx.cinst`emit @${{read:w0}} ${{read:r0}}, ${{read:r1}}`);
+                        } else {
+                            instructions.push(...ctx.cinst`emit @${{read:w0}} ${{read:r1}}, ${{read:r0}}`);
+                        }
+                        
+                        return instructions;
+                    }
+                    case 'value': {
+                        const instructions: Instruction[] = [];
+                        const etx = ctx.createExpressionContext();
+
+                        instructions.push(...this.data.value.compile(etx));
+                        instructions.push(...ctx.cinst`emit ${{read:etx.xreg(this.data.value.domain,0)}}`);
+
+                        return instructions;
+                    }
+                }
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.joint(...this.children.map(x=>x.regCount));
+            }
         }
 
         export class RandStatement extends StatementNode {
             constructor(pos: Position,public readonly ident: IdentifierNode, public readonly min?: ExpressionNode, public readonly max?: ExpressionNode) {
-                super(pos,[...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
+                super(pos,[ident,...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
             }
             get [Graphviz.label]() {
                 return 'Rand';
             }
             get [Graphviz.children]() {
                 return [['id',this.ident],...[this.min !== undefined ? ['min',this.min] : []],...[this.max !== undefined ? ['max',this.max] : []]]
+            }
+            compile(ctx: CompileContext): Instruction[] {
+                const address = ZLang.getEnclosingScope(this).get(this.ident.name,this.ident.pos).address;
+
+                switch(this.ident.domain) {
+                    case 'bool':
+                    case 'float': {
+                            const w0 = ctx.reg('w',ASM.domainToRegisterType(this.ident.domain),0);
+                            return [
+                                ...ctx.cinst`rand ${{write:w0}}`,
+                                ...ctx.cinst`store ${{read:w0}} ${address}`
+                            ];
+                        }
+                    case 'int': {
+                        const instructions: Instruction[] = [];
+                        const etx = ctx.createExpressionContext();
+                        
+                        // Compile larger first
+                        const [e0,e1] = RegisterCount.sortExpressionsDescending([this.min!,this.max!]);
+                        const [r0, r1] = [etx.xreg(e0.domain,0),etx.xreg(e1.domain,1)];
+                        instructions.push(...e0.compile(etx));
+                        instructions.push(...e1.compile(etx.slice(e1.domain,1)));
+                        
+                        const w0 = etx.ctx.reg('wr0');
+
+                        if(e0 === this.min) {
+                            instructions.push(...ctx.cinst`rand ${{write:w0}} ${{read:r0}}, ${{read:r1}}`);
+                        } else {
+                            instructions.push(...ctx.cinst`rand ${{write:w0}} ${{read:r1}}, ${{read:r0}}`);
+                        }
+                        instructions.push(...ctx.cinst`store ${{read:w0}} ${address}`);
+
+                        return instructions;
+                    }
+                }
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.joint(...this.children.map(x=>x.regCount));
             }
         }
 
@@ -364,6 +1233,12 @@ namespace ZLang {
             }
             get[Graphviz.exclude]() {
                 return ['scope',...super[Graphviz.exclude]];
+            }
+            get regCount(): RegisterCount {
+                return RegisterCount.disjoint(...this.statements.map(s=>s.regCount));    
+            }
+            compile(ctx: CompileContext): Instruction[] {
+                return this.statements.flatMap(s => s.compile(ctx));
             }
         }
     }
@@ -605,9 +1480,9 @@ namespace ZLang {
 
     // For preorder traversal, returning false prevents visiting children
     // For postorder traversal, returing false prevents visiting parents but not sibblings and parents' sibblings
-    export function visit(program: Program, f: (node:Nodes.ZNode)=>void|boolean, order: 'post');
-    export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order?: 'pre');
-    export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order: 'pre'|'post' = 'pre') {
+    export function visit(program: Program, f: (node:Nodes.ZNode)=>void|boolean, order: 'post', thisArg?: any);
+    export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order?: 'pre', thisArg?: any);
+    export function visit(program: Program, f: (node:Nodes.ZNode, V: Set<Nodes.ZNode>)=>void|boolean, order: 'pre'|'post' = 'pre', thisArg?: any) {
         const V = new Set<Nodes.ZNode>;
         function visit(node: Nodes.ZNode) {
             if(V.has(node)) return;
@@ -617,7 +1492,7 @@ namespace ZLang {
             let postcondition = true;
 
             if(order === 'pre') {
-                precondition = f(node,V) as undefined | boolean ?? precondition;
+                precondition = f.bind(thisArg ?? node)(node,V) as undefined | boolean ?? precondition;
             }
             
             if(precondition && node instanceof Nodes.ZNode) {
@@ -628,7 +1503,7 @@ namespace ZLang {
 
 
             if(order === 'post' && postcondition) {
-                postcondition = f.bind(node)(node);
+                postcondition = f.bind(thisArg ?? node)(node);
             }
 
             return postcondition;
@@ -674,7 +1549,7 @@ namespace ZLang {
         throw new Parsing.SemanticError(`${SemanticErrors[errno]}: ${message}`, pos);
     }
 
-    type Declaration = {n: number, name: string, type: ZType | ZFunctionType, pos: Position} & DeclarationDetails
+    type Declaration = {n: number, name: string, type: ZType | ZFunctionType, pos: Position, address?: ASM.Address} & DeclarationDetails
     type DeclarationDetails = {used:boolean, initialized:boolean};
     export class Scope {
         private readonly data = new Map<string,Declaration>;
@@ -720,6 +1595,14 @@ namespace ZLang {
             }
         }
 
+        public setAddress(name: string, address: ASM.Address) {
+            if(this.hasLocal(name)) {
+                this.data.get(name).address = address;
+            } else {
+                throw new Error(`'${name}' does not exist in the current scope chain`);
+            }
+        }
+
         public entries(): [string,Declaration][] {
             return [
                 ...(this.parent ? this.parent.entries() : []),
@@ -751,6 +1634,11 @@ namespace ZLang {
 
     export function applySemantics(program: Program) {
         initSymbols(program);
+        return program;
+    }
+
+    export function compile(text: string, options: ASM.CompileOptions): string {
+        return ZLang.applySemantics(ZLang.parse(text)).compile(options).filter(line => options.includeComments || (line.trim() && !line.trim().startsWith('#'))).join('\n');
     }
 
     function initSymbols(program: Program) {
