@@ -1,4 +1,4 @@
-# Compiled at 2024-05-12T00:19:32.975Z
+# Compiled at 2024-05-12T00:59:44.904Z
 # 1 Virtual General Registers
 label @0w !vr0
 
@@ -22,23 +22,24 @@ init @8i
 
 # Body
 load r0 @3w
-#r0->vr0
-#vr0->r0
+store r0 @0w #vr0
+load r0 @0w #vr0
 store r0 @6w
-load r0 @4f
-#r0->vr0
-#vr0->r0
-chs r0, r0
-#r0->vr0
-#vr0->r0
-store r0 @7f
-load r0 @7f
-#r0->vr0
-load r0 @5f
-#r0->vr0
-#vr0->r0
-add r0 r0, [object Object]
-#r0->vr0
-#vr0->r0
-emit r0
+load f0 @4f
+store f0 @1f #vf0
+load f0 @1f #vf0
+chs f0 f0
+store f0 @1f #vf0
+load f0 @1f #vf0
+store f0 @7f
+load f0 @7f
+store f0 @1f #vf0
+load f0 @5f
+store f0 @2f #vf1
+load f0 @1f #vf0
+load f1 @2f #vf1
+add f0 f0, f1
+store f0 @1f #vf0
+load f0 @1f #vf0
+emit f0
 return

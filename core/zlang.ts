@@ -255,8 +255,7 @@ namespace ZLang {
             constructor(public readonly ctx: CompileContext, private readonly registerList: Readonly<RegisterList>) {}
             
             reg(domain: Domain, index: number) {
-                this.registerList[ASM.domainToRegisterType(domain)].at(index);
-                return this.registerList.r.at(index);
+                return this.registerList[ASM.domainToRegisterType(domain)].at(index) as VirtualRegister|Register;
             }
             slice(domain: Domain, start?: number, end?: number): ExpressionContext {
                 return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end));
@@ -281,7 +280,7 @@ namespace ZLang {
                 case 'int':
                     return 'r';
                 case 'float':
-                    return 'f'
+                    return 'f';
             }
         }
         export function alignmentToBytes(alignment: Alignment) {
@@ -295,9 +294,9 @@ namespace ZLang {
             }
         }
 
-        type InstructionArgument = {toASM():string} | AbstractRegister | {read:AbstractRegister} | {write:AbstractRegister} | {raw:string} | Address | number | bigint;
-        export function inst(strings: TemplateStringsArray, ...args: InstructionArgument[]): Instruction[] {
-            const virtualReads = new Map<string,string>(), virtualWrites = new Map<string,string>();
+        type InstructionArgument = {toASM():string} | VirtualRegister|Register | {read:VirtualRegister|Register} | {write:VirtualRegister|Register} | {raw:string} | Address | number | bigint;
+        export function inst(this: void | ExpressionContext, strings: TemplateStringsArray, ...args: InstructionArgument[]): Instruction[] {
+            const virtualReads = new Map<VirtualRegister,string>(), virtualWrites = new Map<VirtualRegister,string>();
             let instruction = '';
             let nRead = 0, nWrite = 0;
 
@@ -306,7 +305,7 @@ namespace ZLang {
                     if(arg instanceof AbstractRegister) {
                         return f({read:arg});
                     } else if(typeof arg === 'object' && arg !== null) {
-                        const {read,write,raw}:{read?:AbstractRegister,write?:AbstractRegister,raw?:string,toASM?:()=>string} = arg;
+                        const {read,write,raw}:{read?:VirtualRegister|Register,write?:VirtualRegister|Register,raw?:string,toASM?:()=>string} = arg;
                         
                         if('toASM' in arg) {
                             return arg.toASM();
@@ -317,17 +316,23 @@ namespace ZLang {
                         }
                         
                         if(write) {
-                            if(write instanceof VirtualRegister && !virtualWrites.has(write.name)) {
-                                virtualWrites.set(write.name,write.toASM(nWrite++));
+                            if(write instanceof VirtualRegister) {
+                                if(!virtualWrites.has(write)) {
+                                    virtualWrites.set(write,write.toASM(nWrite++));
+                                }
+                                return virtualWrites.get(write);
                             }
-                            return virtualWrites.get(write.name)??(write as Register).toASM();
+                            return write.toASM();
                         }
 
                         if(read) {
-                            if(read instanceof VirtualRegister && !virtualReads.has(read.name)) {
-                                virtualReads.set(read.name,read.toASM(nRead++));
+                            if(read instanceof VirtualRegister) {
+                                if(!virtualReads.has(read)) {
+                                    virtualReads.set(read,read.toASM(nRead++));
+                                }
+                                return virtualReads.get(read);
                             }
-                            return virtualReads.get(read.name)??(read as Register).toASM();
+                            return read.toASM();
                         }
                     } else if(typeof arg === 'number') {
                         return ZLang.Nodes.FloatLiteral.toASM(arg,true);
@@ -341,9 +346,9 @@ namespace ZLang {
             }
 
             return [
-                ...virtualReads.entries().map(([v,w])=>`#${v}->${w}`),
+                ...virtualReads.entries().map(([{name,address},w])=>`load ${w} ${address} #${name}`),
                 instruction,
-                ...virtualWrites.entries().map(([v,w])=>`#${w}->${v}`)
+                ...virtualWrites.entries().map(([{name,address},w])=>`store ${w} ${address} #${name}`)
             ];
         }
     }
@@ -614,12 +619,12 @@ namespace ZLang {
                     (this.lhs as LiteralNode<any>).toASM
                     return [
                         ...this.rhs.compile(etx),
-                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.rhs.domain,0)}}, ${this.lhs}`
+                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.rhs.domain,0)}}, ${this.lhs as LiteralNode<any>}`
                     ];
                 } else if(BinaryOp.willUseInlineImmediate(this.rhs)) {
                     return [
                         ...this.lhs.compile(etx),
-                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.lhs.domain,0)}}, ${this.rhs}`
+                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.lhs.domain,0)}}, ${this.rhs as LiteralNode<any>}`
                     ];
                 } else {
                     const instructions: Instruction[] = [];
@@ -629,7 +634,7 @@ namespace ZLang {
                     const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
                     instructions.push(...e0.compile(etx));
                     instructions.push(...e1.compile(etx.slice(e1.domain,1)));
-
+                    
                     if(e0 === this.lhs) {
                         instructions.push(...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r0}}, ${{read:r1}}`);
                     } else {
@@ -660,7 +665,7 @@ namespace ZLang {
             compile(etx: ExpressionContext): Instruction[] {
                 const instructions: Instruction[] = [];
                 instructions.push(...this.val.compile(etx));
-                instructions.push(...inst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.reg(this.domain,0)}}, ${{read:etx.reg(this.domain,0)}}`);
+                instructions.push(...inst`${{raw:UnaryOp.imap[this.name]}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.domain,0)}}`);
                 return instructions;
             }
         }

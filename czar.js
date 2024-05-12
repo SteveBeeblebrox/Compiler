@@ -3551,8 +3551,7 @@ var ZLang;
                 this.registerList = registerList;
             }
             reg(domain, index) {
-                this.registerList[ASM.domainToRegisterType(domain)].at(index);
-                return this.registerList.r.at(index);
+                return this.registerList[ASM.domainToRegisterType(domain)].at(index);
             }
             slice(domain, start, end) {
                 return new ExpressionContext(this.ctx, this.registerList.slice(domain, start, end));
@@ -3599,7 +3598,6 @@ var ZLang;
             let nRead = 0, nWrite = 0;
             for (const [i, s] of strings.entries()) {
                 const arg = (function f(arg) {
-                    var _a, _b;
                     if (arg instanceof AbstractRegister) {
                         return f({ read: arg });
                     }
@@ -3612,16 +3610,22 @@ var ZLang;
                             return raw;
                         }
                         if (write) {
-                            if (write instanceof VirtualRegister && !virtualWrites.has(write.name)) {
-                                virtualWrites.set(write.name, write.toASM(nWrite++));
+                            if (write instanceof VirtualRegister) {
+                                if (!virtualWrites.has(write)) {
+                                    virtualWrites.set(write, write.toASM(nWrite++));
+                                }
+                                return virtualWrites.get(write);
                             }
-                            return (_a = virtualWrites.get(write.name)) !== null && _a !== void 0 ? _a : write.toASM();
+                            return write.toASM();
                         }
                         if (read) {
-                            if (read instanceof VirtualRegister && !virtualReads.has(read.name)) {
-                                virtualReads.set(read.name, read.toASM(nRead++));
+                            if (read instanceof VirtualRegister) {
+                                if (!virtualReads.has(read)) {
+                                    virtualReads.set(read, read.toASM(nRead++));
+                                }
+                                return virtualReads.get(read);
                             }
-                            return (_b = virtualReads.get(read.name)) !== null && _b !== void 0 ? _b : read.toASM();
+                            return read.toASM();
                         }
                     }
                     else if (typeof arg === 'number') {
@@ -3635,9 +3639,9 @@ var ZLang;
                 instruction += s + (arg !== null && arg !== void 0 ? arg : '');
             }
             return [
-                ...virtualReads.entries().map(([v, w]) => `#${v}->${w}`),
+                ...virtualReads.entries().map(([{ name, address }, w]) => `load ${w} ${address} #${name}`),
                 instruction,
-                ...virtualWrites.entries().map(([v, w]) => `#${w}->${v}`)
+                ...virtualWrites.entries().map(([{ name, address }, w]) => `store ${w} ${address} #${name}`)
             ];
         }
         ASM.inst = inst;
@@ -3943,7 +3947,7 @@ var ZLang;
             compile(etx) {
                 const instructions = [];
                 instructions.push(...this.val.compile(etx));
-                instructions.push(...inst `${{ raw: UnaryOp.imap[this.name] }} ${{ write: etx.reg(this.domain, 0) }}, ${{ read: etx.reg(this.domain, 0) }}`);
+                instructions.push(...inst `${{ raw: UnaryOp.imap[this.name] }} ${{ write: etx.reg(this.domain, 0) }} ${{ read: etx.reg(this.domain, 0) }}`);
                 return instructions;
             }
         }
