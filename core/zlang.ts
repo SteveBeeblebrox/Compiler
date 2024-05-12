@@ -252,13 +252,17 @@ namespace ZLang {
         }
 
         export class ExpressionContext {
-            constructor(public readonly ctx: CompileContext, private readonly registerList: Readonly<RegisterList>) {}
+            constructor(
+                public readonly ctx: CompileContext,
+                private readonly registerList: Readonly<RegisterList>,
+                private readonly ancillaStates: Map<Register,VirtualRegister> = new Map()
+            ) {}
             
             reg(domain: Domain, index: number) {
                 return this.registerList[ASM.domainToRegisterType(domain)].at(index) as VirtualRegister|Register;
             }
             slice(domain: Domain, start?: number, end?: number): ExpressionContext {
-                return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end));
+                return new ExpressionContext(this.ctx,this.registerList.slice(domain,start,end),this.ancillaStates);
             }
         }
 
@@ -294,8 +298,17 @@ namespace ZLang {
             }
         }
 
+        // Use when an instruction is guarenteed to not jump, this allows for some significant vreg optimizations
+        // Most expressions expcept function calls should use this
+        export function cinst(strings: TemplateStringsArray, ...args: InstructionArgument[]) {
+            return createInstruction(true,strings,...args);
+        }
+        export function inst(strings: TemplateStringsArray, ...args: InstructionArgument[]) {
+            return createInstruction(false,strings,...args);
+        } 
+
         type InstructionArgument = {toASM():string} | VirtualRegister|Register | {read:VirtualRegister|Register} | {write:VirtualRegister|Register} | {raw:string} | Address | number | bigint;
-        export function inst(this: void | ExpressionContext, strings: TemplateStringsArray, ...args: InstructionArgument[]): Instruction[] {
+        function createInstruction(contiguous: boolean, strings: TemplateStringsArray, ...args: InstructionArgument[]): Instruction[] {
             const virtualReads = new Map<VirtualRegister,string>(), virtualWrites = new Map<VirtualRegister,string>();
             let instruction = '';
             let nRead = 0, nWrite = 0;
