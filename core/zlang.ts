@@ -947,7 +947,7 @@ namespace ZLang {
                         const etx = ctx.createExpressionContext();
                         instructions.push(...value.compile(etx));
                         for(const ident of idents) {
-                            instructions.push(...inst`store ${{read:etx.reg(this.type.domain,0)}} ${this.enclosingScope.get(ident.name,ident.pos).address}`);
+                            instructions.push(...cinst`store ${{read:etx.reg(this.type.domain,0)}} ${this.enclosingScope.get(ident.name,ident.pos).address}`);
                         }
                     }
                 }
@@ -1073,12 +1073,12 @@ namespace ZLang {
                         instructions.push(...e1.compile(etx.slice(e1.domain,1)));
 
                         const w0 = etx.ctx.reg('wr0');
-                        instructions.push(...inst`load ${{write:w0}} ${address}`);
+                        instructions.push(...cinst`load ${{write:w0}} ${address}`);
                         
                         if(e0 === this.data.index) {
-                            instructions.push(...inst`emit @${{read:w0}} ${{read:r0}}, ${{read:r1}}`);
+                            instructions.push(...cinst`emit @${{read:w0}} ${{read:r0}}, ${{read:r1}}`);
                         } else {
-                            instructions.push(...inst`emit @${{read:w0}} ${{read:r1}}, ${{read:r0}}`);
+                            instructions.push(...cinst`emit @${{read:w0}} ${{read:r1}}, ${{read:r0}}`);
                         }
                         
                         return instructions;
@@ -1088,7 +1088,7 @@ namespace ZLang {
                         const etx = ctx.createExpressionContext();
 
                         instructions.push(...this.data.value.compile(etx));
-                        instructions.push(...inst`emit ${{read:etx.reg(this.data.value.domain,0)}}`);
+                        instructions.push(...cinst`emit ${{read:etx.reg(this.data.value.domain,0)}}`);
 
                         return instructions;
                     }
@@ -1117,8 +1117,8 @@ namespace ZLang {
                     case 'float': {
                             const w0 = ctx.reg('w',ASM.domainToRegisterType(this.ident.domain),0);
                             return [
-                                ...inst`rand ${{write:w0}}`,
-                                ...inst`store ${{read:w0}} ${address}`
+                                ...cinst`rand ${{write:w0}}`,
+                                ...cinst`store ${{read:w0}} ${address}`
                             ];
                         }
                     case 'int': {
@@ -1134,11 +1134,11 @@ namespace ZLang {
                         const w0 = etx.ctx.reg('wr0');
 
                         if(e0 === this.min) {
-                            instructions.push(...inst`rand ${{write:w0}} ${{read:r0}}, ${{read:r1}}`);
+                            instructions.push(...cinst`rand ${{write:w0}} ${{read:r0}}, ${{read:r1}}`);
                         } else {
-                            instructions.push(...inst`rand ${{write:w0}} ${{read:r1}}, ${{read:r0}}`);
+                            instructions.push(...cinst`rand ${{write:w0}} ${{read:r1}}, ${{read:r0}}`);
                         }
-                        instructions.push(...inst`store ${{read:w0}} ${address}`);
+                        instructions.push(...cinst`store ${{read:w0}} ${address}`);
 
                         return instructions;
                     }
