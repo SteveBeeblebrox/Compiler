@@ -1,4 +1,4 @@
-# Compiled at 2024-05-11T21:36:35.284Z
+# Compiled at 2024-05-12T00:19:32.975Z
 # 1 Virtual General Registers
 label @0w !vr0
 
@@ -32,6 +32,13 @@ chs r0, r0
 #r0->vr0
 #vr0->r0
 store r0 @7f
+load r0 @7f
+#r0->vr0
+load r0 @5f
+#r0->vr0
+#vr0->r0
+add r0 r0, [object Object]
+#r0->vr0
 #vr0->r0
 emit r0
 return

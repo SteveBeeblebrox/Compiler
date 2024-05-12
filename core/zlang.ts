@@ -330,7 +330,7 @@ namespace ZLang {
                             return virtualReads.get(read.name)??(read as Register).toASM();
                         }
                     } else if(typeof arg === 'number') {
-                        return ZLang.Nodes.FloatLiteral.toASM(arg);
+                        return ZLang.Nodes.FloatLiteral.toASM(arg,true);
                     } else if(typeof arg === 'bigint') {
                         return ZLang.Nodes.IntLiteral.toASM(arg);
                     }
@@ -447,10 +447,10 @@ namespace ZLang {
                 return this.value % 1 ? this.value.toString().split('.')[1].length : 0;
             }
             toASM(): string {
-                return FloatLiteral.toASM(this.value);
+                return FloatLiteral.toASM(this.value, this.isImmediate);
             }
-            public static toASM(value: FloatLiteral['value']): string {
-                return `#${value.toFixed(8)}`;
+            public static toASM(value: FloatLiteral['value'], imm: boolean = false): string {
+                return `#${value.toFixed(imm ? 2 : 8)}`;
             }
             compile(etx: ExpressionContext): Instruction[] {
                 return inst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
@@ -503,7 +503,20 @@ namespace ZLang {
             }
         }
         export class BinaryOp extends ExpressionNode {
-            static willUseInlineImmediate(node: ZNode): boolean {
+            private static imap = new Mapping({
+                '+': 'add',
+                '-': 'sub',
+                '*': 'mul',
+                '/': 'div',
+                '%': 'rem',
+                '<': 'lt',
+                '<=': 'lte',
+                '==': 'eq',
+                '>=': 'gte',
+                '>': 'gt'
+            });
+
+            public static willUseInlineImmediate(node: ZNode): boolean {
                 return node instanceof LiteralNode
                     && node.isImmediate
                     && node.parent instanceof BinaryOp
@@ -560,8 +573,8 @@ namespace ZLang {
             }
             get domain() {
                 switch(this.name) {
-                    case '-':
                     case '+':
+                    case '-':
                     
                     case '*':
                     case '/':
@@ -596,11 +609,35 @@ namespace ZLang {
                 }
             }
             compile(etx: ExpressionContext): Instruction[] {
-            
-                ///#warning TODO bops and vreg saving
-                //throw new Error('TODO bops!!');
-            return []
-            
+                const op = BinaryOp.imap[this.name];
+                if(BinaryOp.willUseInlineImmediate(this.lhs)) {
+                    (this.lhs as LiteralNode<any>).toASM
+                    return [
+                        ...this.rhs.compile(etx),
+                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.rhs.domain,0)}}, ${this.lhs}`
+                    ];
+                } else if(BinaryOp.willUseInlineImmediate(this.rhs)) {
+                    return [
+                        ...this.lhs.compile(etx),
+                        ...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:etx.reg(this.lhs.domain,0)}}, ${this.rhs}`
+                    ];
+                } else {
+                    const instructions: Instruction[] = [];
+
+                    // Compile larger first
+                    const [e0,e1] = RegisterCount.sortExpressionsDescending([this.lhs, this.rhs]);
+                    const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
+                    instructions.push(...e0.compile(etx));
+                    instructions.push(...e1.compile(etx.slice(e1.domain,1)));
+
+                    if(e0 === this.lhs) {
+                        instructions.push(...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r0}}, ${{read:r1}}`);
+                    } else {
+                        instructions.push(...inst`${{raw:op}} ${{write:etx.reg(this.domain,0)}} ${{read:r1}}, ${{read:r0}}`);
+                    }
+
+                    return instructions;
+                }
             }
         }
         export class UnaryOp extends ExpressionNode {
@@ -610,6 +647,7 @@ namespace ZLang {
                 '!': 'not',
                 '~': 'compl'
             });
+
             constructor(pos: Position,public override readonly name: string,public readonly val:ExpressionNode) {
                 super(pos,[val]);
             }
@@ -1011,7 +1049,7 @@ namespace ZLang {
                         const address = ZLang.getEnclosingScope(this).get(this.data.ident.name,this.data.ident.pos).address;
                         
                         // Compile larger first
-                        const [e0,e1] = RegisterCount.sortExpressionsDescending([this.data.index!,this.data.length!]);
+                        const [e0,e1] = RegisterCount.sortExpressionsDescending([this.data.index,this.data.length]);
                         const [r0, r1] = [etx.reg(e0.domain,0),etx.reg(e1.domain,1)];
                         instructions.push(...e0.compile(etx));
                         instructions.push(...e1.compile(etx.slice(e1.domain,1)));
