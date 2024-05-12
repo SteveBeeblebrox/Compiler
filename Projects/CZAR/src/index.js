@@ -4850,7 +4850,7 @@ var ZLang;
     }
     ZLang.applySemantics = applySemantics;
     function compile(text, options) {
-        return ZLang.applySemantics(ZLang.parse(text)).compile(options).filter(line => options.includeComments || !line.trim().startsWith('#')).join('\n');
+        return ZLang.applySemantics(ZLang.parse(text)).compile(options).filter(line => options.includeComments || (line.trim() && !line.trim().startsWith('#'))).join('\n');
     }
     ZLang.compile = compile;
     function initSymbols(program) {

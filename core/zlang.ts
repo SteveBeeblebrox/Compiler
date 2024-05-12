@@ -1638,7 +1638,7 @@ namespace ZLang {
     }
 
     export function compile(text: string, options: ASM.CompileOptions): string {
-        return ZLang.applySemantics(ZLang.parse(text)).compile(options).filter(line => options.includeComments || !line.trim().startsWith('#')).join('\n');
+        return ZLang.applySemantics(ZLang.parse(text)).compile(options).filter(line => options.includeComments || (line.trim() && !line.trim().startsWith('#'))).join('\n');
     }
 
     function initSymbols(program: Program) {
