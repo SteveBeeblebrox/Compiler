@@ -370,7 +370,8 @@ namespace ZLang {
         import ExpressionContext = ASM.ExpressionContext;
         import RegisterCount = ASM.RegisterCount;
         import Instruction = ASM.Instruction;
-        import inst = ASM.inst;
+        import _inst = ASM.inst;
+        import cinst = ASM.cinst;
         export abstract class ZNode extends Tree {
             constructor(public readonly pos: Position, children: ZNode[] = []) {
                 super();
@@ -439,7 +440,7 @@ namespace ZLang {
                 return `#${value}`;
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return inst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+                return cinst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
             }
         }
         export namespace IntLiteral {
@@ -470,7 +471,7 @@ namespace ZLang {
                 return `#${value.toFixed(imm ? 2 : 8)}`;
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return inst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
+                return cinst`load ${{write:etx.reg(this.domain,0)}} ${this.isImmediate ? this : etx.ctx.getLiteral(this)}`;
             }
         }
         export namespace FloatLiteral {
@@ -498,7 +499,7 @@ namespace ZLang {
                 return this.value.slice(1,-1).length;
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return inst`load ${{write:etx.reg(this.domain,0)}} ${{raw:`#${etx.ctx.getLiteral(this).slice(1)}`}}`
+                return cinst`load ${{write:etx.reg(this.domain,0)}} ${{raw:`#${etx.ctx.getLiteral(this).slice(1)}`}}`
             }
         }
         export class IdentifierNode extends ExpressionNode {
@@ -513,7 +514,7 @@ namespace ZLang {
                 return RegisterCount.forDomain(this.domain);
             }
             compile(etx: ExpressionContext): Instruction[] {
-                return inst`load ${{write:etx.reg(this.domain,0)}} ${this.enclosingScope.get(this.name,this.pos).address}`;
+                return cinst`load ${{write:etx.reg(this.domain,0)}} ${this.enclosingScope.get(this.name,this.pos).address}`;
             }
             get enclosingScope() {
                 return ZLang.getEnclosingScope(this);
