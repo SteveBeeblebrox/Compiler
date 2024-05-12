@@ -1067,7 +1067,7 @@ namespace ZLang {
                 instructions.push(...body);
                 instructions.push(...predicate);
 
-                instructions.push(...ctx.inst`ifnz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:-(body.length + predicate.length)}}`);
+                instructions.push(...ctx.inst`ifnz ${{read:etx.xreg(this.predicate.domain,0)}} ${{jump:-(body.length + predicate.length + 1)}}`);
 
                 return instructions;
             }
@@ -1096,7 +1096,7 @@ namespace ZLang {
                 instructions.push(...condition);
                 instructions.push(...body);
 
-                instructions.push(...ctx.inst`jump ${{jump:-(predicate.length + condition.length + body.length)}}`)
+                instructions.push(...ctx.inst`jump ${{jump:-(predicate.length + condition.length + body.length + 1)}}`)
                 
                 return instructions;
             }
