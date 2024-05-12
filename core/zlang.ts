@@ -86,7 +86,7 @@ namespace ZLang {
         export type Address = `@${number}${Alignment}`;
         export type Instruction = '' | `#${string}` | string;
         export type Alignment = 'w' | 'f' | 'i' | 'b';
-        type InstructionArgument = {toASM():string} | VirtualRegister|Register | {read:VirtualRegister|Register} | {write:VirtualRegister|Register} | {raw:string} | Address | number | bigint;
+        type InstructionArgument = {toASM():string} | VirtualRegister|Register | {read:VirtualRegister|Register} | {write:VirtualRegister|Register} | {raw:string|number|bigint} | Address | number | bigint;
 
         abstract class AbstractRegister {
             public constructor(public readonly name: string) {}
@@ -274,7 +274,7 @@ namespace ZLang {
                         if(arg instanceof AbstractRegister) {
                             return f({read:arg});
                         } else if(typeof arg === 'object' && arg !== null) {
-                            const {read,write,raw}:{read?:VirtualRegister|Register,write?:VirtualRegister|Register,raw?:string,toASM?:()=>string} = arg;
+                            const {read,write,raw}:{read?:VirtualRegister|Register,write?:VirtualRegister|Register,raw?:string|number|bigint,toASM?:()=>string} = arg;
                             
                             if('toASM' in arg) {
                                 return arg.toASM();
@@ -1012,7 +1012,22 @@ namespace ZLang {
                 return this.bfalse !== undefined ? 'If-Else' : 'If'
             }
             compile(ctx: CompileContext): Instruction[] {
-                throw new Error('If/Else NYI');   
+                const instructions: Instruction[] = [];
+                const etx = ctx.createExpressionContext();
+
+                instructions.push(...this.predicate.compile(etx));
+
+                const trueBranch = this.btrue.compile(ctx);
+                const falseBranch = this.bfalse?.compile(ctx) ?? [];
+
+                instructions.push(...ctx.inst`ifz ${{read:etx.reg(this.predicate.domain,0)}} @${{raw:trueBranch.length + +!!falseBranch.length}}i(pc)`);
+                instructions.push(...trueBranch);
+                if(falseBranch.length) {
+                    instructions.push(...ctx.inst`jump @${{raw:falseBranch.length}}i(pc)`);
+                    instructions.push(...falseBranch);
+                }
+                
+                return instructions;
             }
             get regCount(): RegisterCount {
                 return RegisterCount.disjoint(this.predicate.regCount, this.btrue.regCount, ...(this.bfalse ? [this.bfalse.regCount]: []));
