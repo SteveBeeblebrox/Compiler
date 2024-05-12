@@ -132,7 +132,8 @@ namespace ZLang {
         }
 
         export type CompileOptions = {
-            regCount: RegisterCount
+            regCount: RegisterCount,
+            includeComments: boolean
         }
 
         export class CompileContext {
@@ -317,9 +318,9 @@ namespace ZLang {
                 }
 
                 const instructions: Instruction[] = [
-                    ...virtualReads.entries().map(([{name,address},ancilla])=>`load ${ancilla} ${address} #${name}`),
+                    ...virtualReads.entries().map(([{name,address},ancilla])=>`load ${ancilla} ${address}`),
                     instruction,
-                    ...virtualWrites.entries().map(([{name,address},ancilla])=>`store ${ancilla} ${address} #${name}`)
+                    ...virtualWrites.entries().map(([{name,address},ancilla])=>`store ${ancilla} ${address}`)
                 ];
 
                 if(!contiguous) {
@@ -1597,7 +1598,7 @@ namespace ZLang {
     }
 
     export function compile(text: string, options: ASM.CompileOptions): string {
-        return ZLang.applySemantics(ZLang.parse(text)).compile(options).join('\n');
+        return ZLang.applySemantics(ZLang.parse(text)).compile(options).filter(line => options.includeComments || !line.trim().startsWith('#')).join('\n');
     }
 
     function initSymbols(program: Program) {

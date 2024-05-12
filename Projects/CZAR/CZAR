@@ -1,3 +1,4 @@
+#!/home/siana/.nvm/versions/node/v21.5.0/bin/node
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
     for (var i = 0; i < initializers.length; i++) {
@@ -3592,9 +3593,9 @@ var ZLang;
                             instruction += s + (arg !== null && arg !== void 0 ? arg : '');
                         }
                         const instructions = [
-                            ...virtualReads.entries().map(([{ name, address }, ancilla]) => `load ${ancilla} ${address}`),
+                            ...virtualReads.entries().map(([{ name, address }, ancilla]) => `load ${ancilla} ${address} #${name}`),
                             instruction,
-                            ...virtualWrites.entries().map(([{ name, address }, ancilla]) => `store ${ancilla} ${address}`)
+                            ...virtualWrites.entries().map(([{ name, address }, ancilla]) => `store ${ancilla} ${address} #${name}`)
                         ];
                         if (!contiguous) {
                             // this.ancillaStates.clear();
@@ -4823,7 +4824,7 @@ var ZLang;
     }
     ZLang.applySemantics = applySemantics;
     function compile(text, options) {
-        return ZLang.applySemantics(ZLang.parse(text)).compile(options).filter(line => options.includeComments || !line.trim().startsWith('#')).join('\n');
+        return ZLang.applySemantics(ZLang.parse(text)).compile(options).join('\n');
     }
     ZLang.compile = compile;
     function initSymbols(program) {
