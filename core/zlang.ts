@@ -239,7 +239,7 @@ namespace ZLang {
                     } else if(arg0 === 'pc') {
                         return this.pc;
                     } else {
-                        return this.reg(...name.padStart(3,'X').split('') as ['a'|'w'|'x'|'h'|'v'|'X','f'|'r',`${number}`]);
+                        return this.reg(...arg0.padStart(3,'X').split('') as ['a'|'w'|'x'|'h'|'v'|'X','f'|'r',`${number}`]);
                     }
                 }
             }
@@ -323,7 +323,7 @@ namespace ZLang {
                 ];
 
                 if(!contiguous) {
-                    // TODO set up map and filter reads. do we need to worry if some code changes the virtual register? yes.
+                    ///#warning TODO set up ancilla map and filter reads. do we need to worry if some code changes the virtual register? yes.
                     // this.ancillaStates.clear();
                 }
 
@@ -558,7 +558,7 @@ namespace ZLang {
                     && node.parent instanceof BinaryOp
                     && (
                         (node.parent.rhs === node && node.parent.supportsRightImmediate)
-                        || (!BinaryOp.willUseInlineImmediate(node.parent.rhs) && node.parent.supportsLeftImmediate)
+                        || (node.parent.lhs === node && node.parent.supportsLeftImmediate && !BinaryOp.willUseInlineImmediate(node.parent.rhs))
                     )
                 ;
             }
@@ -1057,7 +1057,7 @@ namespace ZLang {
                 return 'While';
             }
             compile(ctx: CompileContext): Instruction[] {
-                throw new Error('While Loop NYI');   
+                throw new Error('While Loop NYI');
             }
             get regCount(): RegisterCount {
                 return  RegisterCount.disjoint(this.predicate.regCount,this.body.regCount);
@@ -1134,7 +1134,7 @@ namespace ZLang {
 
         export class RandStatement extends StatementNode {
             constructor(pos: Position,public readonly ident: IdentifierNode, public readonly min?: ExpressionNode, public readonly max?: ExpressionNode) {
-                super(pos,[...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
+                super(pos,[ident,...(min !== undefined ? [min] : []), ...(max !== undefined ? [max] : [])]);
             }
             get [Graphviz.label]() {
                 return 'Rand';
@@ -1594,6 +1594,10 @@ namespace ZLang {
     export function applySemantics(program: Program) {
         initSymbols(program);
         return program;
+    }
+
+    export function compile(text: string, options: ASM.CompileOptions): string {
+        return ZLang.applySemantics(ZLang.parse(text)).compile(options).join('\n');
     }
 
     function initSymbols(program: Program) {

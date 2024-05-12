@@ -30,7 +30,6 @@ namespace CZAR {
         await writer.write(new TextEncoder().encode(text));
         await writer.ready;
         await writer.close();
-        console.log('ok')
     }
 
     const name = 'cgldata-1'//'fltexpr-3'//'cgldata-1';
@@ -44,7 +43,7 @@ namespace CZAR {
     // dump('restored',read(`data/dist/tests/${name}.def`));
 
 
-    // For a language with instruction `op r1,r2,r3,...,rn` there must be n work registers
-    // Blaster lang needs at least three
+    // For a language with instruction `op rd,rs1,rs2,rs3,...,rsn` there must be n ancilla hardware registers
+    // Blaster lang needs at least two
     
 }

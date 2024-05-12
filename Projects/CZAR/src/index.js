@@ -1,5 +1,3 @@
-#!/usr/bin/bash
-//`which sjs` <(mtsc -po- -tes2018 -Ilib "$0" | tee czar.js) "$@"; exit $?
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
     for (var i = 0; i < initializers.length; i++) {
@@ -3599,7 +3597,6 @@ var ZLang;
                             ...virtualWrites.entries().map(([{ name, address }, ancilla]) => `store ${ancilla} ${address} #${name}`)
                         ];
                         if (!contiguous) {
-                            // TODO set up map and filter reads. do we need to worry if some code changes the virtual register? yes.
                             // this.ancillaStates.clear();
                         }
                         return instructions;
@@ -4825,6 +4822,10 @@ var ZLang;
         return program;
     }
     ZLang.applySemantics = applySemantics;
+    function compile(text, options) {
+        return ZLang.applySemantics(ZLang.parse(text)).compile(options).join('\n');
+    }
+    ZLang.compile = compile;
     function initSymbols(program) {
         ZLang.visit(program, function (node, V) {
             // Set up scopes
@@ -4907,30 +4908,17 @@ var ZLang;
     }
     ZLang.parse = parse;
 })(ZLang || (ZLang = {}));
-var CZAR;
-(function (CZAR) {
-    const [regs = '4,4', ast, output] = system.args.slice(1);
+///<reference path="../../../lib/compat.ts"/> // Make VS Code happy 
+///<reference path="../../../lib/types.ts"/> // Make VS Code happy
+///<reference path="../../../lib/encoding.ts"/> // Make VS Code happy
+///<reference path="../../../core/lex.ts"/> // Make VS Code happy
+///<reference path="../../../core/zlang.ts"/> // Make VS Code happy
+///<reference path="../../../lib/graphviz.ts"/> // Make VS Code happy
+;
+(function () {
+    const [regs = '4,4', def, output = def.replace(/\.def$/, '.czr')] = system.args.slice(1);
     const [RN, RF] = regs.split(',').map(x => +x);
-    async function dump(name, node, { format = 'png' } = {}) {
-        //@ts-ignore
-        const dot = new system.Command('dot', {
-            args: [`-T${format}`, `-odata/${name}.${format}`],
-            stdin: 'piped'
-        }).spawn();
-        const text = Graphviz.serialize(node);
-        system.writeTextFileSync(`data/${name}.dot`, text);
-        const writer = dot.stdin.getWriter();
-        await writer.write(new TextEncoder().encode(text));
-        await writer.ready;
-        await writer.close();
-    }
-    const name = 'cgldata-1'; //'fltexpr-3'//'cgldata-1';
-    //
-    // const AST = ZLang.applySemantics(ZLang.parse(`emit(1);`));
-    const AST = ZLang.applySemantics(ZLang.parse(system.readTextFileSync(`data/dist/tests/${name}.src`)));
-    dump('parsed', AST);
-    system.writeTextFileSync('out.czr', AST.compile({ regCount: new ZLang.ASM.RegisterCount(RN, RF) }).join('\n'));
-    // dump('restored',read(`data/dist/tests/${name}.def`));
-    // For a language with instruction `op rd,rs1,rs2,rs3,...,rsn` there must be n ancilla hardware registers
-    // Blaster lang needs at least two
-})(CZAR || (CZAR = {}));
+    // Validate that .def file is readable
+    void system.readTextFileSync(def);
+    system.writeTextFileSync(output, ZLang.compile(system.readTextFileSync(def.replace(/\.def$/, '.src')), { regCount: new ZLang.ASM.RegisterCount(RN, RF) }));
+})();
