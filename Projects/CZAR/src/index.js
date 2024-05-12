@@ -3583,10 +3583,10 @@ var ZLang;
                                     if (jump) {
                                         let n = jump;
                                         if (n < 0) {
-                                            n -= this.virtualReads.length;
+                                            n -= virtualReads.size;
                                         }
                                         else if (n > 0) {
-                                            n += this.virtualWrites.length;
+                                            n += virtualWrites.size;
                                         }
                                         return f(`@${n}i(pc)`);
                                     }
