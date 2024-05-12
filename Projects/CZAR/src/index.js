@@ -4360,7 +4360,7 @@ var ZLang;
                 const etx = ctx.createExpressionContext();
                 const predicate = this.predicate.compile(etx);
                 const body = this.body.compile(ctx);
-                const condition = ctx.inst `ifz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: body.length }}`;
+                const condition = ctx.inst `ifz ${{ read: etx.xreg(this.predicate.domain, 0) }} ${{ jump: body.length + 1 }}`;
                 instructions.push(...predicate);
                 instructions.push(...condition);
                 instructions.push(...body);
